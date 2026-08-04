@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Hallmark Color Tokens - Warm Editorial & Deep Emerald Palette */
+    --background: 40 20% 98%;      /* Warm cream/parchment neutral */
+    --foreground: 160 30% 12%;      /* Deep charcoal forest */
+
+    --card: 0 0% 100%;
+    --card-foreground: 160 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 30% 12%;
+
+    --primary: 158 64% 22%;         /* Deep Emerald */
+    --primary-foreground: 40 30% 98%;
+
+    --secondary: 40 25% 94%;        /* Warm Sand Accent */
+    --secondary-foreground: 158 64% 18%;
+
+    --muted: 40 15% 92%;
+    --muted-foreground: 160 10% 42%;
+
+    --accent: 38 75% 94%;          /* Warm Amber Accent */
+    --accent-foreground: 38 80% 22%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 158 64% 22%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 160 25% 7%;
+    --foreground: 40 20% 95%;
+
+    --card: 160 25% 9%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 160 25% 9%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 158 55% 42%;
+    --primary-foreground: 160 25% 7%;
+
+    --secondary: 160 20% 15%;
+    --secondary-foreground: 40 20% 95%;
+
+    --muted: 160 15% 15%;
+    --muted-foreground: 160 10% 65%;
+
+    --accent: 38 50% 18%;
+    --accent-foreground: 38 80% 85%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 160 15% 18%;
+    --input: 160 15% 18%;
+    --ring: 158 55% 42%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom Hallmark Tactile Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.subtle-ring {
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.08), 0 2px 4px rgba(0, 0, 0, 0.02);
+}

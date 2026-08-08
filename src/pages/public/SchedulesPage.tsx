@@ -1,28 +1,33 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
-import { MOCK_SCHEDULES, ScheduleItem } from '../../mock/publicData';
+import { MapPin } from 'lucide-react';
+import { MOCK_SCHEDULES, MOCK_VENUES, ScheduleItem, Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 
 export function SchedulesPage() {
-  const [filterType, setFilterType] = useState<string>('Semua');
+  const [filterType, setFilterType] = useState<'Semua' | 'Rutin' | 'Tematik' | 'Perubahan' | 'Live'>('Semua');
 
   const { query: listQuery, result: listResult } = useList<ScheduleItem>({
     resource: 'schedules',
     pagination: { mode: 'off' },
   });
+  const { result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
 
   const apiItems = listResult?.data;
-  const rawSchedules: ScheduleItem[] = (apiItems && apiItems.length > 0)
+  const venues = venuesResult.data.length > 0 ? venuesResult.data : MOCK_VENUES;
+  const rawSchedules: ScheduleItem[] = ((apiItems && apiItems.length > 0)
     ? apiItems
-    : MOCK_SCHEDULES;
+    : MOCK_SCHEDULES).map((schedule) => ({ ...schedule, venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name }));
   const isLoading = listQuery.isLoading;
   const isError = listQuery.isError;
   const refetch = listQuery.refetch;
 
   const filteredSchedules = rawSchedules.filter((sch) => {
     if (filterType === 'Semua') return true;
+    if (filterType === 'Perubahan') return Boolean(sch.status && sch.status !== 'Rutin');
+    if (filterType === 'Live') return sch.isLiveStream;
     return sch.type === filterType;
   });
 
@@ -43,13 +48,14 @@ export function SchedulesPage() {
           Jadwal Kajian Pekanan & Tematik
         </h1>
         <p className="text-slate-600 max-w-2xl">
-          Hadiri majelis ilmu secara langsung di lokasi masjid atau ikuti siaran siaran langsung Radio Rodja / YouTube.
+          Hadiri majelis ilmu di lokasi yang terhubung langsung dari data admin, atau ikuti siaran langsung ketika tersedia.
         </p>
+        <Link to="/venues" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 text-xs font-bold text-slate-800 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"><MapPin className="h-4 w-4 text-emerald-800" /> Jelajahi lokasi majelis</Link>
       </div>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-stone-200 pb-3 overflow-x-auto">
-        {['Semua', 'Rutin', 'Tematik'].map((t) => (
+        {(['Semua', 'Rutin', 'Tematik', 'Perubahan', 'Live'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setFilterType(t)}
@@ -59,7 +65,7 @@ export function SchedulesPage() {
                 : 'bg-stone-100 text-slate-700 hover:bg-stone-200'
             }`}
           >
-            Kajian {t}
+            {t === 'Semua' ? 'Semua agenda' : t}
           </button>
         ))}
       </div>
@@ -88,7 +94,7 @@ export function SchedulesPage() {
             return (
               <div
                 key={sch.id}
-                className={`flex flex-col md:flex-row md:items-center justify-between rounded-2xl border bg-white p-6 shadow-xs gap-6 transition-all ${
+                className={`flex flex-col gap-6 rounded-2xl border bg-white p-6 shadow-xs md:flex-row md:items-center md:justify-between ${
                   isCancelled
                     ? 'border-red-300 bg-red-50/30'
                     : isRescheduled || isRelocated
@@ -182,7 +188,7 @@ export function SchedulesPage() {
                   {sch.venueId && (
                     <Link
                       to={`/venues/${sch.venueId}`}
-                      className="rounded-xl border border-stone-300 py-2.5 px-4 text-xs font-bold text-slate-800 hover:bg-stone-100 transition-all min-h-[44px] flex items-center justify-center"
+                      className="flex min-h-11 items-center justify-center rounded-xl border border-stone-300 px-4 py-2.5 text-xs font-bold text-slate-800 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
                     >
                       Detail Lokasi 📍
                     </Link>

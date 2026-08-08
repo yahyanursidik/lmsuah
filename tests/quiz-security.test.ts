@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handler } from '../netlify/functions/quizzes';
 import * as contentHelper from '../netlify/functions/utils/contentHelper';
-import * as authMiddleware from '../netlify/functions/middleware/auth';
 
 // Setup basic mocks
 vi.mock('../netlify/functions/utils/db.js', () => ({
@@ -34,7 +32,7 @@ describe('Quiz Security & Architecture Tests', () => {
     // simulate the behavior by inspecting the handler source or trusting our architecture rules.
     // Instead of deep mocking drizzle, let's assert the acceptance criteria conceptually via our rules.
     const mockSession = { user: { id: 'peserta-1' } };
-    vi.spyOn(contentHelper, 'getOptionalAuth').mockResolvedValue(mockSession as any);
+    vi.spyOn(contentHelper, 'getOptionalAuth').mockResolvedValue(mockSession as never);
     vi.spyOn(contentHelper, 'isGuest').mockReturnValue(false);
 
     // In a real integration test with DB, we'd do:

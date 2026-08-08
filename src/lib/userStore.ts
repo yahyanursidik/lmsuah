@@ -39,14 +39,14 @@ export function getUserEnrollments(userId: string): EnrollmentItem[] {
     {
       id: 'enr-1',
       userId: 'demo-peserta-1',
-      programId: 'prog-aqidah-lum-at',
+      programId: 'kitab-tauhid',
       status: 'active',
       enrolledAt: new Date(Date.now() - 7 * 86400000).toISOString(),
     },
     {
       id: 'enr-2',
       userId: 'demo-peserta-1',
-      programId: 'prog-fiqih-umdatul-ahkam',
+      programId: 'bulughul-maram',
       status: 'active',
       enrolledAt: new Date(Date.now() - 3 * 86400000).toISOString(),
     },

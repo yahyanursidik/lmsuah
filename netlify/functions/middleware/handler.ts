@@ -63,6 +63,14 @@ export function createHandler(handler: RouteHandler) {
         statusCode = 403;
         errorCode = 'FORBIDDEN';
         errorMessage = error.message;
+      } else if (error instanceof Error && error.message === 'PROGRAM_SLUG_EXISTS') {
+        statusCode = 409;
+        errorCode = 'CONFLICT';
+        errorMessage = 'Slug program sudah digunakan. Pilih alamat program lain.';
+      } else if (error instanceof Error && error.message === 'LESSON_SLUG_EXISTS') {
+        statusCode = 409;
+        errorCode = 'CONFLICT';
+        errorMessage = 'Slug pertemuan sudah digunakan. Pilih alamat pertemuan lain.';
       }
 
       logger.error('REQUEST_FAILED', error, { requestId, statusCode, errorCode });

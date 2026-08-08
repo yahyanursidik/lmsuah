@@ -1,20 +1,29 @@
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
+import { Search } from 'lucide-react';
 import { MOCK_VENUES, Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 
-const getVenueImage = (v: any) => {
-  if (v.image && v.image.startsWith('/masjid')) return v.image;
-  if (v.id?.includes('ukhuwah') || v.name?.toLowerCase().includes('ukhuwah')) return '/masjid-ukhuwah.jpg';
+const getVenueImage = (venue: Pick<Venue, 'id' | 'name' | 'image'>) => {
+  if (venue.image?.startsWith('/masjid')) return venue.image;
+  if (venue.id.includes('ukhuwah') || venue.name.toLowerCase().includes('ukhuwah')) return '/masjid-ukhuwah.jpg';
   return '/masjid-umar.jpg';
 };
 
 export function VenuesPage() {
-  const { result: apiVenues } = useList<Venue>({
+  const [query, setQuery] = useState('');
+  const { result: apiVenues, query: venuesQuery } = useList<Venue>({
     resource: 'venues',
+    pagination: { mode: 'off' },
   });
 
   const venuesList = (apiVenues?.data && apiVenues.data.length > 0 ? apiVenues.data : MOCK_VENUES) as Venue[];
+  const visibleVenues = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return venuesList;
+    return venuesList.filter((venue) => [venue.name, venue.address, venue.city, venue.district].some((value) => value?.toLowerCase().includes(needle)));
+  }, [query, venuesList]);
 
   return (
     <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -32,17 +41,19 @@ export function VenuesPage() {
         </p>
       </div>
 
+      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between"><label className="relative block w-full sm:max-w-md"><span className="sr-only">Cari lokasi majelis</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama, kota, atau alamat…" className="min-h-11 w-full rounded-lg border border-stone-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20" /></label><p className="text-xs font-semibold text-slate-500">{venuesQuery.isLoading ? 'Memuat lokasi…' : `${visibleVenues.length} lokasi ditemukan`}</p></div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {venuesList.map((venue) => (
+        {visibleVenues.map((venue) => (
           <div
             key={venue.id}
-            className="flex flex-col justify-between rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-xs hover:shadow-md transition-all"
+            className="flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30"
           >
             <div className="h-56 overflow-hidden bg-stone-100 relative">
               <img
                 src={getVenueImage(venue)}
                 alt={venue.name}
-                className="h-full w-full object-cover hover:scale-105 transition-transform duration-300"
+                className="h-full w-full object-cover"
               />
               <span className="absolute top-3 left-3 bg-slate-900/80 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md backdrop-blur-xs">
                 {venue.city || 'Kota Bandung'}

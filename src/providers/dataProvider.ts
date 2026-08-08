@@ -14,6 +14,15 @@ export const API_URL = '/api';
 export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
   const headers = new Headers(options.headers);
 
+  if (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    try {
+      const demoUser = JSON.parse(window.localStorage.getItem('lms_demo_user') || 'null') as { id?: string } | null;
+      if (demoUser?.id === 'demo-admin-1') headers.set('X-LMS-Demo-User', demoUser.id);
+    } catch {
+      // Invalid demo state is ignored; the server will require a real session.
+    }
+  }
+
   // Set Request ID jika belum ada
   if (!headers.has('X-Request-ID')) {
     headers.set('X-Request-ID', crypto.randomUUID());

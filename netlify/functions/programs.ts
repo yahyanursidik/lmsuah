@@ -14,6 +14,7 @@ import {
   requireContentDeleteAccess,
   logMutationAudit,
   isGuest,
+  getDatabaseActorId,
 } from './utils/contentHelper.js';
 
 const ALLOWED_FILTERS = ['status', 'title', 'slug'];
@@ -115,6 +116,9 @@ const programsHandler = async (request: Request) => {
   if (method === 'POST') {
     const body = await validateBody(request, programSchema);
     const authSession = requireContentCreateAccess(session, body.status);
+    const databaseActorId = getDatabaseActorId(authSession);
+    const duplicate = await db.select({ id: programs.id }).from(programs).where(eq(programs.slug, body.slug)).limit(1);
+    if (duplicate[0]) throw new Error('PROGRAM_SLUG_EXISTS');
 
     const [newProgram] = await db
       .insert(programs)
@@ -123,8 +127,8 @@ const programsHandler = async (request: Request) => {
         title: body.title,
         description: body.description,
         status: body.status,
-        createdBy: authSession.userId,
-        updatedBy: authSession.userId,
+        createdBy: databaseActorId,
+        updatedBy: databaseActorId,
       })
       .returning();
 
@@ -149,6 +153,11 @@ const programsHandler = async (request: Request) => {
     }
 
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
+    const databaseActorId = getDatabaseActorId(authSession);
+    if (body.slug && body.slug !== existing[0].slug) {
+      const duplicate = await db.select({ id: programs.id }).from(programs).where(eq(programs.slug, body.slug)).limit(1);
+      if (duplicate[0]) throw new Error('PROGRAM_SLUG_EXISTS');
+    }
 
     const [updatedProgram] = await db
       .update(programs)
@@ -157,7 +166,7 @@ const programsHandler = async (request: Request) => {
         ...(body.title && { title: body.title }),
         ...(body.description !== undefined && { description: body.description }),
         ...(body.status && { status: body.status }),
-        updatedBy: authSession.userId,
+        updatedBy: databaseActorId,
         updatedAt: new Date(),
       })
       .where(eq(programs.id, resourceId))

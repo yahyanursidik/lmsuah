@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Refine, DataProvider } from '@refinedev/core';
 import { ProgramsPage } from '../src/pages/public/ProgramsPage';
@@ -93,6 +93,29 @@ describe('Public Portal & Admin Integration UI Tests', () => {
     );
 
     expect(screen.getByText(/Pengelolaan Program Kajian/i)).toBeDefined();
-    expect(screen.getAllByText(/Tambah Program Baru/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Tambah program/i).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Syarah Bulughul Maram/i)).toBeDefined();
+    expect(screen.getByText(/Sudah terbit/i)).toBeDefined();
+    expect(screen.getByRole('button', { name: /Kelola program/i })).toBeDefined();
+  });
+
+  it('filters admin programs and can reset an empty result', async () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/programs']}>
+        <Refine dataProvider={safeDataProvider}>
+          <Routes>
+            <Route path="/admin/programs" element={<AdminProgramsPage />} />
+          </Routes>
+        </Refine>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/Syarah Bulughul Maram/i)).toBeDefined();
+    fireEvent.change(screen.getByRole('searchbox', { name: /Cari program/i }), {
+      target: { value: 'tidak-ada' },
+    });
+    expect(screen.getByText(/Program tidak ditemukan/i)).toBeDefined();
+    fireEvent.click(screen.getAllByRole('button', { name: /Reset filter/i })[0]);
+    expect(screen.getByText(/Syarah Bulughul Maram/i)).toBeDefined();
   });
 });

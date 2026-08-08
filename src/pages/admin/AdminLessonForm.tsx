@@ -1,306 +1,91 @@
-import { useState, useEffect } from 'react';
-import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
-import { useCreate, useUpdate, useOne } from '@refinedev/core';
-import { X, Save, Plus, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { useEffect, useState } from 'react';
+import { useCreate, useOne, useUpdate } from '@refinedev/core';
+import { AlertCircle, CalendarDays, LoaderCircle, Save, X } from 'lucide-react';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 
-interface LessonFormData {
+interface MeetingFormData {
   title: string;
   slug: string;
   sequence: number;
   date: string;
   description: string;
   status: 'draft' | 'published';
-  materials: {
-    type: string;
-    url: string;
-    filename?: string;
-    duration?: string;
-  }[];
-  quizEnabled: boolean;
-  quiz: {
-    title: string;
-    description: string;
-    passingScore: number;
-    maxAttempts: number;
-    isPublished: boolean;
-    questions: {
-      type: string;
-      text: string;
-      explanation: string;
-      points: number;
-      options: { text: string; isCorrect: boolean }[];
-    }[];
-  } | null;
 }
+
+interface MeetingRecord extends MeetingFormData { id: string }
 
 interface AdminLessonFormProps {
   lessonId: string | null;
   onClose: () => void;
   programId?: string;
+  chapterId?: string;
 }
 
-export function AdminLessonForm({ lessonId, onClose, programId }: AdminLessonFormProps) {
-  const isEditing = !!lessonId;
+const normalizeSlug = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+const errorMessage = (error: unknown) => error && typeof error === 'object' && 'message' in error
+  ? String(error.message)
+  : 'Pertemuan belum dapat disimpan. Periksa kembali data yang diisi.';
+
+export function AdminLessonForm({ lessonId, onClose, programId, chapterId }: AdminLessonFormProps) {
+  const isEditing = Boolean(lessonId);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const lessonQuery = useOne<MeetingRecord>({ resource: 'lessons', id: lessonId || '', queryOptions: { enabled: isEditing } });
   const { mutate: createLesson, mutation: createMutation } = useCreate();
   const { mutate: updateLesson, mutation: updateMutation } = useUpdate();
-  
-  const [activeTab, setActiveTab] = useState<'info' | 'materials' | 'quiz'>('info');
-
-  const { result: lessonResult } = useOne({
-    resource: 'lessons',
-    id: lessonId || '',
-    queryOptions: { enabled: isEditing }
+  const { register, handleSubmit, reset, watch, setValue } = useForm<MeetingFormData>({
+    defaultValues: { title: '', slug: '', sequence: 1, date: '', description: '', status: 'draft' },
   });
-
-  const lessonData = lessonResult?.data as any;
-
-  const { register, control, handleSubmit, reset, watch, setValue } = useForm<LessonFormData>({
-    defaultValues: {
-      title: '', slug: '', sequence: 1, date: '', description: '', status: 'draft',
-      materials: [],
-      quizEnabled: false,
-      quiz: {
-        title: 'Kuis Evaluasi', description: '', passingScore: 70, maxAttempts: 3, isPublished: true,
-        questions: []
-      }
-    }
-  });
-
-  const { fields: materialFields, append: appendMaterial, remove: removeMaterial } = useFieldArray({
-    control, name: 'materials'
-  });
-
-  const { fields: questionFields, append: appendQuestion, remove: removeQuestion } = useFieldArray({
-    control, name: 'quiz.questions'
-  });
+  const isSaving = Boolean(createMutation.isPending || updateMutation.isPending);
 
   useEffect(() => {
-    if (lessonData) {
-      reset({
-        title: lessonData.title || '',
-        slug: lessonData.slug || '',
-        sequence: lessonData.sequence || 1,
-        date: lessonData.date || '',
-        description: lessonData.description || '',
-        status: lessonData.status || 'draft',
-        materials: lessonData.materials || [],
-        quizEnabled: !!lessonData.quiz,
-        quiz: lessonData.quiz || {
-          title: 'Kuis Evaluasi', description: '', passingScore: 70, maxAttempts: 3, isPublished: true,
-          questions: []
-        }
-      });
+    if (lessonQuery.result) {
+      const lesson = lessonQuery.result;
+      reset({ title: lesson.title, slug: lesson.slug, sequence: lesson.sequence, date: lesson.date || '', description: lesson.description || '', status: lesson.status });
     }
-  }, [lessonData, reset]);
+  }, [lessonQuery.result, reset]);
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !isSaving) onClose(); };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', closeOnEscape); };
+  }, [isSaving, onClose]);
 
   const title = watch('title');
-  useEffect(() => {
-    if (!isEditing && title) {
-      setValue('slug', title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
-    }
-  }, [title, isEditing, setValue]);
+  const slug = watch('slug');
+  useEffect(() => { if (!isEditing && (!slug || slug === normalizeSlug(title.slice(0, -1)))) setValue('slug', normalizeSlug(title)); }, [isEditing, setValue, slug, title]);
 
-  const quizEnabled = watch('quizEnabled');
-
-  const onSubmit: SubmitHandler<LessonFormData> = (data) => {
-    const payload = {
-      ...data,
-      sequence: Number(data.sequence),
-      programId: programId,
-      quiz: data.quizEnabled ? data.quiz : null,
-    };
-
-    if (isEditing) {
-      updateLesson({ resource: 'lessons', id: lessonId, values: payload }, { onSuccess: () => onClose() });
-    } else {
-      createLesson({ resource: 'lessons', values: payload }, { onSuccess: () => onClose() });
-    }
+  const onSubmit: SubmitHandler<MeetingFormData> = (values) => {
+    setFeedback(null);
+    const options = { onSuccess: onClose, onError: (error: unknown) => setFeedback(errorMessage(error)) };
+    if (lessonId) updateLesson({ resource: 'lessons', id: lessonId, values }, options);
+    else createLesson({ resource: 'lessons', values: { ...values, programId, chapterId } }, options);
   };
 
-  const isLoading = createMutation?.isPending || updateMutation?.isPending || false;
-
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/80 backdrop-blur-sm">
-      <div className="w-full max-w-4xl bg-slate-950 h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 border-l border-slate-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h2 className="text-xl font-bold text-white">
-            {isEditing ? 'Sunting Pertemuan' : 'Tambah Pertemuan Baru'}
-          </h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex px-6 space-x-4 border-b border-slate-800 bg-slate-900/50">
-          <button onClick={() => setActiveTab('info')} className={`py-3 text-sm font-medium border-b-2 ${activeTab === 'info' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}`}>Info Utama</button>
-          <button onClick={() => setActiveTab('materials')} className={`py-3 text-sm font-medium border-b-2 ${activeTab === 'materials' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}`}>Multi-Materi</button>
-          <button onClick={() => setActiveTab('quiz')} className={`py-3 text-sm font-medium border-b-2 ${activeTab === 'quiz' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}`}>Kuis & Evaluasi</button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-700">
-          <form id="lesson-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            
-            {/* TAB: INFO UTAMA */}
-            <div className={activeTab === 'info' ? 'block' : 'hidden'}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Judul Pertemuan *</label>
-                  <input {...register('title', { required: true })} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-emerald-500" placeholder="Contoh: Pertemuan 1 - Pengantar" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Slug *</label>
-                  <input {...register('slug', { required: true })} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-slate-400" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Urutan *</label>
-                    <input type="number" {...register('sequence')} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Tanggal</label>
-                    <input type="date" {...register('date')} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white [color-scheme:dark]" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
-                  <select {...register('status')} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-emerald-500">
-                    <option value="draft">Draft (Sembunyikan)</option>
-                    <option value="published">Published (Tayangkan)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Deskripsi Ringkas</label>
-                  <textarea {...register('description')} rows={4} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-emerald-500"></textarea>
-                </div>
-              </div>
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/85 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="meeting-form-title">
+      <div className="max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-950 shadow-2xl sm:max-w-2xl sm:rounded-2xl">
+        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-950 px-5 py-4 sm:px-6">
+          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-400">Data pertemuan</p><h2 id="meeting-form-title" className="mt-1 text-lg font-bold text-white">{isEditing ? 'Edit pertemuan' : 'Tambah pertemuan'}</h2><p className="mt-1 text-xs text-slate-500">Materi dan kuis ditambahkan langsung dari kartu pertemuan setelah data ini tersimpan.</p></div>
+          <button type="button" onClick={onClose} disabled={isSaving} aria-label="Tutup" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50"><X className="h-4 w-4" /></button>
+        </header>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 p-5 sm:p-6">
+          {feedback && <div role="alert" className="flex items-start gap-2 rounded-lg border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-200"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{feedback}</div>}
+          {lessonQuery.query.isLoading ? <div className="h-48 animate-pulse rounded-xl bg-slate-900 motion-reduce:animate-none" /> : <>
+            <label className="block space-y-2"><span className="text-sm font-semibold text-slate-300">Judul pertemuan *</span><input autoFocus required {...register('title')} placeholder="Contoh: Adab menuntut ilmu" className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" /></label>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+              <label className="block space-y-2"><span className="text-sm font-semibold text-slate-300">Slug *</span><input required {...register('slug')} className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" /></label>
+              <label className="block space-y-2"><span className="text-sm font-semibold text-slate-300">Urutan *</span><input type="number" min="1" required {...register('sequence', { valueAsNumber: true })} className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" /></label>
             </div>
-
-            {/* TAB: MATERI */}
-            <div className={activeTab === 'materials' ? 'block' : 'hidden'}>
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-slate-200">Daftar Materi Pendukung</h3>
-                  <p className="text-xs text-slate-400">Tambahkan banyak materi seperti video, audio, atau PDF</p>
-                </div>
-                <Button type="button" size="sm" onClick={() => appendMaterial({ type: 'youtube', url: '', filename: '' })} className="bg-slate-800 text-white hover:bg-slate-700">
-                  <Plus className="w-4 h-4 mr-2" /> Tambah Materi
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {materialFields.map((field, index) => (
-                  <div key={field.id} className="p-4 border border-slate-700 rounded-lg bg-slate-900/50">
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="text-xs font-bold text-slate-400 uppercase">Materi #{index + 1}</span>
-                      <button type="button" onClick={() => removeMaterial(index)} className="text-red-400 hover:text-red-300">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Tipe Materi</label>
-                        <select {...register(`materials.${index}.type` as const)} className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded text-sm text-white focus:outline-none focus:border-emerald-500">
-                          <option value="youtube">Video (YouTube)</option>
-                          <option value="PDF">Dokumen (PDF)</option>
-                          <option value="audio">Audio / Podcast</option>
-                          <option value="drive">Google Drive Link</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">URL / Link</label>
-                        <input {...register(`materials.${index}.url` as const)} placeholder="https://..." className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded text-sm text-white focus:outline-none focus:border-emerald-500" />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Label / Nama File (Opsional)</label>
-                        <input {...register(`materials.${index}.filename` as const)} placeholder="Contoh: Slide PDF" className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded text-sm text-white focus:outline-none focus:border-emerald-500" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {materialFields.length === 0 && (
-                  <div className="p-8 text-center border border-dashed border-slate-700 rounded-lg text-slate-500">
-                    Belum ada materi ditambahkan.
-                  </div>
-                )}
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block space-y-2"><span className="text-sm font-semibold text-slate-300">Tanggal</span><span className="relative block"><CalendarDays className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" /><input type="date" {...register('date')} className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 pl-10 pr-3.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" /></span></label>
+              <label className="block space-y-2"><span className="text-sm font-semibold text-slate-300">Status</span><select {...register('status')} className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3.5 text-sm text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"><option value="draft">Draft</option><option value="published">Terbit</option></select></label>
             </div>
-
-            {/* TAB: KUIS */}
-            <div className={activeTab === 'quiz' ? 'block' : 'hidden'}>
-              <div className="flex items-center gap-3 mb-6 p-4 border border-slate-700 rounded-lg bg-slate-900/50">
-                <input type="checkbox" id="quizEnabled" {...register('quizEnabled')} className="w-4 h-4 text-emerald-500 bg-slate-950 border-slate-700 rounded focus:ring-emerald-500 focus:ring-2" />
-                <label htmlFor="quizEnabled" className="text-sm font-medium text-slate-200">Aktifkan Kuis / Evaluasi untuk Pertemuan Ini</label>
-              </div>
-
-              {quizEnabled && (
-                <div className="space-y-6 animate-in fade-in">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Judul Kuis</label>
-                      <input {...register('quiz.title')} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-sm text-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Passing Score (%)</label>
-                      <input type="number" {...register('quiz.passingScore', { valueAsNumber: true })} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-sm text-white" />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-800 pt-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-sm font-bold text-white">Daftar Pertanyaan</h4>
-                      <Button type="button" size="sm" onClick={() => appendQuestion({ type: 'single_choice', text: '', explanation: '', points: 10, options: [{text: '', isCorrect: true}, {text: '', isCorrect: false}] })} className="bg-slate-800 text-white hover:bg-slate-700">
-                        <Plus className="w-4 h-4 mr-2" /> Tambah Soal
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {questionFields.map((q, qIndex) => (
-                        <div key={q.id} className="p-4 border border-slate-700 rounded-lg bg-slate-900">
-                          <div className="flex justify-between mb-3">
-                            <span className="text-xs font-bold text-emerald-400">Soal {qIndex + 1}</span>
-                            <button type="button" onClick={() => removeQuestion(qIndex)} className="text-red-400 hover:text-red-300">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div className="space-y-3">
-                            <textarea {...register(`quiz.questions.${qIndex}.text` as const)} placeholder="Tulis soal di sini..." rows={2} className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded text-sm text-white"></textarea>
-                            
-                            <div className="space-y-2 pl-4 border-l-2 border-slate-700">
-                              {/* Simple options render for MVP */}
-                              {[0, 1, 2, 3].map((optIndex) => (
-                                <div key={optIndex} className="flex items-center gap-2">
-                                  <input type="radio" {...register(`quiz.questions.${qIndex}.options.${optIndex}.isCorrect` as const)} value="true" name={`correct-${qIndex}`} className="w-3 h-3 text-emerald-500 bg-slate-950 border-slate-700 focus:ring-emerald-500" />
-                                  <input {...register(`quiz.questions.${qIndex}.options.${optIndex}.text` as const)} placeholder={`Opsi ${optIndex + 1}`} className="flex-1 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white" />
-                                </div>
-                              ))}
-                            </div>
-                            <input {...register(`quiz.questions.${qIndex}.explanation` as const)} placeholder="Penjelasan jawaban (opsional)" className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded text-xs text-slate-300 mt-2" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-          </form>
-        </div>
-
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose} disabled={isLoading} className="border-slate-700 text-slate-300 hover:bg-slate-800">
-            Batal
-          </Button>
-          <Button type="submit" form="lesson-form" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
-            {isLoading ? 'Menyimpan...' : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Simpan
-              </>
-            )}
-          </Button>
-        </div>
+            <label className="block space-y-2"><span className="text-sm font-semibold text-slate-300">Deskripsi</span><textarea rows={4} {...register('description')} placeholder="Ringkasan bahasan pertemuan" className="w-full resize-y rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" /></label>
+          </>}
+          <footer className="flex flex-col-reverse gap-2 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={isSaving} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50">Batal</button><button type="submit" disabled={isSaving || lessonQuery.query.isLoading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-50">{isSaving ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Save className="h-4 w-4" />} Simpan pertemuan</button></footer>
+        </form>
       </div>
     </div>
   );

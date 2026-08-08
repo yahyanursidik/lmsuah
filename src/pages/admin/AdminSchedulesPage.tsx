@@ -4,7 +4,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingSkeleton, EmptyState, ErrorAlert } from '@/components/public/UIStates';
-import { Plus, Edit3, Trash2, Calendar, RefreshCw, X, AlertTriangle } from 'lucide-react';
+import { Plus, Edit3, Trash2, Calendar, RefreshCw, X, AlertTriangle, Search, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface ScheduleItem {
   id: string;
@@ -29,19 +30,24 @@ interface VenueItem {
   id: string;
   name: string;
 }
+interface ProgramItem { id: string; title: string; status?: string }
+const today = new Date().toISOString().slice(0, 10);
 
 export function AdminSchedulesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | ScheduleItem['status']>('all');
 
   const [formData, setFormData] = useState({
     venueId: '',
+    programId: '',
     title: '',
     speaker: 'Ustadz Abu Haidar As-Sundawy',
     category: 'Fiqih',
     type: 'Rutin' as 'Rutin' | 'Tematik' | 'Special',
     day: 'Sabtu',
-    date: '08 Februari 2026',
+    date: today,
     startTime: '09:00',
     endTime: '11:30',
     timezone: 'Asia/Jakarta',
@@ -58,9 +64,16 @@ export function AdminSchedulesPage() {
   const { result: venuesResult } = useList<VenueItem>({
     resource: 'venues',
   });
+  const { result: programsResult } = useList<ProgramItem>({ resource: 'programs', pagination: { mode: 'off' } });
 
   const schedulesList = schedulesResult?.data || [];
   const venuesList = venuesResult?.data || [];
+  const programsList = programsResult.data || [];
+  const filteredSchedules = schedulesList.filter((schedule) => {
+    const venueName = venuesList.find((venue) => venue.id === schedule.venueId)?.name || '';
+    const matchesQuery = [schedule.title, schedule.speaker, schedule.category, venueName].some((value) => value?.toLowerCase().includes(query.trim().toLowerCase()));
+    return matchesQuery && (statusFilter === 'all' || schedule.status === statusFilter);
+  });
   const isLoading = schedulesQuery.isLoading;
   const isError = schedulesQuery.isError;
   const refetch = schedulesQuery.refetch;
@@ -75,12 +88,13 @@ export function AdminSchedulesPage() {
     setEditingSchedule(null);
     setFormData({
       venueId: venuesList[0]?.id || '',
+      programId: '',
       title: '',
       speaker: 'Ustadz Abu Haidar As-Sundawy',
       category: 'Fiqih',
       type: 'Rutin',
       day: 'Sabtu',
-      date: '08 Februari 2026',
+      date: today,
       startTime: '09:00',
       endTime: '11:30',
       timezone: 'Asia/Jakarta',
@@ -96,6 +110,7 @@ export function AdminSchedulesPage() {
     setEditingSchedule(sch);
     setFormData({
       venueId: sch.venueId,
+      programId: sch.programId || '',
       title: sch.title,
       speaker: sch.speaker,
       category: sch.category || 'Fiqih',
@@ -178,9 +193,9 @@ export function AdminSchedulesPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
-          <Badge variant="emerald">Admin Module</Badge>
-          <h1 className="text-2xl font-bold text-white mt-1">Pengelolaan Jadwal Kajian & Perubahan Status</h1>
-          <p className="text-xs text-slate-400">Atur jadwal rutin/tematik dan informasikan perubahan (Dibatalkan/Diundur/Pindah Lokasi) dalam zona WIB (Asia/Jakarta).</p>
+          <Badge variant="emerald">Penyelenggaraan</Badge>
+          <h1 className="mt-1 text-2xl font-bold text-white">Pengelolaan Jadwal Kajian</h1>
+          <p className="text-xs text-slate-400">Hubungkan agenda ke program dan lokasi, lalu publikasikan perubahan ke website serta portal peserta.</p>
         </div>
 
         <Button
@@ -192,12 +207,19 @@ export function AdminSchedulesPage() {
         </Button>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
+        ['Total agenda', schedulesList.length],
+        ['Sesuai jadwal', schedulesList.filter((item) => item.status === 'Rutin').length],
+        ['Ada perubahan', schedulesList.filter((item) => item.status !== 'Rutin').length],
+        ['Siaran live', schedulesList.filter((item) => item.isLiveStream).length],
+      ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-700 bg-slate-950 p-4"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-white">{isLoading ? '—' : value}</p></div>)}</div>
+
       <Card className="bg-slate-950 border-slate-800 text-slate-100">
         <CardHeader className="border-b border-slate-800">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white text-base">Daftar Jadwal Kajian</CardTitle>
-              <CardDescription className="text-slate-400">Total: {schedulesList.length} Agenda Kajian</CardDescription>
+              <CardDescription className="text-slate-400">Semua perubahan tampil pada kanal publik yang terhubung.</CardDescription>
             </div>
             <Button
               size="sm"
@@ -205,12 +227,13 @@ export function AdminSchedulesPage() {
               onClick={() => refetch()}
               className="text-slate-400 hover:text-white"
             >
-              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Segarkan
             </Button>
           </div>
         </CardHeader>
 
         <CardContent className="p-4 sm:p-6">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><span className="sr-only">Cari jadwal</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari agenda, pemateri, atau lokasi…" className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 pl-10 pr-3 text-sm text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></label><select aria-label="Filter status jadwal" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className="min-h-11 rounded-lg border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-emerald-500"><option value="all">Semua status</option><option value="Rutin">Sesuai jadwal</option><option value="Diundur">Diundur</option><option value="Pindah Lokasi">Pindah lokasi</option><option value="Dibatalkan">Dibatalkan</option></select><Link to="/schedules" target="_blank" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 text-xs font-bold text-slate-200 hover:bg-slate-800"><ExternalLink className="h-4 w-4" /> Lihat publik</Link></div>
           {isLoading ? (
             <LoadingSkeleton count={3} />
           ) : isError ? (
@@ -218,7 +241,7 @@ export function AdminSchedulesPage() {
               message="Gagal mengambil data jadwal dari server."
               onRetry={() => refetch()}
             />
-          ) : schedulesList.length === 0 ? (
+          ) : filteredSchedules.length === 0 ? (
             <EmptyState
               title="Belum Ada Jadwal Kajian"
               description="Klik 'Tambah Jadwal Baru' untuk menjadwalkan agenda majelis taklim."
@@ -241,7 +264,7 @@ export function AdminSchedulesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {schedulesList.map((sch: ScheduleItem) => (
+                    {filteredSchedules.map((sch: ScheduleItem) => (
                       <tr key={sch.id} className="hover:bg-slate-900/50">
                         <td className="p-3 font-semibold text-white">
                           <div className="flex items-center gap-2">
@@ -287,7 +310,7 @@ export function AdminSchedulesPage() {
 
               {/* Mobile Card View */}
               <div className="block md:hidden space-y-4">
-                {schedulesList.map((sch: ScheduleItem) => (
+                {filteredSchedules.map((sch: ScheduleItem) => (
                   <div key={sch.id} className="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <h3 className="font-bold text-white text-sm">{sch.title}</h3>
@@ -362,17 +385,20 @@ export function AdminSchedulesPage() {
                   onChange={(e) => setFormData((prev) => ({ ...prev, venueId: e.target.value }))}
                   className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none min-h-[44px]"
                 >
+                  <option value="" disabled>Pilih lokasi majelis</option>
                   {venuesList.map((v: VenueItem) => (
                     <option key={v.id} value={v.id}>{v.name}</option>
                   ))}
                 </select>
               </div>
 
+              <div className="space-y-1"><label className="text-xs font-semibold text-slate-300">Program terkait <span className="font-normal text-slate-500">(opsional)</span></label><select value={formData.programId} onChange={(event) => setFormData((previous) => ({ ...previous, programId: event.target.value }))} className="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 text-sm text-white focus:border-emerald-500 focus:outline-none"><option value="">Agenda umum / tanpa program</option>{programsList.map((program) => <option key={program.id} value={program.id}>{program.title}</option>)}</select><p className="text-[11px] text-slate-500">Jika dipilih, agenda muncul sebagai bagian dari program peserta.</p></div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-300">Hari *</label>
                   <input
-                    type="text"
+                    type="date"
                     required
                     value={formData.day}
                     onChange={(e) => setFormData((prev) => ({ ...prev, day: e.target.value }))}
@@ -387,7 +413,6 @@ export function AdminSchedulesPage() {
                     required
                     value={formData.date}
                     onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-                    placeholder="e.g. 08 Februari 2026"
                     className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none min-h-[44px]"
                   />
                 </div>
@@ -397,7 +422,7 @@ export function AdminSchedulesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-300">Waktu Mulai (WIB)</label>
                   <input
-                    type="text"
+                    type="time"
                     value={formData.startTime}
                     onChange={(e) => setFormData((prev) => ({ ...prev, startTime: e.target.value }))}
                     placeholder="09:00"
@@ -407,7 +432,7 @@ export function AdminSchedulesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-300">Waktu Selesai (WIB)</label>
                   <input
-                    type="text"
+                    type="time"
                     value={formData.endTime}
                     onChange={(e) => setFormData((prev) => ({ ...prev, endTime: e.target.value }))}
                     placeholder="11:30"

@@ -1,185 +1,29 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useGetIdentity } from '@refinedev/core';
-import { Bookmark, FileText, Trash2, ExternalLink, BookOpen, Video } from 'lucide-react';
-import { SEOHead } from '@/components/public/SEOHead';
-import { MOCK_PROGRAMS } from '@/mock/publicData';
-import {
-  getUserBookmarks,
-  getUserNotes,
-  deleteNote,
-  toggleBookmark,
-} from '@/lib/userStore';
+import { Link } from 'react-router-dom';
+import { Bookmark, BookOpen, Clock3, FileText, Search, Trash2, Video } from 'lucide-react';
+import { deleteNote, getUserBookmarks, getUserNotes, toggleBookmark } from '@/lib/userStore';
+import { useParticipantPortalData } from './useParticipantPortalData';
 
 export function SavedItemsPage() {
-  const { data: identity } = useGetIdentity<{ id: string; name: string }>();
+  const { data: identity } = useGetIdentity<{ id: string }>();
   const userId = identity?.id || 'demo-peserta-1';
-
+  const { programs, lessons } = useParticipantPortalData();
   const [activeTab, setActiveTab] = useState<'bookmarks' | 'notes'>('bookmarks');
-  const [bookmarks, setBookmarks] = useState<ReturnType<typeof getUserBookmarks>>([]);
-  const [notes, setNotes] = useState<ReturnType<typeof getUserNotes>>([]);
+  const [bookmarks, setBookmarks] = useState(() => getUserBookmarks(userId));
+  const [notes, setNotes] = useState(() => getUserNotes(userId));
+  const [query, setQuery] = useState('');
+  useEffect(() => { setBookmarks(getUserBookmarks(userId)); setNotes(getUserNotes(userId)); }, [userId]);
 
-  useEffect(() => {
-    if (userId) {
-      setBookmarks(getUserBookmarks(userId));
-      setNotes(getUserNotes(userId));
-    }
-  }, [userId]);
+  const removeBookmark = (resourceType: 'program' | 'lesson', resourceId: string) => { toggleBookmark(userId, resourceType, resourceId); setBookmarks(getUserBookmarks(userId)); };
+  const removeNote = (noteId: string) => { deleteNote(userId, noteId); setNotes(getUserNotes(userId)); };
+  const visibleBookmarks = bookmarks.filter((bookmark) => { const resource = bookmark.resourceType === 'program' ? programs.find((item) => item.id === bookmark.resourceId) : lessons.find((item) => item.id === bookmark.resourceId); return (resource?.title || bookmark.resourceId).toLowerCase().includes(query.toLowerCase()); });
+  const visibleNotes = notes.filter((note) => { const lesson = lessons.find((item) => item.id === note.lessonId); return `${lesson?.title || ''} ${note.content}`.toLowerCase().includes(query.toLowerCase()); });
 
-  const handleDeleteNote = (noteId: string) => {
-    deleteNote(userId, noteId);
-    setNotes(getUserNotes(userId));
-  };
-
-  const handleRemoveBookmark = (resourceType: 'program' | 'lesson', resourceId: string) => {
-    toggleBookmark(userId, resourceType, resourceId);
-    setBookmarks(getUserBookmarks(userId));
-  };
-
-  return (
-    <div className="space-y-6 pb-12">
-      <SEOHead title="Tersimpan & Catatan Saya" />
-
-      {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-extrabold text-slate-900">Tersimpan & Catatan Saya</h1>
-        <p className="text-xs text-slate-600">
-          Kumpulan markah buku (bookmark) dan catatan privat kajian Anda.
-        </p>
-      </div>
-
-      {/* Tab Switcher */}
-      <div className="flex gap-2 border-b border-stone-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab('bookmarks')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all rounded-t-xl ${
-            activeTab === 'bookmarks'
-              ? 'bg-emerald-950 text-amber-300 border-b-2 border-amber-400'
-              : 'text-stone-600 hover:bg-stone-100'
-          }`}
-        >
-          <Bookmark size={16} />
-          <span>Bookmark Tersimpan ({bookmarks.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('notes')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all rounded-t-xl ${
-            activeTab === 'notes'
-              ? 'bg-emerald-950 text-amber-300 border-b-2 border-amber-400'
-              : 'text-stone-600 hover:bg-stone-100'
-          }`}
-        >
-          <FileText size={16} />
-          <span>Catatan Privat ({notes.length})</span>
-        </button>
-      </div>
-
-      {/* Tab Content: Bookmarks */}
-      {activeTab === 'bookmarks' && (
-        <div className="space-y-4">
-          {bookmarks.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-xs text-stone-500 space-y-2">
-              <Bookmark className="mx-auto h-8 w-8 text-stone-400" />
-              <p className="font-semibold text-slate-700">Belum Ada Bookmark</p>
-              <p>Klik ikon pita bookmark pada detail program atau lesson untuk menyimpannya ke daftar ini.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {bookmarks.map((bm) => {
-                const program = MOCK_PROGRAMS.find((p) => p.id === bm.resourceId);
-                return (
-                  <div
-                    key={bm.id}
-                    className="flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-5 shadow-xs hover:border-emerald-700/40 transition-all space-y-4"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
-                          {bm.resourceType === 'program' ? <BookOpen size={12} /> : <Video size={12} />}
-                          {bm.resourceType === 'program' ? 'Program Kajian' : 'Pertemuan'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveBookmark(bm.resourceType, bm.resourceId)}
-                          className="text-stone-400 hover:text-red-600 p-1"
-                          title="Hapus Bookmark"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                      <h3 className="font-bold text-slate-900 text-sm">
-                        {program ? program.title : `Resource ID: ${bm.resourceId}`}
-                      </h3>
-                      {program && <p className="text-xs text-slate-600">{program.instructor}</p>}
-                    </div>
-
-                    <div className="pt-2 border-t border-stone-100 flex justify-between items-center">
-                      <span className="text-[10px] text-stone-400">
-                        Disimpan: {new Date(bm.createdAt).toLocaleDateString('id-ID')}
-                      </span>
-                      <Link
-                        to={bm.resourceType === 'program' ? `/programs/${bm.resourceId}` : `/lesson/${bm.resourceId}`}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-emerald-900 hover:underline"
-                      >
-                        <span>Buka</span>
-                        <ExternalLink size={12} />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab Content: User Notes */}
-      {activeTab === 'notes' && (
-        <div className="space-y-3">
-          {notes.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-xs text-stone-500 space-y-2">
-              <FileText className="mx-auto h-8 w-8 text-stone-400" />
-              <p className="font-semibold text-slate-700">Belum Ada Catatan Privat</p>
-              <p>Anda dapat menuliskan faedah dan rincian catatan pada halaman materi pelajaran mana pun.</p>
-            </div>
-          ) : (
-            notes.map((note) => (
-              <div
-                key={note.id}
-                className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs space-y-2 flex justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-emerald-900">
-                      ID Materi: {note.lessonId}
-                    </span>
-                    {note.timestampSeconds != null && (
-                      <span className="bg-stone-200 text-stone-800 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded">
-                        {Math.floor(note.timestampSeconds / 60)}m {note.timestampSeconds % 60}s
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-800 leading-relaxed font-medium">{note.content}</p>
-                  <span className="text-[10px] text-stone-400 block">
-                    Dibuat: {new Date(note.createdAt).toLocaleString('id-ID')}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteNote(note.id)}
-                  className="text-stone-400 hover:text-red-600 p-1 shrink-0"
-                  title="Hapus Catatan"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return <div className="space-y-6"><header><h1 className="break-words text-2xl font-bold tracking-tight text-slate-950">Tersimpan & Catatan</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Koleksi privat untuk kembali ke program, pertemuan, dan faedah yang pernah dicatat.</p></header>
+    <section className="rounded-xl border border-stone-200 bg-white p-3"><div className="flex flex-col gap-3 sm:flex-row"><div className="grid grid-cols-2 gap-1 rounded-lg bg-stone-100 p-1 sm:w-auto">{([['bookmarks',`Tersimpan (${bookmarks.length})`,Bookmark],['notes',`Catatan (${notes.length})`,FileText]] as const).map(([value,label,Icon]) => <button key={value} type="button" onClick={() => setActiveTab(value)} aria-pressed={activeTab === value} className={`inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${activeTab === value ? 'bg-white text-emerald-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}><Icon className="h-4 w-4" /> {label}</button>)}</div><label className="relative min-w-0 flex-1"><span className="sr-only">Cari koleksi</span><Search className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari dalam koleksi" className="min-h-11 w-full rounded-lg border border-stone-300 bg-stone-50 pl-10 pr-3 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20" /></label></div></section>
+    {activeTab === 'bookmarks' ? visibleBookmarks.length > 0 ? <div className="grid gap-4 lg:grid-cols-2">{visibleBookmarks.map((bookmark) => { const program = bookmark.resourceType === 'program' ? programs.find((item) => item.id === bookmark.resourceId) : undefined; const lesson = bookmark.resourceType === 'lesson' ? lessons.find((item) => item.id === bookmark.resourceId) : undefined; const title = program?.title || lesson?.title || 'Konten tidak lagi tersedia'; const href = program ? `/programs/${program.slug || program.id}` : lesson ? `/lesson/${lesson.id}` : '#'; const Icon = program ? BookOpen : Video; return <article key={bookmark.id} className="flex min-w-0 flex-col rounded-xl border border-stone-200 bg-white p-5"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800"><Icon className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{program ? 'Program' : 'Pertemuan'}</p><h2 className="mt-1 break-words text-sm font-bold text-slate-900">{title}</h2><p className="mt-2 text-xs text-slate-500">Disimpan {new Date(bookmark.createdAt).toLocaleDateString('id-ID')}</p></div></div><div className="mt-5 flex gap-2 border-t border-stone-200 pt-4"><Link to={href} aria-disabled={!program && !lesson} className={`inline-flex min-h-10 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-3 text-xs font-bold ${program || lesson ? 'bg-slate-900 text-white hover:bg-slate-800' : 'pointer-events-none bg-stone-100 text-slate-400'}`}>Buka kembali</Link><button type="button" onClick={() => removeBookmark(bookmark.resourceType, bookmark.resourceId)} aria-label={`Hapus ${title} dari tersimpan`} className="flex h-10 w-10 items-center justify-center rounded-lg text-rose-700 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600"><Trash2 className="h-4 w-4" /></button></div></article>; })}</div> : <Empty icon={Bookmark} title="Belum ada konten tersimpan" helper="Gunakan ikon bookmark pada program atau pertemuan agar mudah ditemukan kembali." action="Jelajahi program" href="/programs" /> : visibleNotes.length > 0 ? <div className="space-y-3">{visibleNotes.map((note) => { const lesson = lessons.find((item) => item.id === note.lessonId); return <article key={note.id} className="rounded-xl border border-stone-200 bg-white p-5"><div className="flex items-start gap-3"><FileText className="mt-0.5 h-5 w-5 shrink-0 text-emerald-800" /><div className="min-w-0 flex-1"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-sm font-bold text-slate-900">{lesson?.title || 'Pertemuan tidak lagi tersedia'}</h2><p className="mt-1 text-xs text-slate-500">{new Date(note.createdAt).toLocaleString('id-ID')}{note.timestampSeconds != null && <span className="ml-2 inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {Math.floor(note.timestampSeconds / 60)}:{String(note.timestampSeconds % 60).padStart(2, '0')}</span>}</p></div><button type="button" onClick={() => removeNote(note.id)} aria-label="Hapus catatan" className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-lg text-rose-700 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 sm:self-auto"><Trash2 className="h-4 w-4" /></button></div><p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">{note.content}</p>{lesson && <Link to={`/lesson/${lesson.id}`} className="mt-4 inline-flex min-h-10 items-center whitespace-nowrap rounded-lg border border-stone-300 px-3 text-xs font-bold text-slate-700 hover:bg-stone-100">Buka pertemuan</Link>}</div></div></article>; })}</div> : <Empty icon={FileText} title="Belum ada catatan privat" helper="Catatan yang dibuat ketika menyimak pertemuan akan terkumpul di sini." action="Buka kajian saya" href="/belajar" />}
+  </div>;
 }
+
+function Empty({ icon: Icon, title, helper, action, href }: { icon: typeof Bookmark; title: string; helper: string; action: string; href: string }) { return <section className="rounded-2xl border border-dashed border-stone-300 bg-white px-5 py-12 text-center"><Icon className="mx-auto h-7 w-7 text-slate-400" /><h2 className="mt-3 text-base font-bold text-slate-900">{title}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{helper}</p><Link to={href} className="mt-4 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">{action}</Link></section>; }

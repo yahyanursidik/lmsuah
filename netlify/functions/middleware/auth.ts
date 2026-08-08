@@ -7,6 +7,23 @@ import { getUserPermissions } from '../utils/permissions.js';
 export interface UserSession {
   userId: string;
   roles: string[];
+  isDevelopmentDemo?: boolean;
+}
+
+export function getDevelopmentDemoSession(
+  request: Request,
+  environment = process.env.NODE_ENV
+): UserSession | null {
+  if (environment === 'production') return null;
+
+  const demoUserId = request.headers.get('x-lms-demo-user');
+  if (demoUserId !== 'demo-admin-1') return null;
+
+  return {
+    userId: demoUserId,
+    roles: ['super_administrator'],
+    isDevelopmentDemo: true,
+  };
 }
 
 /**
@@ -14,6 +31,9 @@ export interface UserSession {
  * lalu mengambil role pengguna dari tabel user_roles.
  */
 export async function requireAuth(request: Request): Promise<UserSession> {
+  const developmentDemoSession = getDevelopmentDemoSession(request);
+  if (developmentDemoSession) return developmentDemoSession;
+
   const sessionData = await auth.api.getSession({
     headers: request.headers,
   });

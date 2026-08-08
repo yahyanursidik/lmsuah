@@ -1,130 +1,42 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useOne, useList } from '@refinedev/core';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { ArrowLeft, Users, Mail, Phone, Calendar } from 'lucide-react';
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4
+ * Hallmark · genre: modern-minimal · macrostructure: Program summary · design-system: design.md · designed-as-app
+ */
+import { useList, useOne } from '@refinedev/core';
+import { ArrowRight, BookOpenCheck, Files, FileQuestion, Users } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 
-interface ProgramItem {
-  id: string;
-  title: string;
-  status: string;
-}
-
-interface EnrollmentItem {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  profilePhone: string;
-  status: string;
-  enrolledAt: string;
-}
+interface ProgramSummary { id: string; title: string; description?: string; status: 'draft' | 'published' | 'archived' }
+interface EnrollmentSummary { id: string }
+interface LessonSummary { id: string; status: 'draft' | 'published'; materialCount?: number; hasQuiz?: boolean }
 
 export function AdminProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const { query: programQuery, result: program } = useOne<ProgramSummary>({ resource: 'programs', id: id || '' });
+  const enrollments = useList<EnrollmentSummary>({ resource: 'enrollments', filters: [{ field: 'programId', operator: 'eq', value: id }], pagination: { mode: 'off' } });
+  const lessons = useList<LessonSummary>({ resource: 'lessons', filters: [{ field: 'programId', operator: 'eq', value: id }], pagination: { mode: 'off' } });
+  const lessonItems = lessons.result.data;
+  const isLoading = programQuery.isLoading || enrollments.query.isLoading || lessons.query.isLoading;
+  const metrics = [
+    { label: 'Pertemuan', value: lessonItems.length, helper: `${lessonItems.filter((item) => item.status === 'published').length} sudah terbit`, icon: BookOpenCheck },
+    { label: 'Sumber materi', value: lessonItems.reduce((total, item) => total + (item.materialCount || 0), 0), helper: 'YouTube, PDF, audio, dan lainnya', icon: Files },
+    { label: 'Kuis', value: lessonItems.filter((item) => item.hasQuiz).length, helper: 'Terhubung ke pertemuan', icon: FileQuestion },
+    { label: 'Peserta', value: enrollments.result.data.length, helper: 'Terdaftar di program', icon: Users },
+  ];
 
-  const { query: programQuery, result: programResult } = useOne({
-    resource: 'programs',
-    id: id || '',
-  });
-
-  const { query: enrollmentsQuery, result: enrollmentsResult } = useList({
-    resource: 'enrollments',
-    filters: [
-      {
-        field: 'programId',
-        operator: 'eq',
-        value: id,
-      }
-    ]
-  });
-
-  const isLoadingProgram = programQuery.isLoading;
-  const isLoadingEnrollments = enrollmentsQuery.isLoading;
-
-  const program = (programResult?.data as any) as ProgramItem | undefined;
-  const enrollments = ((enrollmentsResult?.data as any) || []) as EnrollmentItem[];
+  if (isLoading) return <div className="h-64 animate-pulse rounded-xl bg-slate-800 motion-reduce:animate-none" />;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center gap-4 border-b border-slate-800 pb-5">
-        <Button variant="outline" size="sm" onClick={() => navigate('/admin/programs')} className="h-10 w-10 shrink-0 rounded-full bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <Badge variant="emerald">Detail Program</Badge>
-          <h1 className="text-2xl font-bold text-white mt-1">
-            {isLoadingProgram ? 'Memuat...' : program?.title}
-          </h1>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <section className="flex flex-col gap-4 rounded-xl border border-slate-700 bg-slate-950 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+        <div><h2 className="text-xl font-bold text-white">Ringkasan program</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">Lihat kesiapan isi program lalu lanjutkan penyusunan pertemuan, materi, dan evaluasi.</p></div>
+        <Link to={`/admin/programs/${id}/curriculum`} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 active:bg-emerald-700">Kelola pertemuan <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+      </section>
 
-      <Card className="bg-slate-900 border-slate-800">
-        <CardHeader className="border-b border-slate-800 bg-slate-900/50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-medium text-slate-200 flex items-center gap-2">
-              <Users className="h-5 w-5 text-emerald-500" />
-              Daftar Peserta Terdaftar ({enrollments.length})
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoadingEnrollments ? (
-            <div className="p-8 text-center text-slate-400">Memuat daftar peserta...</div>
-          ) : enrollments.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center">
-              <Users className="h-12 w-12 text-slate-700 mb-4" />
-              <h3 className="text-lg font-medium text-slate-300 mb-1">Belum Ada Peserta</h3>
-              <p className="text-slate-500">Belum ada peserta yang mendaftar di program ini.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-slate-300">
-                <thead className="text-xs uppercase bg-slate-950 text-slate-400 border-b border-slate-800">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Nama Peserta</th>
-                    <th className="px-6 py-4 font-medium">Kontak</th>
-                    <th className="px-6 py-4 font-medium">Tanggal Daftar</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {enrollments.map((enrollment: EnrollmentItem) => (
-                    <tr key={enrollment.id} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-200">
-                        {enrollment.userName || 'Tanpa Nama'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1 text-xs text-slate-400">
-                          <span className="flex items-center gap-1.5"><Mail className="w-3 h-3"/> {enrollment.userEmail}</span>
-                          {enrollment.profilePhone && (
-                            <span className="flex items-center gap-1.5"><Phone className="w-3 h-3"/> {enrollment.profilePhone}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="w-4 h-4 text-slate-500" />
-                          {new Date(enrollment.enrolledAt).toLocaleDateString('id-ID', {
-                            day: 'numeric', month: 'short', year: 'numeric'
-                          })}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge variant={enrollment.status === 'active' ? 'emerald' : 'secondary'}>
-                          {enrollment.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <section aria-label="Ringkasan isi program" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => { const Icon = metric.icon; return <div key={metric.label} className="rounded-xl border border-slate-700 bg-slate-800/50 p-5"><div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold text-slate-300">{metric.label}</p><Icon className="h-4 w-4 text-emerald-400" aria-hidden="true" /></div><p className="mt-4 text-3xl font-bold text-white">{metric.value.toLocaleString('id-ID')}</p><p className="mt-1 text-xs leading-5 text-slate-500">{metric.helper}</p></div>; })}
+      </section>
+
+      <section className="rounded-xl border border-slate-700 bg-slate-900/60 p-5 sm:p-6"><h2 className="text-base font-bold text-white">Informasi umum</h2><dl className="mt-5 grid gap-5"><div><dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Judul</dt><dd className="mt-1 text-sm font-semibold text-slate-200">{program?.title}</dd></div><div><dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Deskripsi</dt><dd className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">{program?.description || 'Belum ada deskripsi program.'}</dd></div></dl></section>
     </div>
   );
 }

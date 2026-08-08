@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingSkeleton, EmptyState, ErrorAlert } from '@/components/public/UIStates';
-import { Plus, Edit3, Trash2, MapPin, RefreshCw, X, ExternalLink } from 'lucide-react';
+import { Plus, Edit3, Trash2, MapPin, RefreshCw, X, ExternalLink, Search } from 'lucide-react';
 
 interface VenueItem {
   id: string;
@@ -23,6 +23,8 @@ interface VenueItem {
 export function AdminVenuesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVenue, setEditingVenue] = useState<VenueItem | null>(null);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | VenueItem['status']>('all');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -41,6 +43,10 @@ export function AdminVenuesPage() {
   });
 
   const venuesList = listResult?.data || [];
+  const filteredVenues = venuesList.filter((venue) => {
+    const matchesQuery = [venue.name, venue.address, venue.city, venue.district].some((value) => value?.toLowerCase().includes(query.trim().toLowerCase()));
+    return matchesQuery && (statusFilter === 'all' || venue.status === statusFilter);
+  });
   const isLoading = listQuery.isLoading;
   const isError = listQuery.isError;
   const refetch = listQuery.refetch;
@@ -135,9 +141,9 @@ export function AdminVenuesPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
-          <Badge variant="emerald">Admin Module</Badge>
-          <h1 className="text-2xl font-bold text-white mt-1">Pengelolaan Lokasi Majelis (Venues)</h1>
-          <p className="text-xs text-slate-400">Kelola masjid, alamat rincian, peta Google Maps, dan kapasitas jamaah.</p>
+          <Badge variant="emerald">Penyelenggaraan</Badge>
+          <h1 className="mt-1 text-2xl font-bold text-white">Pengelolaan Lokasi Majelis</h1>
+          <p className="text-xs text-slate-400">Satu data lokasi untuk jadwal admin, website utama, dan portal peserta.</p>
         </div>
 
         <Button
@@ -149,12 +155,18 @@ export function AdminVenuesPage() {
         </Button>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">{[
+        ['Total lokasi', venuesList.length],
+        ['Aktif', venuesList.filter((venue) => venue.status === 'active').length],
+        ['Nonaktif', venuesList.filter((venue) => venue.status === 'inactive').length],
+      ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-700 bg-slate-950 p-4"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-white">{isLoading ? '—' : value}</p></div>)}</div>
+
       <Card className="bg-slate-950 border-slate-800 text-slate-100">
         <CardHeader className="border-b border-slate-800">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white text-base">Daftar Lokasi Majelis</CardTitle>
-              <CardDescription className="text-slate-400">Total: {venuesList.length} Masjid/Lokasi</CardDescription>
+              <CardDescription className="text-slate-400">Cari, periksa status, lalu buka tampilan publik.</CardDescription>
             </div>
             <Button
               size="sm"
@@ -162,12 +174,13 @@ export function AdminVenuesPage() {
               onClick={() => refetch()}
               className="text-slate-400 hover:text-white"
             >
-              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Segarkan
             </Button>
           </div>
         </CardHeader>
 
         <CardContent className="p-4 sm:p-6">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><span className="sr-only">Cari lokasi</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama, alamat, atau kota…" className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 pl-10 pr-3 text-sm text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></label><select aria-label="Filter status lokasi" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className="min-h-11 rounded-lg border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-emerald-500"><option value="all">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></div>
           {isLoading ? (
             <LoadingSkeleton count={2} />
           ) : isError ? (
@@ -175,7 +188,7 @@ export function AdminVenuesPage() {
               message="Gagal mengambil data lokasi dari server."
               onRetry={() => refetch()}
             />
-          ) : venuesList.length === 0 ? (
+          ) : filteredVenues.length === 0 ? (
             <EmptyState
               title="Belum Ada Lokasi Majelis"
               description="Klik 'Tambah Lokasi Baru' untuk memasukkan lokasi majelis masjid."
@@ -198,7 +211,7 @@ export function AdminVenuesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {venuesList.map((v: VenueItem) => (
+                    {filteredVenues.map((v: VenueItem) => (
                       <tr key={v.id} className="hover:bg-slate-900/50">
                         <td className="p-3 font-semibold text-white">
                           <div className="flex items-center gap-2">
@@ -253,7 +266,7 @@ export function AdminVenuesPage() {
 
               {/* Mobile Card View */}
               <div className="block md:hidden space-y-4">
-                {venuesList.map((v: VenueItem) => (
+                {filteredVenues.map((v: VenueItem) => (
                   <div key={v.id} className="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">

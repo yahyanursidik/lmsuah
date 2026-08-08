@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Refine, DataProvider, useOne, useList } from '@refinedev/core';
 import { LessonDetailPage } from '../src/pages/public/LessonDetailPage';
 import { AdminLessonsPage } from '../src/pages/admin/AdminLessonsPage';
+import { AdminLessonForm } from '../src/pages/admin/AdminLessonForm';
+import { AdminMaterialDialog } from '../src/pages/admin/AdminMaterialDialog';
+import { AdminQuizDialog } from '../src/pages/admin/AdminQuizDialog';
 
 
 
@@ -15,8 +18,8 @@ vi.mock('@refinedev/core', async () => {
     useOne: vi.fn(),
     useList: vi.fn(),
     useDelete: vi.fn(() => ({ mutate: vi.fn(), isLoading: false })),
-    useCreate: vi.fn(() => ({ mutate: vi.fn(), isLoading: false })),
-    useUpdate: vi.fn(() => ({ mutate: vi.fn(), isLoading: false })),
+    useCreate: vi.fn(() => ({ mutate: vi.fn(), mutation: { isPending: false } })),
+    useUpdate: vi.fn(() => ({ mutate: vi.fn(), mutation: { isPending: false } })),
   };
 });
 
@@ -30,12 +33,12 @@ const mockLesson = {
   description: 'Pembahasan pembukaan kitab dan biografi pengarang.',
   status: 'published',
   programId: 'program-1',
-  video: {
+  materials: [{
     id: 'video-1',
-    youtubeId: 'dQw4w9WgXcQ',
+    type: 'youtube',
+    url: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
     duration: '01:45:00',
-    status: 'active',
-  },
+  }],
   markers: [
     { id: 'mark-1', timestamp: 0, title: 'Pembukaan & Doa', description: 'Muqaddimah kajian' },
     { id: 'mark-2', timestamp: 305, title: 'Biografi Ibn Hajar', description: 'Riwayat hidup pengarang' },
@@ -50,8 +53,16 @@ const mockLessonNoVideo = {
   title: 'Bab 2: Bab Thaharah',
   slug: 'bab-2-thaharah',
   sequence: 2,
-  video: null,
+  materials: [],
   markers: [],
+};
+
+const mockLessonWithPdf = {
+  ...mockLesson,
+  materials: [
+    ...mockLesson.materials,
+    { id: 'pdf-1', type: 'PDF', url: 'https://example.com/modul.pdf', filename: 'Modul Thaharah' },
+  ],
 };
 
 const mockSiblings = [mockLesson, mockLessonNoVideo];
@@ -92,12 +103,12 @@ describe('Lessons Feature Integration Tests', () => {
     mockedUseOne.mockReturnValue({
       query: { isLoading: false, isError: false, refetch: vi.fn() },
       result: mockLesson,
-    } as any);
+    } as never);
 
     mockedUseList.mockReturnValue({
       query: { isLoading: false, isError: false, refetch: vi.fn() },
       result: { data: mockSiblings, total: 2 },
-    } as any);
+    } as never);
   });
 
   it('renders LessonDetailPage with video player, title, and sequence number', () => {
@@ -106,7 +117,7 @@ describe('Lessons Feature Integration Tests', () => {
     // title may appear in both h1 and sidebar navigation
     expect(screen.getAllByText(/Bab 1: Pengenalan Kitab Bulughul Maram/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Pertemuan #1/i)).toBeDefined();
-    expect(screen.getByTitle(/Bab 1: Pengenalan Kitab Bulughul Maram/i)).toBeDefined();
+    expect(screen.getByTitle(/Video YouTube/i)).toBeDefined();
   });
 
   it('renders clickable timestamp markers (daftar isi video)', () => {
@@ -121,11 +132,26 @@ describe('Lessons Feature Integration Tests', () => {
     expect(screen.getAllByText('5:05').length).toBeGreaterThan(0);
   });
 
+  it('membuka PDF langsung di pembaca materi peserta', () => {
+    mockedUseOne.mockImplementation(((args: { resource?: string }) => ({
+      query: { isLoading: false, isError: false, refetch: vi.fn() },
+      result: args.resource === 'settings' ? { id: 'general', allowPdfDownload: true } : mockLessonWithPdf,
+    })) as never);
+
+    render(<TestWrapper path="/lessons/bab-1-pengenalan" element={<LessonDetailPage />} />);
+    fireEvent.click(screen.getByRole('button', { name: /Semua Materi/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Baca di sini/i }));
+
+    expect(screen.getByTitle(/Pratinjau PDF Modul Thaharah/i)).toBeDefined();
+    expect(screen.getByRole('button', { name: /Perbesar pratinjau PDF/i })).toBeDefined();
+    expect(screen.getByRole('link', { name: /Unduh PDF/i })).toBeDefined();
+  });
+
   it('renders Fallback "Video Belum Tersedia" when lesson has no video', () => {
     mockedUseOne.mockReturnValue({
       query: { isLoading: false, isError: false, refetch: vi.fn() },
       result: mockLessonNoVideo,
-    } as any);
+    } as never);
 
     render(<TestWrapper path="/lessons/bab-2-thaharah" element={<LessonDetailPage />} />);
 
@@ -147,11 +173,11 @@ describe('Lessons Feature Integration Tests', () => {
     mockedUseOne.mockReturnValue({
       query: { isLoading: false, isError: false, refetch: vi.fn() },
       result: undefined,
-    } as any);
+    } as never);
     mockedUseList.mockReturnValue({
       query: { isLoading: false, isError: false, refetch: vi.fn() },
       result: { data: [], total: 0 },
-    } as any);
+    } as never);
 
     render(<TestWrapper path="/lessons/tidak-ada" element={<LessonDetailPage />} />);
 
@@ -161,10 +187,10 @@ describe('Lessons Feature Integration Tests', () => {
   it('renders AdminLessonsPage with CRUD table and add button', async () => {
     // Provide admin-specific mock for useList (already set in beforeEach as mockSiblings)
     mockedUseList.mockReturnValue({
-      data: { data: [mockLesson, mockLessonNoVideo], total: 2 } as any,
+      data: { data: [mockLesson, mockLessonNoVideo], total: 2 },
       isLoading: false,
       isError: false,
-    } as any);
+    } as never);
 
     const dummyProvider = {
       getList: vi.fn().mockResolvedValue({ data: [], total: 0 }),
@@ -187,6 +213,47 @@ describe('Lessons Feature Integration Tests', () => {
 
     expect(screen.getByText(/Pengelolaan Materi \(Lessons\)/i)).toBeDefined();
     expect(screen.getAllByText(/Tambah Materi Baru/i).length).toBeGreaterThan(0);
+  });
+
+  it('memisahkan editor data pertemuan dari materi dan kuis', () => {
+    mockedUseOne.mockReturnValue({
+      query: { isLoading: false, isError: false, refetch: vi.fn() },
+      result: undefined,
+    } as never);
+
+    render(
+      <MemoryRouter>
+        <Refine dataProvider={dummyDataProvider} resources={resourcesConfig}>
+          <AdminLessonForm lessonId={null} programId="program-1" onClose={vi.fn()} />
+        </Refine>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: /Tambah pertemuan/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Simpan pertemuan/i })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Tambah materi/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tambah soal/i })).toBeNull();
+  });
+
+  it('dialog materi menyediakan multi-sumber dalam alur terpisah', () => {
+    mockedUseOne.mockReturnValue({ query: { isLoading: false, isError: false, refetch: vi.fn() }, result: { ...mockLesson, materials: [] } } as never);
+    render(<MemoryRouter><Refine dataProvider={dummyDataProvider} resources={resourcesConfig}><AdminMaterialDialog lessonId="lesson-1" onClose={vi.fn()} onSuccess={vi.fn()} /></Refine></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Tambah materi$/i }));
+    expect(screen.getByText('Materi 1')).toBeDefined();
+    expect(screen.getByRole('option', { name: /YouTube/i })).toBeDefined();
+    expect(screen.getByRole('option', { name: /PDF/i })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /^Tambah materi$/i }));
+    expect(screen.getByText('Materi 2')).toBeDefined();
+  });
+
+  it('dialog kuis menyediakan pengaturan dan bank soal dalam alur terpisah', () => {
+    mockedUseOne.mockReturnValue({ query: { isLoading: false, isError: false, refetch: vi.fn() }, result: { ...mockLesson, quiz: null } } as never);
+    render(<MemoryRouter><Refine dataProvider={dummyDataProvider} resources={resourcesConfig}><AdminQuizDialog lessonId="lesson-1" onClose={vi.fn()} onSuccess={vi.fn()} /></Refine></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Tambah soal$/i }));
+    expect(screen.getByText('Soal 1')).toBeDefined();
+    expect(screen.getByRole('button', { name: /Tambah opsi/i })).toBeDefined();
   });
 
 });

@@ -74,6 +74,7 @@ const enrollmentsHandler = async (request: Request) => {
 };
 
 export const handler = createHandler(enrollmentsHandler);
+export default handler;
 
 export const config: Config = {
   path: ['/api/enrollments', '/api/enrollments/*'],

@@ -1,8 +1,16 @@
 import { Link } from 'react-router-dom';
-import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES } from '../../mock/publicData';
+import { useList } from '@refinedev/core';
+import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES, type ScheduleItem, type Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 
 export function HomePage() {
+  const schedulesQuery = useList<ScheduleItem>({ resource: 'schedules', pagination: { mode: 'off' } });
+  const venuesQuery = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
+  const venues = venuesQuery.result.data.length > 0 ? venuesQuery.result.data : MOCK_VENUES;
+  const schedules = (schedulesQuery.result.data.length > 0 ? schedulesQuery.result.data : MOCK_SCHEDULES).map((schedule) => ({
+    ...schedule,
+    venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name,
+  }));
   return (
     <div className="space-y-16 pb-12">
       <SEOHead
@@ -16,7 +24,7 @@ export function HomePage() {
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-center">
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-900/20 bg-emerald-900/5 px-3.5 py-1 text-xs font-semibold text-emerald-900">
-                <span className="h-2 w-2 rounded-full bg-emerald-700 animate-pulse" />
+                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-700 motion-reduce:animate-none" />
                 <span>Portal Pembelajaran Syar'i Ustadz Abu Haidar As-Sundawy</span>
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl leading-[1.2]">
@@ -28,13 +36,13 @@ export function HomePage() {
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <Link
                   to="/programs"
-                  className="rounded-xl bg-emerald-900 px-6 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-950 active:scale-98 transition-all min-h-[44px] flex items-center justify-center"
+                  className="flex min-h-11 items-center justify-center rounded-xl bg-emerald-900 px-6 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 active:bg-emerald-950"
                 >
                   Jelajahi Program Kitab
                 </Link>
                 <Link
                   to="/schedules"
-                  className="rounded-xl border border-stone-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-800 shadow-2xs hover:bg-stone-50 active:scale-98 transition-all min-h-[44px] flex items-center justify-center"
+                  className="flex min-h-11 items-center justify-center rounded-xl border border-stone-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-800 shadow-2xs hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 active:bg-stone-100"
                 >
                   Jadwal Kajian Pekanan
                 </Link>
@@ -50,11 +58,11 @@ export function HomePage() {
                     Live Stream
                   </span>
                 </div>
-                {MOCK_SCHEDULES.slice(0, 2).map((sch) => (
+                {schedules.slice(0, 2).map((sch) => (
                   <div key={sch.id} className="rounded-xl bg-stone-50 p-4 border border-stone-200/60 space-y-2">
                     <div className="flex items-center justify-between text-xs text-stone-500 font-medium">
                       <span>{sch.day}, {sch.date}</span>
-                      <span className="text-emerald-900 font-bold">{sch.time}</span>
+                      <span className="text-emerald-900 font-bold">{sch.time || [sch.startTime, sch.endTime].filter(Boolean).join(' – ') || 'Menyusul'}</span>
                     </div>
                     <h4 className="font-bold text-slate-900 text-sm leading-snug">{sch.title}</h4>
                     <p className="text-xs text-slate-600">📍 {sch.venueName}</p>
@@ -88,13 +96,13 @@ export function HomePage() {
           {MOCK_PROGRAMS.map((prog) => (
             <div
               key={prog.id}
-              className="group flex flex-col justify-between rounded-2xl border border-stone-200/80 bg-white overflow-hidden shadow-xs hover:shadow-md transition-all"
+              className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs hover:border-emerald-900/30"
             >
               <div className="relative h-48 overflow-hidden bg-stone-100">
                 <img
                   src={prog.coverImage}
                   alt={prog.title}
-                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="h-full w-full object-cover"
                 />
                 <span className="absolute top-3 left-3 rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
                   {prog.category}
@@ -121,7 +129,7 @@ export function HomePage() {
                 </div>
                 <Link
                   to={`/programs/${prog.id}`}
-                  className="mt-2 block w-full rounded-xl border border-stone-300 py-2.5 text-center text-xs font-bold text-slate-800 hover:bg-emerald-900 hover:text-white hover:border-emerald-900 transition-all min-h-[44px] flex items-center justify-center"
+                  className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-stone-300 py-2.5 text-center text-xs font-bold text-slate-800 hover:border-emerald-900 hover:bg-emerald-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
                 >
                   Lihat Detail Program
                 </Link>
@@ -181,7 +189,7 @@ export function HomePage() {
       <section className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
         <div className="flex items-center justify-between border-b border-stone-200 pb-4">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Lokasi Majelis Offine</h2>
+            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Lokasi Majelis Offline</h2>
             <p className="text-sm text-slate-600 mt-1">Masjid dan majelis penyelenggara kajian rutin Ustadz Abu Haidar As-Sundawy.</p>
           </div>
           <Link to="/venues" className="text-sm font-semibold text-emerald-900 hover:underline">
@@ -190,10 +198,10 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {MOCK_VENUES.map((v) => (
-            <div key={v.id} className="rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-xs space-y-4 hover:shadow-md transition-all">
+          {venues.slice(0, 4).map((v) => (
+            <div key={v.id} className="space-y-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30">
               <div className="h-44 w-full bg-stone-100 overflow-hidden">
-                <img src={v.image} alt={v.name} className="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
+                <img src={v.image} alt={v.name} className="h-full w-full object-cover" />
               </div>
               <div className="p-6 pt-0 space-y-3">
                 <h3 className="text-lg font-bold text-slate-900">{v.name}</h3>

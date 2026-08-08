@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationError } from '../middleware/validation.js';
 
 export async function validateBody<T extends z.ZodTypeAny>(
   request: Request,
@@ -15,11 +16,4 @@ export async function validateBody<T extends z.ZodTypeAny>(
   }
 }
 
-export class ValidationError extends Error {
-  public details?: unknown;
-  constructor(message: string, details?: unknown) {
-    super(message);
-    this.name = 'ValidationError';
-    this.details = details;
-  }
-}
+export { ValidationError };

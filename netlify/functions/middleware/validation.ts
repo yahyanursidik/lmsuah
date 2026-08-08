@@ -10,8 +10,11 @@ export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown) {
 }
 
 export class ValidationError extends Error {
-  constructor(message: string) {
+  public details?: unknown;
+
+  constructor(message: string, details?: unknown) {
     super(message);
     this.name = 'ValidationError';
+    this.details = details;
   }
 }

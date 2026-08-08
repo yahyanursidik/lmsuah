@@ -35,7 +35,7 @@ function removeStoredDemo(): void {
 }
 
 export const authProvider: AuthProvider = {
-  login: async ({ email, password: _password, providerName }) => {
+  login: async ({ email, providerName }) => {
     // 1. Social provider login (Google)
     if (providerName === 'google') {
       try {

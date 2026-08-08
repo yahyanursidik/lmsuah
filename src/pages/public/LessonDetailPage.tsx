@@ -4,6 +4,7 @@ import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { SEOHead } from '../../components/public/SEOHead';
 import { LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import { QuizComponent } from '../../components/public/QuizComponent';
+import { MaterialViewer } from '../../components/material/MaterialViewer';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   FileText,
   Plus,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 import {
   getSingleLessonProgress,
@@ -73,12 +75,15 @@ export function LessonDetailPage() {
   const [bookmarked, setBookmarked] = useState(false);
   const [notes, setNotes] = useState<ReturnType<typeof getUserNotes>>([]);
   const [newNoteText, setNewNoteText] = useState('');
+  const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
 
   const { query: lessonQuery, result: lesson } = useOne<LessonItem>({
     resource: 'lessons',
     id: id || '',
     queryOptions: { enabled: !!id },
   });
+  const { result: systemSettings } = useOne<{ id: string; allowPdfDownload?: boolean }>({ resource: 'settings', id: 'general' });
   const isLoading = lessonQuery?.isLoading ?? false;
   const isError = lessonQuery?.isError ?? false;
   const refetch = lessonQuery?.refetch ?? (() => {});
@@ -97,6 +102,17 @@ export function LessonDetailPage() {
       setNotes(getUserNotes(userId, lesson.id));
     }
   }, [lesson?.id, userId]);
+
+  useEffect(() => {
+    const lessonMaterials = lesson?.materials || [];
+    if (lessonMaterials.length === 0) {
+      setActiveMaterialId(null);
+      return;
+    }
+    const preferred = lessonMaterials.find((material) => material.type === 'youtube') || lessonMaterials[0];
+    if (!preferred) return;
+    setActiveMaterialId(preferred.id || preferred.url);
+  }, [lesson?.id, lesson?.materials]);
 
   // Track position to save on unmount or marker click
   const mountTimeRef = useRef<number>(Date.now());
@@ -201,10 +217,8 @@ export function LessonDetailPage() {
 
   const materials = lesson.materials || [];
   const youtubeVideo = materials.find(m => m.type === 'youtube');
-  const otherMaterials = materials.filter(m => m.type !== 'youtube');
+  const activeMaterial = materials.find((material) => (material.id || material.url) === activeMaterialId) || youtubeVideo || materials[0];
   const markers = lesson.markers || [];
-  const videoAvailable = !!youtubeVideo;
-  
   const video = youtubeVideo ? { youtubeId: youtubeVideo.url.split('v=')[1] || youtubeVideo.url.split('/').pop() || '', duration: youtubeVideo.duration } : null;
 
   return (
@@ -253,7 +267,8 @@ export function LessonDetailPage() {
             <button
               type="button"
               onClick={handleToggleBookmark}
-              className={`p-2.5 rounded-xl border transition-all ${
+              aria-label={bookmarked ? 'Hapus bookmark materi' : 'Simpan bookmark materi'}
+              className={`p-2.5 rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${
                 bookmarked
                   ? 'bg-amber-500 text-black border-amber-400 shadow-xs'
                   : 'bg-white text-stone-600 border-stone-300 hover:bg-stone-100'
@@ -266,7 +281,7 @@ export function LessonDetailPage() {
             <button
               type="button"
               onClick={handleToggleCompletion}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${
                 isCompleted
                   ? 'bg-emerald-800 text-white border-emerald-700 shadow-xs'
                   : 'bg-white text-slate-700 border-stone-300 hover:bg-emerald-50'
@@ -284,19 +299,10 @@ export function LessonDetailPage() {
           {/* Video Player Column */}
           <div className="lg:col-span-2 space-y-4">
 
-            {/* Video Player IFrame */}
-            {videoAvailable ? (
-              <div className="relative w-full overflow-hidden rounded-2xl shadow-lg bg-slate-900" style={{ aspectRatio: '16/9' }}>
-                <iframe
-                  key={startAt}
-                  src={`https://www.youtube.com/embed/${video?.youtubeId}?start=${Math.floor(startAt)}&autoplay=1&rel=0&modestbranding=1`}
-                  width="100%"
-                  height="100%"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title={lesson.title}
-                  style={{ position: 'absolute', top: 0, left: 0, border: 'none' }}
-                />
+            {/* Primary material viewer */}
+            {activeMaterial ? (
+              <div ref={viewerRef} className="scroll-mt-24">
+                <MaterialViewer material={activeMaterial} startAtSeconds={activeMaterial.type === 'youtube' ? startAt : 0} allowDownload={systemSettings?.allowPdfDownload !== false} />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center w-full rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 text-slate-500 py-16 space-y-4">
@@ -312,12 +318,12 @@ export function LessonDetailPage() {
 
             {/* Tabs for Summary & Private Notes */}
             <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-xs">
-              <div className="flex flex-wrap gap-2 border-b border-stone-200 pb-2">
+              <div className="flex gap-2 overflow-x-auto border-b border-stone-200 pb-2">
                 {[
                   { label: 'Ringkasan', icon: BookOpen },
                   { label: `Catatan Saya (${notes.length})`, icon: FileText },
                   { label: 'Daftar Isi Video', icon: List },
-                  { label: `Materi Pendukung (${otherMaterials.length})`, icon: Bookmark },
+                  { label: `Semua Materi (${materials.length})`, icon: Bookmark },
                   ...(lesson.quiz ? [{ label: 'Kuis Evaluasi', icon: AlertCircle }] : []),
                 ].map((tab, i) => {
                   const Icon = tab.icon;
@@ -325,7 +331,7 @@ export function LessonDetailPage() {
                     <button
                       key={tab.label}
                       onClick={() => setIsTabActive(i)}
-                      className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all ${
+                      className={`flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs font-semibold rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${
                         isTabActive === i
                           ? 'bg-emerald-950 text-emerald-300 font-bold'
                           : 'text-stone-600 hover:bg-stone-100'
@@ -414,27 +420,23 @@ export function LessonDetailPage() {
                 </div>
               )}
 
-              {/* Tab 3: Materi Pendukung */}
+              {/* Tab 3: Semua materi */}
               {isTabActive === 3 && (
                 <div className="space-y-3">
-                  {otherMaterials.length > 0 ? (
-                    otherMaterials.map(mat => (
-                      <a
+                  {materials.length > 0 ? (
+                    materials.map(mat => {
+                      const isActive = (mat.id || mat.url) === (activeMaterial?.id || activeMaterial?.url);
+                      return <div
                         key={mat.id}
-                        href={mat.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors"
+                        className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center ${isActive ? 'border-emerald-700 bg-emerald-50' : 'border-stone-200 bg-stone-50'}`}
                       >
-                        <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-bold text-xs uppercase">
-                          {mat.type}
-                        </div>
-                        <div>
+                        <div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold uppercase text-emerald-700">{mat.type}</div><div className="min-w-0">
                           <p className="font-semibold text-slate-800 text-sm">{mat.filename || 'Lampiran Materi'}</p>
-                          <p className="text-xs text-slate-500">{mat.url}</p>
-                        </div>
-                      </a>
-                    ))
+                          <p className="truncate text-xs text-slate-500">{mat.url}</p>
+                        </div></div>
+                        <div className="flex shrink-0 gap-2"><button type="button" onClick={() => { setActiveMaterialId(mat.id || mat.url); window.setTimeout(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); }} disabled={isActive} className="inline-flex min-h-10 flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-emerald-800 px-3 text-xs font-bold text-white hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 active:bg-emerald-950 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-slate-500 sm:flex-none">{isActive ? 'Sedang dibuka' : 'Baca di sini'}</button><a href={mat.url} target="_blank" rel="noreferrer" aria-label={`Buka ${mat.filename || mat.type} di tab baru`} className="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-300 text-slate-600 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"><ExternalLink className="h-4 w-4" /></a></div>
+                      </div>;
+                    })
                   ) : (
                     <div className="text-xs text-stone-400 italic py-4">Tidak ada materi pendukung tambahan.</div>
                   )}
@@ -496,7 +498,7 @@ export function LessonDetailPage() {
           {prevLesson ? (
             <Link
               to={`/lesson/${prevLesson.id}`}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl border border-stone-200 bg-white hover:border-emerald-900/30 hover:bg-stone-50 transition-all text-sm font-semibold text-slate-700 max-w-[48%]"
+              className="flex max-w-[48%] items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-900/30 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
             >
               <ChevronLeft size={18} className="shrink-0 text-emerald-900" />
               <div className="min-w-0">
@@ -509,7 +511,7 @@ export function LessonDetailPage() {
           {nextLesson ? (
             <Link
               to={`/lesson/${nextLesson.id}`}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl border border-stone-200 bg-white hover:border-emerald-900/30 hover:bg-stone-50 transition-all text-sm font-semibold text-slate-700 max-w-[48%] text-right ml-auto"
+              className="ml-auto flex max-w-[48%] items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-right text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-900/30 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
             >
               <div className="min-w-0">
                 <div className="text-[10px] text-stone-500 font-normal">Berikutnya</div>
@@ -540,7 +542,7 @@ function TimestampList({
         <button
           key={marker.id}
           onClick={() => onSeek(marker.timestamp, marker.id)}
-          className={`w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all ${
+          className={`w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${
             activeMarker === marker.id
               ? 'bg-emerald-50 text-emerald-900 font-bold'
               : 'hover:bg-stone-50 text-slate-600'

@@ -45,7 +45,7 @@ export function ProgramDetailPage() {
         setProgressInfo(getProgramProgress(userId, displayProgram.lessons));
       }
     }
-  }, [displayProgram?.id, userId]);
+  }, [displayProgram?.id, displayProgram?.lessons, userId]);
 
   const handleEnrollToggle = () => {
     if (!displayProgram?.id) return;

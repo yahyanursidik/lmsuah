@@ -119,7 +119,7 @@ const quizzesHandler = async (request: Request) => {
     if (isGuest(session)) throw new ForbiddenError('Must be logged in to submit a quiz.');
     const userId = session!.userId;
 
-    const data: any = await validateBody(request, submitSchema);
+    const data = await validateBody(request, submitSchema);
 
     const attemptRes = await db.select().from(quizAttempts).where(eq(quizAttempts.id, attemptId)).limit(1);
     const attempt = attemptRes[0];
@@ -143,7 +143,7 @@ const quizzesHandler = async (request: Request) => {
     const answerInserts = [];
 
     for (const q of qs) {
-      const userAnswer = data.answers.find((a: any) => a.questionId === q.id);
+      const userAnswer = data.answers.find((answer) => answer.questionId === q.id);
       let isCorrect = false;
 
       if (userAnswer) {

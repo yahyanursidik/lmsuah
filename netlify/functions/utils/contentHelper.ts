@@ -20,12 +20,18 @@ export function isGuest(session: UserSession | null): boolean {
 
 export function isPublisher(session: UserSession | null): boolean {
   if (!session) return false;
-  return session.roles.includes('publisher') || session.roles.includes('admin');
+  return session.roles.some((role) =>
+    ['publisher', 'admin', 'administrator', 'super_administrator'].includes(role)
+  );
 }
 
 export function isContributor(session: UserSession | null): boolean {
   if (!session) return false;
-  return session.roles.includes('contributor') || isPublisher(session);
+  return session.roles.some((role) => ['contributor', 'content_contributor'].includes(role)) || isPublisher(session);
+}
+
+export function getDatabaseActorId(session: UserSession): string | null {
+  return session.isDevelopmentDemo ? null : session.userId;
 }
 
 export function requireContentReadAccess(session: UserSession | null): { isGuestAccess: boolean } {

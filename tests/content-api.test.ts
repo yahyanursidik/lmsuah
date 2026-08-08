@@ -64,6 +64,9 @@ describe('Content API Utilities & Security Rules', () => {
     const contributorSession = { userId: 'user-2', roles: ['contributor'] };
     const publisherSession = { userId: 'user-3', roles: ['publisher'] };
     const adminSession = { userId: 'user-4', roles: ['admin'] };
+    const administratorSession = { userId: 'user-5', roles: ['administrator'] };
+    const superAdministratorSession = { userId: 'user-6', roles: ['super_administrator'] };
+    const contentContributorSession = { userId: 'user-7', roles: ['content_contributor'] };
 
     it('should correctly identify guest, contributor, and publisher roles', () => {
       expect(isGuest(guestSession)).toBe(true);
@@ -76,7 +79,10 @@ describe('Content API Utilities & Security Rules', () => {
 
       expect(isPublisher(publisherSession)).toBe(true);
       expect(isPublisher(adminSession)).toBe(true);
+      expect(isPublisher(administratorSession)).toBe(true);
+      expect(isPublisher(superAdministratorSession)).toBe(true);
       expect(isPublisher(contributorSession)).toBe(false);
+      expect(isContributor(contentContributorSession)).toBe(true);
     });
 
     it('should allow contributor to create draft but prevent contributor from publishing', () => {

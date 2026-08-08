@@ -106,6 +106,20 @@ export const privacyConsents = pgTable('privacy_consents', {
   consentedAt: timestamp('consented_at').defaultNow().notNull(),
 });
 
+// Konfigurasi global portal. Satu record "general" menjadi sumber pengaturan aktif.
+export const systemSettings = pgTable('system_settings', {
+  id: text('id').primaryKey().default('general'),
+  siteName: text('site_name').default('Portal Kajian UAH').notNull(),
+  supportEmail: text('support_email'),
+  defaultTimezone: text('default_timezone').default('Asia/Jakarta').notNull(),
+  allowRegistration: boolean('allow_registration').default(true).notNull(),
+  maintenanceMode: boolean('maintenance_mode').default(false).notNull(),
+  showPublicSchedule: boolean('show_public_schedule').default(true).notNull(),
+  allowPdfDownload: boolean('allow_pdf_download').default(true).notNull(),
+  updatedBy: text('updated_by').references(() => user.id),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Konten: Instructors
 export const instructors = pgTable('instructors', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -173,7 +187,8 @@ export const seriesBooks = pgTable('series_books', {
 // Konten: Chapters
 export const chapters = pgTable('chapters', {
   id: uuid('id').defaultRandom().primaryKey(),
-  bookId: uuid('book_id').notNull().references(() => books.id),
+  bookId: uuid('book_id').references(() => books.id),
+  programId: uuid('program_id').references(() => programs.id),
   title: text('title').notNull(),
   sequence: integer('sequence').notNull(),
   createdBy: text('created_by').references(() => user.id),

@@ -1,34 +1,64 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface QuizProps {
   quizId: string;
 }
 
+interface QuizOption {
+  id: string;
+  text: string;
+}
+
+interface QuizQuestion {
+  id: string;
+  text: string;
+  options: QuizOption[];
+}
+
+interface QuizData {
+  id: string;
+  title: string;
+  description?: string;
+  passingScore: number;
+  maxAttempts: number;
+  questions: QuizQuestion[];
+}
+
+interface QuizAttempt {
+  id: string;
+  status: 'in_progress' | 'submitted';
+  score?: number;
+  passed?: boolean;
+}
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Terjadi kesalahan yang tidak diketahui';
+
 export function QuizComponent({ quizId }: QuizProps) {
-  const [quiz, setQuiz] = useState<any>(null);
-  const [attempt, setAttempt] = useState<any>(null);
+  const [quiz, setQuiz] = useState<QuizData | null>(null);
+  const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchQuiz();
-  }, [quizId]);
-
-  const fetchQuiz = async () => {
+  const fetchQuiz = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch(`/api/quizzes/${quizId}`);
       if (!res.ok) throw new Error('Gagal memuat kuis');
       const json = await res.json();
       setQuiz(json.data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error: unknown) {
+      setError(errorMessage(error));
     } finally {
       setLoading(false);
     }
-  };
+  }, [quizId]);
+
+  useEffect(() => {
+    fetchQuiz();
+  }, [fetchQuiz]);
 
   const handleStartAttempt = async () => {
     try {
@@ -41,14 +71,16 @@ export function QuizComponent({ quizId }: QuizProps) {
       const json = await res.json();
       setAttempt(json.data);
       setAnswers({});
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error: unknown) {
+      setError(errorMessage(error));
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubmit = async () => {
+    if (!attempt) return;
+
     try {
       setSubmitting(true);
       const payload = {
@@ -70,8 +102,8 @@ export function QuizComponent({ quizId }: QuizProps) {
       }
       const json = await res.json();
       setAttempt(json.data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error: unknown) {
+      setError(errorMessage(error));
     } finally {
       setSubmitting(false);
     }
@@ -103,11 +135,11 @@ export function QuizComponent({ quizId }: QuizProps) {
         </div>
         
         <div className="space-y-8">
-          {quiz.questions.map((q: any, idx: number) => (
+          {quiz.questions.map((q, idx) => (
             <div key={q.id} className="space-y-3">
               <p className="font-semibold text-slate-800">{idx + 1}. {q.text}</p>
               <div className="space-y-2 pl-4">
-                {q.options.map((opt: any) => (
+                {q.options.map((opt) => (
                   <label key={opt.id} className="flex items-center gap-3 p-3 border border-stone-200 rounded-xl cursor-pointer hover:bg-stone-50 transition-colors">
                     <input
                       type="radio"

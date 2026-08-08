@@ -6,9 +6,9 @@ import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import { Copy, Check, Share2, MapPin, ExternalLink, Calendar, Phone, Users, Home } from 'lucide-react';
 
-const getVenueImage = (v: any) => {
-  if (v?.image && v.image.startsWith('/masjid')) return v.image;
-  if (v?.id?.includes('ukhuwah') || v?.name?.toLowerCase().includes('ukhuwah')) return '/masjid-ukhuwah.jpg';
+const getVenueImage = (venue: Pick<Venue, 'id' | 'name' | 'image'>) => {
+  if (venue.image?.startsWith('/masjid')) return venue.image;
+  if (venue.id.includes('ukhuwah') || venue.name.toLowerCase().includes('ukhuwah')) return '/masjid-ukhuwah.jpg';
   return '/masjid-umar.jpg';
 };
 
@@ -29,7 +29,7 @@ export function VenueDetailPage() {
   });
 
   const mockVenue = MOCK_VENUES.find((v) => v.id === id);
-  const rawVenue = (refineVenue as any)?.data || (refineVenue as any) || mockVenue;
+  const rawVenue = refineVenue || mockVenue;
   const venue: Venue | undefined = rawVenue ? { ...rawVenue, image: getVenueImage(rawVenue) } : undefined;
   const isLoading = venueQuery.isLoading;
   const isError = venueQuery.isError;

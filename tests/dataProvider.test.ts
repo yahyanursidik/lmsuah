@@ -8,7 +8,18 @@ global.fetch = fetchMock as unknown as typeof fetch;
 
 describe('Custom Refine REST Data Provider', () => {
   beforeEach(() => {
+    const storage = new Map<string, string>();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+        clear: () => storage.clear(),
+      },
+    });
     fetchMock.mockReset();
+    window.localStorage.clear();
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-1234');
   });
 
@@ -51,6 +62,16 @@ describe('Custom Refine REST Data Provider', () => {
         expect((err as HttpError).statusCode).toBe(403);
         expect((err as HttpError).message).toBe('Akses tidak diizinkan');
       }
+    });
+
+    it('mengirim identitas demo admin pada localhost agar API lokal mengenali sesi', async () => {
+      window.localStorage.setItem('lms_demo_user', JSON.stringify({ id: 'demo-admin-1', role: 'admin' }));
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'success' }) });
+
+      await fetchWrapper('/api/test');
+
+      const headers = fetchMock.mock.calls[0][1].headers as Headers;
+      expect(headers.get('X-LMS-Demo-User')).toBe('demo-admin-1');
     });
   });
 

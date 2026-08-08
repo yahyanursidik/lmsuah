@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { requireRole, requirePermission, ForbiddenError, UserSession } from '../netlify/functions/middleware/auth.js';
+import { requireRole, requirePermission, ForbiddenError, UserSession, getDevelopmentDemoSession } from '../netlify/functions/middleware/auth.js';
 import * as permissionsModule from '../netlify/functions/utils/permissions.js';
 
 describe('Auth & Security Unit Tests', () => {
@@ -58,5 +58,18 @@ describe('Auth & Security Unit Tests', () => {
     // Dipastikan ID yang diperbarui tetap milik user-1 (session.userId)
     expect(activeUserId).toBe('user-1');
     expect(activeUserId).not.toBe('user-2');
+  });
+
+  it('4. Demo admin hanya dapat diterjemahkan menjadi sesi pada environment non-production', () => {
+    const request = new Request('http://localhost/api/programs', {
+      headers: { 'x-lms-demo-user': 'demo-admin-1' },
+    });
+
+    expect(getDevelopmentDemoSession(request, 'development')).toEqual({
+      userId: 'demo-admin-1',
+      roles: ['super_administrator'],
+      isDevelopmentDemo: true,
+    });
+    expect(getDevelopmentDemoSession(request, 'production')).toBeNull();
   });
 });

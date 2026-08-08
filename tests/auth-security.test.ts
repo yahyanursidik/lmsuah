@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { requireRole, requirePermission, ForbiddenError, UserSession, getDevelopmentDemoSession } from '../netlify/functions/middleware/auth.js';
 import * as permissionsModule from '../netlify/functions/utils/permissions.js';
+import { authProvider } from '../src/providers/authProvider.js';
 
 describe('Auth & Security Unit Tests', () => {
   it('1. Participant tidak dapat mengakses endpoint admin (requireRole / requirePermission menolak)', async () => {
@@ -71,5 +72,21 @@ describe('Auth & Security Unit Tests', () => {
       isDevelopmentDemo: true,
     });
     expect(getDevelopmentDemoSession(request, 'production')).toBeNull();
+  });
+
+  it('5. Demo peserta dikenali di development dan 403 tidak memicu logout otomatis', async () => {
+    const request = new Request('http://localhost/api/lessons/lesson-1', {
+      headers: { 'x-lms-demo-user': 'demo-peserta-1' },
+    });
+
+    expect(getDevelopmentDemoSession(request, 'development')).toEqual({
+      userId: 'demo-peserta-1',
+      roles: ['participant'],
+      isDevelopmentDemo: true,
+    });
+
+    await expect(authProvider.onError?.({ statusCode: 403 })).resolves.toMatchObject({
+      logout: false,
+    });
   });
 });

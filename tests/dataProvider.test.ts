@@ -73,6 +73,16 @@ describe('Custom Refine REST Data Provider', () => {
       const headers = fetchMock.mock.calls[0][1].headers as Headers;
       expect(headers.get('X-LMS-Demo-User')).toBe('demo-admin-1');
     });
+
+    it('mengirim identitas demo peserta agar akses pertemuan lokal tidak dianggap guest', async () => {
+      window.localStorage.setItem('lms_demo_user', JSON.stringify({ id: 'demo-peserta-1', role: 'participant' }));
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'success' }) });
+
+      await fetchWrapper('/api/lessons/lesson-1');
+
+      const headers = fetchMock.mock.calls[0][1].headers as Headers;
+      expect(headers.get('X-LMS-Demo-User')).toBe('demo-peserta-1');
+    });
   });
 
   describe('dataProvider', () => {

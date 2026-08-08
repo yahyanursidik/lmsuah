@@ -14,6 +14,12 @@ interface LocalFunctionModule {
 }
 
 function netlifyFunctionsPlugin(): Plugin {
+  const functionPathMap: Record<string, string> = {
+    '/api/admin/roles': 'admin-roles',
+    '/api/admin/roles/assign': 'admin-role-assign',
+    '/api/privacy/consent': 'consent',
+  };
+
   return {
     name: 'netlify-functions-dev',
     configureServer(server) {
@@ -25,7 +31,7 @@ function netlifyFunctionsPlugin(): Plugin {
         try {
           const fullUrl = new URL(req.url, `http://${req.headers.host || 'localhost:5173'}`);
           const pathParts = fullUrl.pathname.split('/').filter(Boolean);
-          const resource = pathParts[1];
+          const resource = functionPathMap[fullUrl.pathname] || pathParts[1];
 
           if (!resource) {
             return next();

@@ -41,6 +41,8 @@ type AdminRolesPayload = {
   userRoles: UserRoleItem[];
 };
 
+type ApiEnvelope<T> = T | { data?: T };
+
 const statusLabel: Record<string, string> = {
   active: 'Aktif',
   completed: 'Selesai',
@@ -65,6 +67,16 @@ function Pill({ children, tone = 'slate' }: { children: ReactNode; tone?: 'emera
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{children}</span>;
 }
 
+async function readJsonPayload<T extends object>(response: Response, fallbackMessage: string): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(fallbackMessage);
+  }
+
+  const body = await response.json() as ApiEnvelope<T>;
+  return 'data' in body && body.data !== undefined ? body.data : body as T;
+}
+
 export function AdminUsersPage() {
   const [query, setQuery] = useState('');
   const [rolesPayload, setRolesPayload] = useState<AdminRolesPayload>({ roles: [], userRoles: [] });
@@ -86,7 +98,7 @@ export function AdminUsersPage() {
     setRolesError('');
     try {
       const response = await fetchWrapper('/api/admin/roles');
-      const body = await response.json() as AdminRolesPayload;
+      const body = await readJsonPayload<AdminRolesPayload>(response, 'Endpoint pengguna mengembalikan halaman HTML. Periksa routing API admin roles.');
       setRolesPayload({ roles: body.roles || [], userRoles: body.userRoles || [] });
     } catch (error) {
       setRolesError(error instanceof Error ? error.message : 'Data pengguna belum dapat dimuat.');

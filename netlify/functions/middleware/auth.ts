@@ -17,6 +17,14 @@ export function getDevelopmentDemoSession(
   if (environment === 'production') return null;
 
   const demoUserId = request.headers.get('x-lms-demo-user');
+  if (demoUserId === 'demo-peserta-1') {
+    return {
+      userId: demoUserId,
+      roles: ['participant'],
+      isDevelopmentDemo: true,
+    };
+  }
+
   if (demoUserId !== 'demo-admin-1') return null;
 
   return {

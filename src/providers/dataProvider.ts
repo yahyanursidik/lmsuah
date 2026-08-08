@@ -17,7 +17,7 @@ export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
   if (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
     try {
       const demoUser = JSON.parse(window.localStorage.getItem('lms_demo_user') || 'null') as { id?: string } | null;
-      if (demoUser?.id === 'demo-admin-1') headers.set('X-LMS-Demo-User', demoUser.id);
+      if (demoUser?.id?.startsWith('demo-')) headers.set('X-LMS-Demo-User', demoUser.id);
     } catch {
       // Invalid demo state is ignored; the server will require a real session.
     }

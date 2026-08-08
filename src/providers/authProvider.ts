@@ -205,11 +205,18 @@ export const authProvider: AuthProvider = {
 
   onError: async (error) => {
     console.error(error);
-    if (error?.status === 401 || error?.status === 403) {
+    const status = error?.statusCode || error?.status;
+    if (status === 401) {
       return {
         logout: true,
         redirectTo: '/login',
         error: new Error('Sesi Anda telah berakhir'),
+      };
+    }
+    if (status === 403) {
+      return {
+        logout: false,
+        error: new Error('Akses tidak diizinkan untuk halaman atau materi ini'),
       };
     }
     return { error };

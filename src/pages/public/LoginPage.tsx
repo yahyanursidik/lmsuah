@@ -125,7 +125,9 @@ export function LoginPage() {
               <div>
                 <p className="text-sm font-semibold text-emerald-800">Selamat datang kembali</p>
                 <h2 id="login-title" className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Masuk ke akun</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500">Gunakan akun portal atau pilih akses demo untuk melihat pengalaman setiap peran.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Gunakan akun portal Anda atau <Link to="/register" className="font-bold text-emerald-800 hover:underline">daftar mandiri di sini</Link>.
+                </p>
               </div>
 
               {loginError && (

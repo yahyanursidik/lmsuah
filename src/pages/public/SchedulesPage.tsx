@@ -13,13 +13,18 @@ export function SchedulesPage() {
     resource: 'schedules',
     pagination: { mode: 'off' },
   });
-  const { result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
+  const { query: venuesQuery, result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
 
-  const apiItems = listResult?.data;
-  const venues = venuesResult.data.length > 0 ? venuesResult.data : MOCK_VENUES;
-  const rawSchedules: ScheduleItem[] = ((apiItems && apiItems.length > 0)
-    ? apiItems
-    : MOCK_SCHEDULES).map((schedule) => ({ ...schedule, venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name }));
+  const apiItems = listResult?.data || [];
+  const apiVenues = venuesResult?.data || [];
+  const isFetched = listQuery.isFetched || apiItems.length > 0;
+  const isVenuesFetched = venuesQuery.isFetched || apiVenues.length > 0;
+
+  const venues = isVenuesFetched ? apiVenues : (venuesQuery.isError ? MOCK_VENUES : []);
+  const rawSchedules: ScheduleItem[] = (isFetched ? apiItems : (listQuery.isError ? MOCK_SCHEDULES : [])).map((schedule) => ({
+    ...schedule,
+    venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name,
+  }));
   const isLoading = listQuery.isLoading;
   const isError = listQuery.isError;
   const refetch = listQuery.refetch;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { SEOHead } from '../../components/public/SEOHead';
 import { LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
@@ -16,12 +16,21 @@ import {
   CheckCircle2,
   Bookmark,
   FileText,
+  FileAudio,
+  Link2,
+  Layers,
   Plus,
   Trash2,
   ExternalLink,
+  Search,
+  X,
+  ChevronDown,
+  Play,
+  Circle,
 } from 'lucide-react';
 import {
   getSingleLessonProgress,
+  getUserLessonProgress,
   saveLastPosition,
   toggleLessonCompletion,
   getUserNotes,
@@ -65,6 +74,7 @@ function formatTimestamp(seconds: number) {
 export function LessonDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: identity } = useGetIdentity<{ id: string; name: string }>();
   const userId = identity?.id || 'demo-peserta-1';
 
@@ -76,6 +86,9 @@ export function LessonDetailPage() {
   const [notes, setNotes] = useState<ReturnType<typeof getUserNotes>>([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
+  const [isMeetingDrawerOpen, setIsMeetingDrawerOpen] = useState(false);
+  const [meetingSearchQuery, setMeetingSearchQuery] = useState('');
+  const [meetingFilter, setMeetingFilter] = useState<'all' | 'completed' | 'uncompleted'>('all');
   const viewerRef = useRef<HTMLDivElement>(null);
 
   const { query: lessonQuery, result: lesson } = useOne<LessonItem>({
@@ -218,8 +231,23 @@ export function LessonDetailPage() {
   const materials = lesson.materials || [];
   const youtubeVideo = materials.find(m => m.type === 'youtube');
   const activeMaterial = materials.find((material) => (material.id || material.url) === activeMaterialId) || youtubeVideo || materials[0];
+  const activeMaterialIndex = materials.findIndex((m) => (m.id || m.url) === (activeMaterial?.id || activeMaterial?.url));
   const markers = lesson.markers || [];
-  const video = youtubeVideo ? { youtubeId: youtubeVideo.url.split('v=')[1] || youtubeVideo.url.split('/').pop() || '', duration: youtubeVideo.duration } : null;
+  const activeYoutube = activeMaterial?.type === 'youtube' ? activeMaterial : youtubeVideo;
+  const video = activeYoutube ? { youtubeId: activeYoutube.url.split('v=')[1] || activeYoutube.url.split('/').pop() || '', duration: activeYoutube.duration } : null;
+
+  const handleSelectMaterial = (mat?: { id?: string; type: string; url: string; filename?: string; duration?: string }) => {
+    if (!mat) return;
+    setActiveMaterialId(mat.id || mat.url);
+  };
+
+  const filteredSiblings = siblings.filter((s: LessonItem) => {
+    const matchesSearch = `${s.sequence} ${s.title} ${s.description || ''}`.toLowerCase().includes(meetingSearchQuery.toLowerCase());
+    const isComp = getUserLessonProgress(userId).some((p: { lessonId: string; isCompleted: boolean }) => p.lessonId === s.id && p.isCompleted);
+    if (meetingFilter === 'completed') return matchesSearch && isComp;
+    if (meetingFilter === 'uncompleted') return matchesSearch && !isComp;
+    return matchesSearch;
+  });
 
   return (
     <div className="min-h-screen bg-stone-50 pb-16">
@@ -293,11 +321,334 @@ export function LessonDetailPage() {
           </div>
         </div>
 
+        {/* Quick Meeting Jump & Selector Bar (User-friendly navigation for many meetings) */}
+        {siblings.length > 1 && (
+          <div className="bg-emerald-950 text-white rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-800 text-emerald-200 font-bold text-sm">
+                  #{lesson.sequence}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                      Pertemuan {lesson.sequence} dari {siblings.length}
+                    </span>
+                    {isCompleted && (
+                      <span className="bg-emerald-800 text-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Selesai
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-bold text-white truncate max-w-md">
+                    {lesson.title}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Action: Open All Meetings Drawer */}
+              <button
+                type="button"
+                onClick={() => setIsMeetingDrawerOpen(true)}
+                className="inline-flex items-center gap-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-emerald-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+              >
+                <List size={16} />
+                <span>Daftar Semua Pertemuan ({siblings.length})</span>
+                <ChevronDown size={14} className="text-emerald-300" />
+              </button>
+            </div>
+
+            {/* Quick Horizontal Jump List for Meetings */}
+            <div className="flex gap-2 overflow-x-auto pt-1 pb-1 scrollbar-thin scrollbar-thumb-emerald-800">
+              {siblings.map((s: LessonItem) => {
+                const isActive = s.id === lesson.id;
+                const isComp = getUserLessonProgress(userId).some((p: { lessonId: string; isCompleted: boolean }) => p.lessonId === s.id && p.isCompleted);
+
+                return (
+                  <Link
+                    key={s.id}
+                    to={location.pathname.startsWith('/belajar') ? `/belajar/lesson/${s.id}` : `/lesson/${s.id}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all ${
+                      isActive
+                        ? 'bg-amber-400 text-slate-950 font-bold shadow-xs scale-[1.02]'
+                        : 'bg-emerald-900/70 text-emerald-100 hover:bg-emerald-800 hover:text-white'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold ${
+                      isActive ? 'bg-slate-950 text-amber-400' : 'bg-emerald-800 text-emerald-200'
+                    }`}>
+                      {s.sequence}
+                    </span>
+                    <span className="truncate max-w-[140px] sm:max-w-[180px]">{s.title}</span>
+                    {isComp && !isActive && <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* All Meetings Modal Drawer */}
+        {isMeetingDrawerOpen && (
+          <div className="fixed inset-0 z-[150] bg-slate-950/70 backdrop-blur-xs flex justify-center items-end sm:items-center p-0 sm:p-4">
+            <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-6">
+              
+              {/* Drawer Header */}
+              <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-100 text-emerald-900 rounded-xl">
+                    <List size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                      Daftar Pertemuan Kajian
+                    </h3>
+                    <p className="text-xs text-stone-500">
+                      Pilih pertemuan untuk mulai menyimak materi ({siblings.length} pertemuan tersedia)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMeetingDrawerOpen(false)}
+                  className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Drawer Search & Filter Bar */}
+              <div className="p-4 border-b border-stone-100 bg-white space-y-3">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3.5 top-3 text-stone-400" />
+                  <input
+                    type="text"
+                    value={meetingSearchQuery}
+                    onChange={(e) => setMeetingSearchQuery(e.target.value)}
+                    placeholder="Cari nomor atau judul pertemuan (misal: Pertemuan 4)..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-emerald-800 focus:bg-white"
+                  />
+                  {meetingSearchQuery && (
+                    <button
+                      onClick={() => setMeetingSearchQuery('')}
+                      className="absolute right-3 top-2.5 text-stone-400 hover:text-slate-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex gap-1.5 text-xs">
+                  {[
+                    { key: 'all', label: 'Semua Pertemuan' },
+                    { key: 'completed', label: '✓ Selesai' },
+                    { key: 'uncompleted', label: '▶ Belum Selesai' },
+                  ].map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setMeetingFilter(f.key as any)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        meetingFilter === f.key
+                          ? 'bg-emerald-950 text-emerald-300 font-bold'
+                          : 'bg-stone-100 text-slate-600 hover:bg-stone-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Drawer Meetings Scroll List */}
+              <div className="p-4 overflow-y-auto space-y-2 flex-1 max-h-[50vh]">
+                {filteredSiblings.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-stone-400 italic">
+                    Tidak ada pertemuan yang sesuai dengan pencarian "{meetingSearchQuery}".
+                  </div>
+                ) : (
+                  filteredSiblings.map((s: LessonItem) => {
+                    const isActive = s.id === lesson.id;
+                    const isComp = getUserLessonProgress(userId).some((p: { lessonId: string; isCompleted: boolean }) => p.lessonId === s.id && p.isCompleted);
+
+                    return (
+                      <Link
+                        key={s.id}
+                        to={location.pathname.startsWith('/belajar') ? `/belajar/lesson/${s.id}` : `/lesson/${s.id}`}
+                        onClick={() => setIsMeetingDrawerOpen(false)}
+                        className={`flex items-center justify-between p-3.5 rounded-xl border text-xs transition-all ${
+                          isActive
+                            ? 'bg-emerald-50 border-emerald-600 font-bold shadow-xs'
+                            : 'bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                            isActive
+                              ? 'bg-emerald-900 text-white'
+                              : 'bg-stone-100 text-slate-700'
+                          }`}>
+                            #{s.sequence}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className={`text-slate-900 text-sm font-semibold truncate ${isActive ? 'font-bold text-emerald-950' : ''}`}>
+                              {s.title}
+                            </h4>
+                            {s.description && (
+                              <p className="text-[11px] text-stone-500 truncate mt-0.5">{s.description}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          {isComp ? (
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                              <CheckCircle2 size={12} /> Selesai
+                            </span>
+                          ) : isActive ? (
+                            <span className="bg-emerald-900 text-white text-[10px] font-bold px-2 py-1 rounded-md">
+                              Sedang Dibuka
+                            </span>
+                          ) : (
+                            <span className="text-stone-400 text-[10px] font-medium hover:text-slate-700">
+                              Buka &rarr;
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-3 bg-stone-50 border-t border-stone-200 text-center text-xs text-stone-500">
+                Menampilkan {filteredSiblings.length} dari {siblings.length} pertemuan
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Desktop Layout: Video Left + Markers Right */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Video Player Column */}
           <div className="lg:col-span-2 space-y-4">
+
+            {/* Multi-Material Header & Switcher Bar (Intuitive UX when lesson has > 1 material) */}
+            {materials.length > 1 && (
+              <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold">
+                      {materials.length}
+                    </span>
+                    <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      <Layers size={16} className="text-emerald-700" />
+                      Materi Pembelajaran Pertemuan Ini
+                    </h2>
+                  </div>
+
+                  {/* Material Prev/Next navigation buttons */}
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <button
+                      type="button"
+                      disabled={activeMaterialIndex <= 0}
+                      onClick={() => handleSelectMaterial(materials[activeMaterialIndex - 1])}
+                      className="px-2.5 py-1.5 rounded-lg border border-stone-200 text-slate-700 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed font-semibold transition-colors flex items-center gap-1"
+                    >
+                      &larr; Prev
+                    </button>
+                    <span className="text-stone-500 text-xs font-mono font-medium px-1">
+                      {activeMaterialIndex + 1} / {materials.length}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={activeMaterialIndex >= materials.length - 1}
+                      onClick={() => handleSelectMaterial(materials[activeMaterialIndex + 1])}
+                      className="px-2.5 py-1.5 rounded-lg border border-stone-200 text-slate-700 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed font-semibold transition-colors flex items-center gap-1"
+                    >
+                      Next &rarr;
+                    </button>
+                  </div>
+                </div>
+
+                {/* Material Vertical List (Playlist Style) */}
+                <div className="flex flex-col gap-2 mt-4 border-t border-stone-100 pt-3">
+                  {materials.map((mat, idx) => {
+                    const isActive = (mat.id || mat.url) === (activeMaterial?.id || activeMaterial?.url);
+                    const Icon = mat.type === 'youtube' ? Video : mat.type === 'PDF' ? FileText : mat.type === 'audio' ? FileAudio : Link2;
+                    const typeBadge = mat.type === 'youtube' ? `Video #${idx + 1}` : mat.type === 'PDF' ? `PDF #${idx + 1}` : mat.type;
+
+                    return (
+                      <button
+                        key={mat.id || mat.url}
+                        type="button"
+                        onClick={() => handleSelectMaterial(mat)}
+                        className={`flex items-center justify-between p-3.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 group ${
+                          isActive
+                            ? 'bg-emerald-50 border-emerald-600 font-bold shadow-xs'
+                            : 'bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-emerald-900 text-white' : 'bg-stone-100 text-emerald-800 group-hover:bg-emerald-100'}`}>
+                            <Icon size={18} />
+                          </div>
+                          <div className="flex flex-col items-start text-left min-w-0">
+                            <span className={`truncate max-w-[200px] sm:max-w-[300px] text-sm ${isActive ? 'text-emerald-950 font-bold' : 'text-slate-900 font-semibold group-hover:text-emerald-800 transition-colors'}`}>
+                              {idx + 1}. {mat.filename || typeBadge}
+                            </span>
+                            <span className="text-[11px] text-stone-500 mt-0.5">
+                              {typeBadge} {mat.duration ? `• ${mat.duration}` : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className={`hidden sm:block text-xs font-semibold ${isActive ? 'text-emerald-700' : 'text-slate-500'}`}>
+                            {isActive ? 'Sedang dibuka' : 'Pilih materi'}
+                          </span>
+                          {isActive ? (
+                            <Play size={16} className="text-emerald-600 fill-emerald-600" />
+                          ) : (
+                            <Circle size={18} className="text-stone-300 group-hover:text-emerald-500 transition-colors" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Quiz Option in the Playlist */}
+                  {lesson.quiz && (
+                    <button
+                      type="button"
+                      onClick={() => setIsTabActive(4)} // Switch to Quiz tab
+                      className="flex items-center justify-between p-3.5 rounded-xl border bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 group"
+                    >
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-amber-600 group-hover:bg-amber-100">
+                          <AlertCircle size={18} />
+                        </div>
+                        <div className="flex flex-col items-start text-left min-w-0">
+                          <span className="truncate max-w-[200px] sm:max-w-[300px] text-sm text-slate-900 font-semibold group-hover:text-amber-700 transition-colors">
+                            {materials.length + 1}. Kuis Evaluasi
+                          </span>
+                          <span className="text-[11px] text-stone-500 mt-0.5">
+                            {lesson.quiz.title || 'Uji pemahaman materi'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="hidden sm:block text-xs font-semibold text-slate-500">
+                          Kerjakan kuis
+                        </span>
+                        <Circle size={18} className="text-stone-300 group-hover:text-amber-500 transition-colors" />
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Primary material viewer */}
             {activeMaterial ? (
@@ -474,7 +825,7 @@ export function LessonDetailPage() {
                   {siblings.map((s: LessonItem) => (
                     <Link
                       key={s.id}
-                      to={`/lesson/${s.id}`}
+                      to={location.pathname.startsWith('/belajar') ? `/belajar/lesson/${s.id}` : `/lesson/${s.id}`}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                         s.id === lesson.id
                           ? 'bg-emerald-50 text-emerald-900 font-bold'
@@ -497,7 +848,7 @@ export function LessonDetailPage() {
         <nav className="flex items-center justify-between gap-4 pt-4 border-t border-stone-200">
           {prevLesson ? (
             <Link
-              to={`/lesson/${prevLesson.id}`}
+              to={location.pathname.startsWith('/belajar') ? `/belajar/lesson/${prevLesson.id}` : `/lesson/${prevLesson.id}`}
               className="flex max-w-[48%] items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-900/30 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
             >
               <ChevronLeft size={18} className="shrink-0 text-emerald-900" />
@@ -510,7 +861,7 @@ export function LessonDetailPage() {
 
           {nextLesson ? (
             <Link
-              to={`/lesson/${nextLesson.id}`}
+              to={location.pathname.startsWith('/belajar') ? `/belajar/lesson/${nextLesson.id}` : `/lesson/${nextLesson.id}`}
               className="ml-auto flex max-w-[48%] items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-right text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-900/30 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
             >
               <div className="min-w-0">

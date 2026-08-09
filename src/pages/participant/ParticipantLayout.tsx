@@ -15,7 +15,7 @@ const groups: Array<{ label: string; items: NavItem[] }> = [
     { label: 'Kajian Saya', href: '/belajar', icon: BookOpen, end: true },
     { label: 'Progres Belajar', href: '/belajar/progres', icon: TrendingUp },
     { label: 'Jadwal Kajian', href: '/belajar/jadwal', icon: CalendarDays },
-    { label: 'Lokasi Majelis', href: '/venues', icon: MapPin },
+    { label: 'Lokasi Majelis', href: '/belajar/lokasi', icon: MapPin },
   ] },
   { label: 'Koleksi & akun', items: [
     { label: 'Tersimpan & Catatan', href: '/tersimpan', icon: Bookmark },

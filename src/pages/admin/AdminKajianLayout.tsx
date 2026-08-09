@@ -18,19 +18,61 @@ export function AdminKajianLayout() {
     { label: 'Peserta', href: `/admin/programs/${id}/participants`, icon: Users },
   ];
 
-  if (query.isLoading) return <div className="h-72 animate-pulse rounded-xl bg-slate-800 motion-reduce:animate-none" />;
+  if (query.isLoading) return <div className="h-72 animate-pulse rounded-xl bg-slate-100 motion-reduce:animate-none" />;
 
   return (
     <div className="mx-auto max-w-[90rem] space-y-6">
-      <header className="flex min-w-0 items-start gap-3 border-b border-slate-800 pb-5">
-        <button type="button" onClick={() => navigate('/admin/programs')} aria-label="Kembali ke daftar program" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 active:bg-slate-700"><ArrowLeft className="h-5 w-5" aria-hidden="true" /></button>
-        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2">{program?.status && <span className="rounded-md bg-slate-800 px-2 py-1 text-[0.65rem] font-bold capitalize text-slate-400">{program.status}</span>}</div><h1 className="mt-1 min-w-0 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">{program?.title || 'Program tidak ditemukan'}</h1></div>
+      <header className="flex min-w-0 items-start gap-3 border-b border-slate-200/80 pb-5">
+        <button 
+          type="button" 
+          onClick={() => navigate('/admin/programs')} 
+          aria-label="Kembali ke daftar program" 
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {program?.status && (
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${
+                program.status === 'published' 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                  : program.status === 'draft'
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-slate-100 border-slate-200 text-slate-600'
+              }`}>
+                {program.status === 'published' ? 'Terbit' : program.status}
+              </span>
+            )}
+          </div>
+          <h1 className="mt-1.5 min-w-0 break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            {program?.title || 'Program tidak ditemukan'}
+          </h1>
+        </div>
       </header>
 
-      <div className="grid min-w-0 gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <nav aria-label="Navigasi program" className="flex gap-1 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-2 lg:flex-col">
-            {menuItems.map((item) => { const Icon = item.icon; const active = location.pathname === item.href; return <Link key={item.href} to={item.href} aria-current={active ? 'page' : undefined} className={`inline-flex min-h-11 shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${active ? 'bg-emerald-950 text-emerald-200' : 'text-slate-400 hover:bg-slate-900 hover:text-white'}`}><Icon className="h-4 w-4" aria-hidden="true" />{item.label}</Link>; })}
+          <nav aria-label="Navigasi program" className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/80 bg-white p-1.5 shadow-xs lg:flex-col">
+            {menuItems.map((item) => { 
+              const Icon = item.icon; 
+              const active = location.pathname === item.href; 
+              return (
+                <Link 
+                  key={item.href} 
+                  to={item.href} 
+                  aria-current={active ? 'page' : undefined} 
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                    active 
+                      ? 'bg-emerald-50 border border-emerald-200/80 text-emerald-700 font-semibold shadow-2xs' 
+                      : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Icon className={`h-4 w-4 ${active ? 'text-emerald-600' : 'text-slate-400'}`} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </Link>
+              ); 
+            })}
           </nav>
         </aside>
         <div className="min-w-0"><Outlet /></div>

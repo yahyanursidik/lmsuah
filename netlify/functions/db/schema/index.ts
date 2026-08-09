@@ -52,6 +52,7 @@ export const profiles = pgTable('profiles', {
   authUserId: text('auth_user_id').notNull().unique().references(() => user.id),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
+  phone: text('phone'),
   avatarUrl: text('avatar_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -395,4 +396,20 @@ export const quizAnswers = pgTable('quiz_answers', {
   optionId: uuid('option_id').references(() => questionOptions.id), // Can be null if unanswered
   isCorrectSnapshot: boolean('is_correct_snapshot'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ----------------------------------------------------
+// PENGUMUMAN (ANNOUNCEMENTS)
+// ----------------------------------------------------
+
+export const announcements = pgTable('announcements', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  linkUrl: text('link_url'),
+  imageUrl: text('image_url'),
+  status: text('status').default('published').notNull(), // 'draft', 'published'
+  createdBy: text('created_by').references(() => user.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

@@ -106,23 +106,33 @@ export function useParticipantPortalData() {
     pagination: { mode: 'off' },
   });
 
-  const apiPrograms = programsQuery.result.data;
-  const apiLessons = lessonsQuery.result.data;
-  const apiSchedules = schedulesQuery.result.data;
-  const apiVenues = venuesQuery.result.data;
-  const venues = apiVenues.length > 0 ? apiVenues : fallbackVenues;
-  const schedules = (apiSchedules.length > 0 ? apiSchedules : fallbackSchedules).map((schedule) => ({
+  const apiPrograms = programsQuery.result.data || [];
+  const apiLessons = lessonsQuery.result.data || [];
+  const apiSchedules = schedulesQuery.result.data || [];
+  const apiVenues = venuesQuery.result.data || [];
+
+  const isProgramsReady = programsQuery.query.isFetched || apiPrograms.length > 0;
+  const isLessonsReady = lessonsQuery.query.isFetched || apiLessons.length > 0;
+  const isSchedulesReady = schedulesQuery.query.isFetched || apiSchedules.length > 0;
+  const isVenuesReady = venuesQuery.query.isFetched || apiVenues.length > 0;
+
+  const programs = isProgramsReady ? apiPrograms : (programsQuery.query.isError ? fallbackPrograms : []);
+  const lessons = isLessonsReady ? apiLessons : (lessonsQuery.query.isError ? fallbackLessons : []);
+  const venues = isVenuesReady ? apiVenues : (venuesQuery.query.isError ? fallbackVenues : []);
+  const rawSchedules = isSchedulesReady ? apiSchedules : (schedulesQuery.query.isError ? fallbackSchedules : []);
+
+  const schedules = rawSchedules.map((schedule) => ({
     ...schedule,
     venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name,
   }));
 
   return {
-    programs: apiPrograms.length > 0 ? apiPrograms : fallbackPrograms,
-    lessons: apiLessons.length > 0 ? apiLessons : fallbackLessons,
+    programs: programs.length > 0 ? programs : (programsQuery.query.isLoading ? [] : fallbackPrograms),
+    lessons: lessons.length > 0 ? lessons : (lessonsQuery.query.isLoading ? [] : fallbackLessons),
     schedules,
     venues,
     isLoading: programsQuery.query.isLoading || lessonsQuery.query.isLoading || schedulesQuery.query.isLoading || venuesQuery.query.isLoading,
-    isFallback: apiPrograms.length === 0 || apiLessons.length === 0,
+    isFallback: isProgramsReady && apiPrograms.length === 0,
     isError: programsQuery.query.isError || lessonsQuery.query.isError || schedulesQuery.query.isError || venuesQuery.query.isError,
     refetch: () => void Promise.all([
       programsQuery.query.refetch(),

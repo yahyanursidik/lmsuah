@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { MOCK_PROGRAMS, Program } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
@@ -8,6 +8,7 @@ import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public
 export function ProgramsPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('Semua');
+  const location = useLocation();
 
   const categories = ['Semua', 'Fiqih', 'Aqidah', 'Akhlaq', 'Hadits'];
 
@@ -16,10 +17,11 @@ export function ProgramsPage() {
     pagination: { mode: 'off' },
   });
 
-  const apiPrograms = listResult?.data;
-  const rawPrograms: Program[] = (apiPrograms && apiPrograms.length > 0)
+  const apiPrograms = listResult?.data || [];
+  const isFetched = listQuery.isFetched || apiPrograms.length > 0;
+  const rawPrograms: Program[] = isFetched
     ? apiPrograms
-    : MOCK_PROGRAMS;
+    : (listQuery.isError ? MOCK_PROGRAMS : []);
   const isLoading = listQuery.isLoading;
   const isError = listQuery.isError;
   const refetch = listQuery.refetch;
@@ -139,7 +141,7 @@ export function ProgramsPage() {
                   </div>
                 </div>
                 <Link
-                  to={`/programs/${prog.id}`}
+                  to={location.pathname.startsWith('/belajar') ? `/belajar/katalog/${prog.id}` : `/programs/${prog.id}`}
                   className="mt-2 block w-full rounded-xl border border-stone-300 py-2.5 text-center text-xs font-bold text-slate-800 hover:bg-emerald-900 hover:text-white hover:border-emerald-900 transition-all min-h-[44px] flex items-center justify-center"
                 >
                   Detail Program & Kurikulum

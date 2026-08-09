@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useOne, useList } from '@refinedev/core';
 import { MOCK_VENUES, MOCK_PROGRAMS, MOCK_SCHEDULES, Venue, Program, ScheduleItem } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
@@ -14,6 +14,7 @@ const getVenueImage = (venue: Pick<Venue, 'id' | 'name' | 'image'>) => {
 
 export function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [sharedLocation, setSharedLocation] = useState(false);
 
@@ -316,7 +317,7 @@ export function VenueDetailPage() {
                     <h4 className="font-bold text-slate-900 text-sm">{prog.title}</h4>
                     <p className="text-xs text-emerald-900 font-semibold">{prog.routineSchedule}</p>
                     <Link
-                      to={`/programs/${prog.id}`}
+                      to={location.pathname.startsWith('/belajar') ? `/belajar/katalog/${prog.id}` : `/programs/${prog.id}`}
                       className="block text-xs font-bold text-slate-700 hover:text-emerald-900 pt-2"
                     >
                       Lihat Detail Program & Kurikulum →

@@ -22,13 +22,15 @@ const adminRoleAssignHandler = async (request: Request) => {
     throw new ForbiddenError('Pengguna tidak dapat menetapkan atau menguatkan role untuk dirinya sendiri');
   }
 
+  const assignedBy = session.isDevelopmentDemo ? null : session.userId;
+
   // Insert atau ignore jika role sudah diberikan
   await db
     .insert(userRoles)
     .values({
       userId: body.targetUserId,
       roleId: body.roleId,
-      assignedBy: session.userId, // Audit log penetapan oleh siapa
+      assignedBy, // Audit log penetapan oleh siapa
       assignedAt: new Date(),
     })
     .onConflictDoNothing();

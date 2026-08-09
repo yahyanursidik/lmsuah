@@ -2,15 +2,60 @@ import { Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES, type ScheduleItem, type Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
+import { KnowledgeJourney } from '../../components/public/KnowledgeJourney';
 
 export function HomePage() {
-  const schedulesQuery = useList<ScheduleItem>({ resource: 'schedules', pagination: { mode: 'off' } });
-  const venuesQuery = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
-  const venues = venuesQuery.result.data.length > 0 ? venuesQuery.result.data : MOCK_VENUES;
-  const schedules = (schedulesQuery.result.data.length > 0 ? schedulesQuery.result.data : MOCK_SCHEDULES).map((schedule) => ({
+  const { query: programsQuery, result: programsResult } = useList<any>({ resource: 'programs', pagination: { mode: 'off' } });
+  const { result: lessonsResult } = useList<any>({ resource: 'lessons', pagination: { mode: 'off' } });
+  const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({ resource: 'schedules', pagination: { mode: 'off' } });
+  const { query: venuesQuery, result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
+
+  const apiPrograms = programsResult?.data || [];
+  const apiLessons = lessonsResult?.data || [];
+  const apiSchedules = schedulesResult?.data || [];
+  const apiVenues = venuesResult?.data || [];
+
+  const isProgramsReady = programsQuery.isFetched || apiPrograms.length > 0;
+  const isSchedulesReady = schedulesQuery.isFetched || apiSchedules.length > 0;
+  const isVenuesReady = venuesQuery.isFetched || apiVenues.length > 0;
+
+  const rawPrograms = isProgramsReady ? apiPrograms : (programsQuery.isError ? MOCK_PROGRAMS : []);
+  const rawSchedules = isSchedulesReady ? apiSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : []);
+  const rawVenues = isVenuesReady ? apiVenues : (venuesQuery.isError ? MOCK_VENUES : []);
+
+  const programs = (rawPrograms.length > 0 ? rawPrograms : (programsQuery.isError ? MOCK_PROGRAMS : [])).map((prog: any) => {
+    const progLessons = apiLessons.filter((l: any) => l.programId === prog.id);
+    return {
+      id: prog.id,
+      title: prog.title,
+      description: prog.description || 'Pembahasan modul kitab induk syar\'i.',
+      category: prog.category || 'Fiqih',
+      bookTitle: prog.bookTitle || prog.title,
+      totalLessons: progLessons.length,
+      coverImage: prog.coverImage || '/masjid-al-ukhuwah.jpg',
+    };
+  });
+
+  const venues = (rawVenues.length > 0 ? rawVenues : (venuesQuery.isError ? MOCK_VENUES : [])).map((v: any) => {
+    const activeKajians = apiSchedules.filter((s: any) => s.venueId === v.id).length;
+    return {
+      ...v,
+      image: v.image || '/masjid-umar-bin-khattab.jpg',
+      activeKajiansCount: activeKajians || v.activeKajiansCount || 1,
+    };
+  });
+
+  const schedules = (rawSchedules.length > 0 ? rawSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : [])).map((schedule: any) => ({
     ...schedule,
-    venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name,
+    venueName: schedule.venueName || venues.find((v: any) => v.id === schedule.venueId)?.name || 'Masjid Umar bin Khattab Bandung',
   }));
+
+  const speaker = {
+    ...MOCK_SPEAKER,
+    activeProgramsCount: programs.length,
+    totalKajiansCount: apiLessons.length > 0 ? apiLessons.length : MOCK_SPEAKER.totalKajiansCount,
+  };
+
   return (
     <div className="space-y-16 pb-12">
       <SEOHead
@@ -58,7 +103,7 @@ export function HomePage() {
                     Live Stream
                   </span>
                 </div>
-                {schedules.slice(0, 2).map((sch) => (
+                {schedules.slice(0, 2).map((sch: any) => (
                   <div key={sch.id} className="rounded-xl bg-stone-50 p-4 border border-stone-200/60 space-y-2">
                     <div className="flex items-center justify-between text-xs text-stone-500 font-medium">
                       <span>{sch.day}, {sch.date}</span>
@@ -80,6 +125,9 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* Animation Section: Journey of Knowledge */}
+      <KnowledgeJourney />
+
       {/* Featured Programs Grid */}
       <section className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-stone-200 pb-4">
@@ -88,12 +136,12 @@ export function HomePage() {
             <p className="text-sm text-slate-600 mt-1">Pembahasan kitab-kitab syar'i yang diampu oleh Ustadz Abu Haidar As-Sundawy.</p>
           </div>
           <Link to="/programs" className="text-sm font-semibold text-emerald-900 hover:underline">
-            Lihat Semua Program ({MOCK_PROGRAMS.length}) →
+            Lihat Semua Program ({programs.length}) →
           </Link>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {MOCK_PROGRAMS.map((prog) => (
+          {programs.map((prog: any) => (
             <div
               key={prog.id}
               className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs hover:border-emerald-900/30"
@@ -146,8 +194,8 @@ export function HomePage() {
             <div className="lg:col-span-4">
               <div className="relative aspect-square overflow-hidden rounded-2xl border border-amber-500/30 bg-black p-4 shadow-2xl flex items-center justify-center">
                 <img
-                  src={MOCK_SPEAKER.image}
-                  alt={MOCK_SPEAKER.name}
+                  src={speaker.image}
+                  alt={speaker.name}
                   className="h-full w-full object-contain rounded-xl"
                 />
               </div>
@@ -157,18 +205,18 @@ export function HomePage() {
                 Pengampu Kajian
               </div>
               <h2 className="text-3xl font-bold sm:text-4xl text-stone-100">
-                {MOCK_SPEAKER.name} <span className="text-emerald-400 text-xl font-normal">({MOCK_SPEAKER.title})</span>
+                {speaker.name} <span className="text-emerald-400 text-xl font-normal">({speaker.title})</span>
               </h2>
               <p className="text-stone-300 leading-relaxed text-sm sm:text-base">
-                {MOCK_SPEAKER.bio}
+                {speaker.bio}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
                 <div className="rounded-xl bg-stone-800/80 p-4 border border-stone-700">
-                  <div className="text-2xl font-bold text-emerald-400">{MOCK_SPEAKER.activeProgramsCount}</div>
+                  <div className="text-2xl font-bold text-emerald-400">{speaker.activeProgramsCount}</div>
                   <div className="text-xs text-stone-400">Program Aktif</div>
                 </div>
                 <div className="rounded-xl bg-stone-800/80 p-4 border border-stone-700">
-                  <div className="text-2xl font-bold text-emerald-400">{MOCK_SPEAKER.totalKajiansCount}+</div>
+                  <div className="text-2xl font-bold text-emerald-400">{speaker.totalKajiansCount}+</div>
                   <div className="text-xs text-stone-400">Arsip Rekaman</div>
                 </div>
               </div>
@@ -198,7 +246,7 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {venues.slice(0, 4).map((v) => (
+          {venues.slice(0, 4).map((v: any) => (
             <div key={v.id} className="space-y-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30">
               <div className="h-44 w-full bg-stone-100 overflow-hidden">
                 <img src={v.image} alt={v.name} className="h-full w-full object-cover" />

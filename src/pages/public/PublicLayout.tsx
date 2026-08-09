@@ -1,7 +1,16 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useGetIdentity } from '@refinedev/core';
+
+type Identity = { id: string; name?: string; email?: string; role?: string; avatar?: string };
 
 export function PublicLayout() {
   const location = useLocation();
+  const { data: identity } = useGetIdentity<Identity>();
+  
+  const storedDemo = typeof window !== 'undefined' ? localStorage.getItem('lms_demo_user') : null;
+  const demoUser = storedDemo ? JSON.parse(storedDemo) : null;
+  const user = identity || demoUser;
+  const dashboardLink = user?.role === 'admin' ? '/admin' : '/dashboard';
 
   const navLinks = [
     { label: 'Beranda', path: '/' },
@@ -50,11 +59,11 @@ export function PublicLayout() {
       ),
     },
     {
-      label: 'Masuk',
-      path: '/login',
+      label: user ? (user.role === 'admin' ? 'Admin' : 'Belajar') : 'Masuk',
+      path: user ? dashboardLink : '/login',
       icon: (
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ),
     },
@@ -115,12 +124,22 @@ export function PublicLayout() {
                 </Link>
               );
             })}
-            <Link
-              to="/login"
-              className="rounded-lg bg-emerald-900 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 transition-all"
-            >
-              Masuk
-            </Link>
+            {user ? (
+              <Link
+                to={dashboardLink}
+                className="flex items-center gap-2 rounded-xl bg-emerald-950 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-900 transition-all border border-emerald-800"
+              >
+                <img src={user.avatar || '/logo-abu-haidar.jpg'} alt="" className="h-5 w-5 rounded-full object-cover border border-amber-400/60" />
+                <span>{user.role === 'admin' ? 'Portal Admin' : (user.name || 'Ruang Belajar')}</span>
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="rounded-lg bg-emerald-900 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 transition-all"
+              >
+                Masuk
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -132,8 +151,8 @@ export function PublicLayout() {
 
       {/* Footer */}
       <footer className="border-t border-stone-200/80 bg-stone-100 py-12 text-slate-600 text-xs">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="space-y-3">
+        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-start md:justify-between gap-8">
+          <div className="space-y-3 max-w-md">
             <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
               <img
                 src="/logo-abu-haidar.jpg"
@@ -155,20 +174,6 @@ export function PublicLayout() {
               <li><Link to="/venues" className="hover:text-emerald-900">Daftar Lokasi Majelis</Link></li>
               <li><Link to="/speaker" className="hover:text-emerald-900">Biografi Pemateri</Link></li>
             </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-3 text-sm">Informasi & Legal</h4>
-            <ul className="space-y-2">
-              <li><Link to="/privacy" className="hover:text-emerald-900">Kebijakan Privasi</Link></li>
-              <li><Link to="/terms" className="hover:text-emerald-900">Ketentuan Penggunaan</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-3 text-sm">Kontak & Majelis</h4>
-            <p className="text-slate-500 mb-2">Masjid Umar bin Khattab, Ujungberung, Kota Bandung</p>
-            <p className="font-medium text-slate-700">Radio Rodja 1476 AM Bandung</p>
           </div>
         </div>
 

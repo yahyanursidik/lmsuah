@@ -39,14 +39,14 @@ export function getUserEnrollments(userId: string): EnrollmentItem[] {
     {
       id: 'enr-1',
       userId: 'demo-peserta-1',
-      programId: 'kitab-tauhid',
+      programId: 'syarah-kitab-at-tauhid-sample',
       status: 'active',
       enrolledAt: new Date(Date.now() - 7 * 86400000).toISOString(),
     },
     {
       id: 'enr-2',
       userId: 'demo-peserta-1',
-      programId: 'bulughul-maram',
+      programId: 'kitab-tauhid',
       status: 'active',
       enrolledAt: new Date(Date.now() - 3 * 86400000).toISOString(),
     },
@@ -290,3 +290,154 @@ export function toggleBookmark(userId: string, resourceType: 'program' | 'lesson
     return true;
   }
 }
+
+// ----------------------------------------------------
+// 5. REGISTERED PARTICIPANTS STORE (Manajemen & Pendaftaran Peserta)
+// ----------------------------------------------------
+const REGISTERED_USERS_KEY = 'uah_lms_registered_participants';
+
+export interface ParticipantUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'participant' | 'admin';
+  createdAt: string;
+  password?: string;
+  status?: 'active' | 'inactive';
+}
+
+const INITIAL_DEMO_USERS: ParticipantUserRecord[] = [
+  {
+    id: 'demo-peserta-1',
+    name: 'Jamaah Penuntut Ilmu',
+    email: 'peserta@abutaidar.id',
+    phone: '081234567890',
+    role: 'participant',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    status: 'active',
+  },
+  {
+    id: 'demo-admin-1',
+    name: 'Administrator UAH',
+    email: 'admin@abutaidar.id',
+    phone: '081987654321',
+    role: 'admin',
+    createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+    status: 'active',
+  },
+];
+
+export function getRegisteredParticipants(): ParticipantUserRecord[] {
+  return getItem<ParticipantUserRecord[]>(REGISTERED_USERS_KEY, INITIAL_DEMO_USERS);
+}
+
+export function registerParticipant(data: {
+  name: string;
+  email: string;
+  phone?: string;
+  password?: string;
+}): { success: boolean; user?: ParticipantUserRecord; message?: string } {
+  const normalizedEmail = data.email.trim().toLowerCase();
+  const all = getRegisteredParticipants();
+
+  if (all.some((u) => u.email.toLowerCase() === normalizedEmail)) {
+    return {
+      success: false,
+      message: 'Email sudah terdaftar. Silakan gunakan email lain atau langsung masuk.',
+    };
+  }
+
+  const newUser: ParticipantUserRecord = {
+    id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    name: data.name.trim(),
+    email: normalizedEmail,
+    phone: data.phone?.trim() || '',
+    role: 'participant',
+    createdAt: new Date().toISOString(),
+    password: data.password || '12345678',
+    status: 'active',
+  };
+
+  all.push(newUser);
+  setItem(REGISTERED_USERS_KEY, all);
+
+  return {
+    success: true,
+    user: newUser,
+    message: 'Pendaftaran berhasil.',
+  };
+}
+
+export function addParticipantManual(data: {
+  name: string;
+  email: string;
+  phone?: string;
+  password?: string;
+}): { success: boolean; user?: ParticipantUserRecord; message?: string } {
+  return registerParticipant(data);
+}
+
+export function importParticipantsBatch(
+  items: Array<{ name: string; email: string; phone?: string; password?: string }>
+): { inserted: number; failed: number; errors: Array<{ email: string; reason: string }> } {
+  const all = getRegisteredParticipants();
+  let inserted = 0;
+  let failed = 0;
+  const errors: Array<{ email: string; reason: string }> = [];
+
+  for (const item of items) {
+    const emailNorm = item.email.trim().toLowerCase();
+    if (all.some((u) => u.email.toLowerCase() === emailNorm)) {
+      failed++;
+      errors.push({ email: emailNorm, reason: 'Email sudah terdaftar' });
+      continue;
+    }
+
+    const newUser: ParticipantUserRecord = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: item.name.trim(),
+      email: emailNorm,
+      phone: item.phone?.trim() || '',
+      role: 'participant',
+      createdAt: new Date().toISOString(),
+      password: item.password || '12345678',
+      status: 'active',
+    };
+
+    all.push(newUser);
+    inserted++;
+  }
+
+  setItem(REGISTERED_USERS_KEY, all);
+
+  return { inserted, failed, errors };
+}
+
+export function resetParticipantPassword(userId: string, newPassword: string): boolean {
+  const all = getRegisteredParticipants();
+  const target = all.find((u) => u.id === userId);
+  if (!target) return false;
+
+  target.password = newPassword;
+  setItem(REGISTERED_USERS_KEY, all);
+  return true;
+}
+
+export function updateParticipantProfile(
+  userId: string,
+  data: { name?: string; email?: string; phone?: string; status?: 'active' | 'inactive' }
+): boolean {
+  const all = getRegisteredParticipants();
+  const target = all.find((u) => u.id === userId);
+  if (!target) return false;
+
+  if (data.name) target.name = data.name.trim();
+  if (data.email) target.email = data.email.trim().toLowerCase();
+  if (data.phone !== undefined) target.phone = data.phone.trim();
+  if (data.status) target.status = data.status;
+
+  setItem(REGISTERED_USERS_KEY, all);
+  return true;
+}
+

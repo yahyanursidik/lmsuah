@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useOne, useGetIdentity } from '@refinedev/core';
+import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { Bookmark, CheckCircle2, PlayCircle, BookOpen, UserCheck, PlusCircle } from 'lucide-react';
 import { MOCK_PROGRAMS, Program } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
@@ -27,11 +27,31 @@ export function ProgramDetailPage() {
     },
   });
 
+  const { result: lessonsListResult } = useList({
+    resource: 'lessons',
+    filters: id ? [{ field: 'programId', operator: 'eq', value: id }] : [],
+    sorters: [{ field: 'sequence', order: 'asc' }],
+    pagination: { mode: 'off' },
+    queryOptions: { enabled: !!id },
+  });
+
   const mockItem = MOCK_PROGRAMS.find((p) => p.id === id);
   const displayProgram: Program | undefined = refineProgram || mockItem;
   const isLoading = oneQuery.isLoading;
   const isError = oneQuery.isError;
   const refetch = oneQuery.refetch;
+
+  const apiLessons = (lessonsListResult?.data || []) as any[];
+  const lessons = apiLessons.length > 0
+    ? apiLessons.map((l, index) => ({
+        id: l.id,
+        title: l.title,
+        meetingNumber: l.sequence || index + 1,
+        date: l.date || 'Tersedia',
+        duration: l.duration || 'Video',
+        summary: l.description || 'Materi pertemuan kajian syar\'i.',
+      }))
+    : (displayProgram?.lessons || []);
 
   const [enrolled, setEnrolled] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -94,7 +114,6 @@ export function ProgramDetailPage() {
     );
   }
 
-  const lessons = displayProgram.lessons || [];
   const userProgressList = getUserLessonProgress(userId);
 
   return (

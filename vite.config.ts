@@ -18,6 +18,8 @@ function netlifyFunctionsPlugin(): Plugin {
     '/api/admin/roles': 'admin-roles',
     '/api/admin/roles/assign': 'admin-role-assign',
     '/api/privacy/consent': 'consent',
+    '/api/auth/register': 'auth-register',
+    '/api/admin/participants': 'admin-participants',
   };
 
   return {

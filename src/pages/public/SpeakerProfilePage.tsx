@@ -1,9 +1,22 @@
 import { Link } from 'react-router-dom';
+import { useList } from '@refinedev/core';
 import { MOCK_SPEAKER, MOCK_PROGRAMS } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 
 export function SpeakerProfilePage() {
-  const speaker = MOCK_SPEAKER;
+  const { query: programsQuery, result: programsResult } = useList<any>({ resource: 'programs', pagination: { mode: 'off' } });
+  const { result: lessonsResult } = useList<any>({ resource: 'lessons', pagination: { mode: 'off' } });
+
+  const apiPrograms = programsResult?.data || [];
+  const apiLessons = lessonsResult?.data || [];
+  const isFetched = programsQuery.isFetched || apiPrograms.length > 0;
+  const programs = isFetched ? (apiPrograms.length > 0 ? apiPrograms : []) : (programsQuery.isError ? MOCK_PROGRAMS : MOCK_PROGRAMS);
+
+  const speaker = {
+    ...MOCK_SPEAKER,
+    activeProgramsCount: programs.length,
+    totalKajiansCount: apiLessons.length > 0 ? apiLessons.length : MOCK_SPEAKER.totalKajiansCount,
+  };
 
   return (
     <div className="space-y-12 pb-16">
@@ -61,7 +74,7 @@ export function SpeakerProfilePage() {
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-slate-900">Program Kajian yang Diampu</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {MOCK_PROGRAMS.map((prog) => (
+            {programs.map((prog: any) => (
               <div key={prog.id} className="rounded-xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-3">
                 <div className="space-y-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded inline-block">

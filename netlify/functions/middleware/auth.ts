@@ -76,10 +76,12 @@ export function requireRole(session: UserSession, allowedRoles: string[]) {
   }
 }
 
-/**
- * Memverifikasi bahwa user memiliki permission tertentu
- */
 export async function requirePermission(session: UserSession, requiredPermission: string) {
+  // Bypass DB check for development demo admin or super_administrator
+  if (session.roles.includes('super_administrator') || session.roles.includes('administrator')) {
+    return;
+  }
+
   const userPermissions = await getUserPermissions(session.userId);
   if (!userPermissions.includes(requiredPermission)) {
     throw new ForbiddenError(`Akses ditolak. Membutuhkan izin: ${requiredPermission}`);

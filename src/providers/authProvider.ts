@@ -35,7 +35,7 @@ function removeStoredDemo(): void {
 }
 
 export const authProvider: AuthProvider = {
-  login: async ({ email, providerName }) => {
+  login: async ({ email, password, providerName }: any) => {
     // 1. Social provider login (Google)
     if (providerName === 'google') {
       try {
@@ -49,15 +49,14 @@ export const authProvider: AuthProvider = {
       }
     }
 
-    // 2. Demo or Email/Password Login
+    // 2. Real Email/Password Login with Fallback to Demo
     if (email) {
       const lowerEmail = String(email).trim().toLowerCase();
-
-      // Admin demo login
+      
+      // Admin demo login bypass
       if (
         lowerEmail === 'admin@abutaidar.id' ||
         lowerEmail === 'admin@lms.id' ||
-        lowerEmail === 'admin@gmail.com' ||
         lowerEmail === 'admin'
       ) {
         const user = {
@@ -74,12 +73,10 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // Peserta demo login
+      // Peserta demo login bypass
       if (
         lowerEmail === 'peserta@abutaidar.id' ||
-        lowerEmail === 'peserta@gmail.com' ||
-        lowerEmail === 'peserta' ||
-        lowerEmail === 'user@gmail.com'
+        lowerEmail === 'peserta'
       ) {
         const user = {
           id: 'demo-peserta-1',
@@ -95,19 +92,37 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // Any custom email login fallback
-      const user = {
-        id: `demo-user-${Date.now()}`,
-        name: email.split('@')[0] || 'Pengguna',
-        email,
-        role: lowerEmail.includes('admin') ? 'admin' : 'participant',
-        avatar: '/logo-abu-haidar.jpg',
-      };
-      setStoredDemo(JSON.stringify(user));
-      return {
-        success: true,
-        redirectTo: user.role === 'admin' ? '/admin' : '/dashboard',
-      };
+      // 3. Real Backend Authentication
+      try {
+        const { error } = await signIn.email({
+          email: lowerEmail,
+          password: password || '',
+        });
+
+        if (error) {
+          return {
+            success: false,
+            error: {
+              name: 'LoginError',
+              message: error.message || 'Gagal masuk. Periksa kembali email dan password.',
+            },
+          };
+        }
+
+        // We successfully logged in with real auth!
+        return {
+          success: true,
+          redirectTo: '/', // Will be redirected to admin or dashboard based on role later if needed, or let app handle
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: {
+            name: 'LoginError',
+            message: err.message || 'Terjadi kesalahan pada server auth.',
+          },
+        };
+      }
     }
 
     return {
@@ -204,8 +219,15 @@ export const authProvider: AuthProvider = {
   },
 
   onError: async (error) => {
-    console.error(error);
+    console.error('[AuthProvider Error]', error);
     const status = error?.statusCode || error?.status;
+
+    // Jika sedang menggunakan akun demo lokal, jangan paksa logout saat terjadi error API 401
+    const storedDemo = getStoredDemo();
+    if (storedDemo) {
+      return { error };
+    }
+
     if (status === 401) {
       return {
         logout: true,

@@ -5,6 +5,7 @@ import { authProvider } from './providers/authProvider';
 import { PublicLayout } from './pages/public/PublicLayout';
 import { HomePage } from './pages/public/HomePage';
 import { LoginPage } from './pages/public/LoginPage';
+import { RegisterPage } from './pages/public/RegisterPage';
 import { OnboardingPage } from './pages/public/OnboardingPage';
 import { ProgramsPage } from './pages/public/ProgramsPage';
 import { ProgramDetailPage } from './pages/public/ProgramDetailPage';
@@ -20,6 +21,7 @@ import { ParticipantLayout } from './pages/participant/ParticipantLayout';
 import { DashboardPage } from './pages/participant/DashboardPage';
 import { SavedItemsPage } from './pages/participant/SavedItemsPage';
 import { MyProgramsPage } from './pages/participant/MyProgramsPage';
+import { ParticipantProgramDetailPage } from './pages/participant/ParticipantProgramDetailPage';
 import { ProgressPage } from './pages/participant/ProgressPage';
 import { ParticipantSchedulePage } from './pages/participant/ParticipantSchedulePage';
 import { ProfilePage } from './pages/participant/ProfilePage';
@@ -35,6 +37,7 @@ import { AdminVenuesPage } from './pages/admin/AdminVenuesPage';
 import { AdminSchedulesPage } from './pages/admin/AdminSchedulesPage';
 import { AdminLessonsPage } from './pages/admin/AdminLessonsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export function App() {
@@ -43,12 +46,22 @@ export function App() {
       <Refine 
         dataProvider={dataProvider()}
         authProvider={authProvider}
+        resources={[
+          {
+            name: 'announcements',
+            list: '/admin/announcements',
+            create: '/admin/announcements/create',
+            edit: '/admin/announcements/edit/:id',
+          },
+          // resources lain bisa didefinisikan jika diperlukan
+        ]}
       >
         <Routes>
           {/* Public Portal Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/programs" element={<ProgramsPage />} />
             <Route path="/programs/:id" element={<ProgramDetailPage />} />
@@ -70,8 +83,15 @@ export function App() {
           }>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/belajar" element={<MyProgramsPage />} />
+            <Route path="/belajar/katalog" element={<ProgramsPage />} />
+            <Route path="/belajar/katalog/:id" element={<ProgramDetailPage />} />
+            <Route path="/belajar/program/:id" element={<ParticipantProgramDetailPage />} />
             <Route path="/belajar/progres" element={<ProgressPage />} />
             <Route path="/belajar/jadwal" element={<ParticipantSchedulePage />} />
+            <Route path="/belajar/lokasi" element={<VenuesPage />} />
+            <Route path="/belajar/lokasi/:id" element={<VenueDetailPage />} />
+            <Route path="/belajar/lesson/:id" element={<LessonDetailPage />} />
+            <Route path="/belajar/lessons/:id" element={<LessonDetailPage />} />
             <Route path="/tersimpan" element={<SavedItemsPage />} />
             <Route path="/akun" element={<ProfilePage />} />
           </Route>
@@ -94,6 +114,7 @@ export function App() {
             <Route path="/admin/venues" element={<AdminVenuesPage />} />
             <Route path="/admin/schedules" element={<AdminSchedulesPage />} />
             <Route path="/admin/lessons" element={<AdminLessonsPage />} />
+            <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Route>
 

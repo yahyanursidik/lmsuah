@@ -53,7 +53,7 @@ export function AdminLessonsPage() {
             setEditingId(null);
             setIsFormOpen(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-900 text-white rounded-lg hover:bg-emerald-800 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-900 text-slate-900 rounded-lg hover:bg-emerald-800 transition-colors"
         >
           <Plus size={20} />
           <span>Tambah Materi Baru</span>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { Search } from 'lucide-react';
 import { MOCK_VENUES, Venue } from '../../mock/publicData';
@@ -12,13 +12,16 @@ const getVenueImage = (venue: Pick<Venue, 'id' | 'name' | 'image'>) => {
 };
 
 export function VenuesPage() {
+  const location = useLocation();
   const [query, setQuery] = useState('');
   const { result: apiVenues, query: venuesQuery } = useList<Venue>({
     resource: 'venues',
     pagination: { mode: 'off' },
   });
 
-  const venuesList = (apiVenues?.data && apiVenues.data.length > 0 ? apiVenues.data : MOCK_VENUES) as Venue[];
+  const apiData = apiVenues?.data || [];
+  const isFetched = venuesQuery.isFetched || apiData.length > 0;
+  const venuesList = (isFetched ? apiData : (venuesQuery.isError ? MOCK_VENUES : [])) as Venue[];
   const visibleVenues = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return venuesList;
@@ -80,7 +83,7 @@ export function VenuesPage() {
                   {venue.activeKajiansCount || 1} Program Kajian Rutin
                 </span>
                 <Link
-                  to={`/venues/${venue.id}`}
+                  to={location.pathname.startsWith('/belajar') ? `/belajar/lokasi/${venue.id}` : `/venues/${venue.id}`}
                   className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 transition-colors min-h-[44px] flex items-center justify-center"
                 >
                   Detail Lokasi & Peta →

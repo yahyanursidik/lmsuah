@@ -57,7 +57,7 @@ describe('Participant portal experience', () => {
     expect(screen.getAllByText('Program API Terbaru').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Pertemuan API Pertama/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Jadwal API')).toBeDefined();
-    expect(screen.getByRole('link', { name: /Lanjutkan belajar/i }).getAttribute('href')).toBe('/lesson/lesson-1');
+    expect(screen.getByRole('link', { name: /Lanjutkan belajar/i }).getAttribute('href')).toBe('/belajar/lesson/lesson-1');
   });
 
   it('kajian tersedia dapat diikuti dan profil menyimpan preferensi', () => {

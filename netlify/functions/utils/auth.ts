@@ -23,6 +23,9 @@ export const auth = betterAuth({
     cookiePrefix: 'lms_kajian',
     useSecureCookies: process.env.NODE_ENV === 'production',
   },
+  emailAndPassword: {
+    enabled: true,
+  },
   // Turnstile / custom validation for registration will be handled in hooks if necessary
   databaseHooks: {
     user: {

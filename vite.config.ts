@@ -20,6 +20,7 @@ function netlifyFunctionsPlugin(): Plugin {
     '/api/privacy/consent': 'consent',
     '/api/auth/register': 'auth-register',
     '/api/admin/participants': 'admin-participants',
+    '/api/auth/me': 'me',
   };
 
   return {

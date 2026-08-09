@@ -181,6 +181,21 @@ export const authProvider: AuthProvider = {
         // Ignore
       }
     }
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.roles && data.roles.length > 0) {
+          if (data.roles.includes('super_administrator')) return 'super_administrator';
+          if (data.roles.includes('administrator')) return 'administrator';
+          return data.roles[0];
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
     return 'participant';
   },
 
@@ -202,6 +217,27 @@ export const authProvider: AuthProvider = {
     }
 
     try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user) {
+          let role = 'participant';
+          if (data.roles && data.roles.length > 0) {
+            if (data.roles.includes('super_administrator')) role = 'super_administrator';
+            else if (data.roles.includes('administrator')) role = 'administrator';
+            else role = data.roles[0];
+          }
+          return {
+            id: data.user.authUserId || data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            avatar: data.user.avatarUrl,
+            role: role,
+          };
+        }
+      }
+
+      // Fallback
       const { data: session } = await authClient.getSession();
       if (session?.user) {
         return {
@@ -209,6 +245,7 @@ export const authProvider: AuthProvider = {
           name: session.user.name,
           email: session.user.email,
           avatar: session.user.image,
+          role: 'participant',
         };
       }
     } catch {

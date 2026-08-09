@@ -86,6 +86,47 @@ export function DashboardPage() {
       </div>
     </section>
 
+    {!announcementsLoading && announcements.length > 0 && (
+      <section className="rounded-3xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50/50 shadow-sm overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
+        <div className="p-5 border-b border-amber-100/50 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <div className="relative flex h-5 w-5 items-center justify-center">
+              <Megaphone className="h-5 w-5 text-amber-600 relative z-10 animate-[bounce_2s_infinite]" />
+              <div className="absolute inset-0 bg-amber-400 opacity-30 rounded-full blur-md animate-pulse"></div>
+            </div>
+            Papan Pengumuman
+          </h2>
+        </div>
+        <div className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {announcements.map((item: any) => (
+            <div key={item.id} className="bg-white rounded-2xl p-5 shadow-sm border border-amber-100/60 hover:shadow-md transition-shadow relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-3">
+                <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm leading-tight pr-6">{item.title}</h3>
+              {item.imageUrl && (
+                <div className="mt-3 mb-3 rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                  <img src={item.imageUrl} alt={item.title} className="w-full object-cover max-h-48 group-hover:scale-105 transition-transform duration-500" />
+                </div>
+              )}
+              <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed mt-2 mb-4">{item.content}</p>
+              <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
+                <p className="text-[10px] font-medium text-slate-400">
+                  {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+                {item.linkUrl && (
+                  <a href={item.linkUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
+                    <LinkIcon size={12} /> Buka Tautan
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
     <section aria-label="Statistik belajar" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {stats.map(({ label, value, suffix, icon: Icon, href }) => 
         <Link key={label} to={href} className="group relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
@@ -159,40 +200,7 @@ export function DashboardPage() {
       </section>
 
       <aside className="space-y-6">
-        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/50 shadow-sm overflow-hidden">
-          <div className="bg-white p-5 border-b border-emerald-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Megaphone className="h-4 w-4 text-emerald-700" /> Papan Pengumuman</h2>
-          </div>
-          <div className="p-4 space-y-4">
-            {announcementsLoading ? (
-              <p className="text-xs text-slate-500 text-center py-4">Memuat pengumuman...</p>
-            ) : announcements.length > 0 ? (
-              announcements.map((item: any) => (
-                <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-emerald-100">
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <h3 className="font-bold text-slate-900 text-sm leading-tight">{item.title}</h3>
-                  </div>
-                  {item.imageUrl && (
-                    <div className="mb-3 rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                      <img src={item.imageUrl} alt={item.title} className="w-full object-cover max-h-40" />
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed mb-3">{item.content}</p>
-                  {item.linkUrl && (
-                    <a href={item.linkUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors">
-                      <LinkIcon size={12} /> Buka Tautan Terkait
-                    </a>
-                  )}
-                  <p className="text-[10px] text-slate-400 mt-3 pt-3 border-t border-slate-100">
-                    {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-500 text-center py-4">Tidak ada pengumuman saat ini.</p>
-            )}
-          </div>
-        </section>
+
 
         <section className="rounded-3xl border border-stone-200 bg-white shadow-sm overflow-hidden">
           <div className="bg-stone-50/50 p-5 border-b border-stone-100 flex items-center justify-between">

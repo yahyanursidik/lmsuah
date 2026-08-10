@@ -21,8 +21,13 @@ import {
 
 import { SEOHead } from '../../components/public/SEOHead';
 
-const getLoginError = (error: unknown) =>
-  error instanceof Error ? error.message : 'Gagal masuk. Periksa kembali data akun Anda.';
+const getLoginError = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return 'Gagal masuk. Periksa kembali email dan password Anda.';
+};
 
 export function LoginPage() {
   const { mutate: login, isPending: isLoading } = useLogin();
@@ -37,7 +42,11 @@ export function LoginPage() {
     setLoginError(null);
     login(credentials, {
       onSuccess: (data) => {
-        if (data?.redirectTo) navigate(data.redirectTo);
+        if (!data?.success) {
+          setLoginError(getLoginError(data?.error));
+          return;
+        }
+        navigate(data.redirectTo || '/');
       },
       onError: (error: unknown) => setLoginError(getLoginError(error)),
     });

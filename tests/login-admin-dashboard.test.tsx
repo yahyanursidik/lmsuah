@@ -65,6 +65,33 @@ describe('Login and admin dashboard experience', () => {
     await waitFor(() => expect(login).toHaveBeenCalledWith(expect.objectContaining({ email: 'admin@abutaidar.id' })));
   });
 
+  it('shows an authentication failure returned by the auth provider', async () => {
+    login.mockResolvedValueOnce({
+      success: false,
+      error: { name: 'LoginError', message: 'Email atau password tidak valid.' },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Refine dataProvider={dashboardProvider} authProvider={loginAuthProvider}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+          </Routes>
+        </Refine>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: /Email/i }), {
+      target: { value: 'admin@abuhaidar.my.id' },
+    });
+    fireEvent.change(screen.getByLabelText('Password', { selector: 'input' }), {
+      target: { value: 'password-yang-salah' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Masuk ke portal/i }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Email atau password tidak valid.');
+  });
+
   it('shows live content totals and genuine draft attention items', async () => {
     render(
       <MemoryRouter initialEntries={['/admin']}>

@@ -3,6 +3,16 @@ import { authClient, signIn, signOut } from '../lib/auth-client';
 
 const DEMO_STORAGE_KEY = 'lms_demo_user';
 
+type LoginParams = {
+  email?: string;
+  password?: string;
+  providerName?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 function getStoredDemo(): string | null {
   if (typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function') {
     try {
@@ -35,7 +45,7 @@ function removeStoredDemo(): void {
 }
 
 export const authProvider: AuthProvider = {
-  login: async ({ email, password, providerName }: any) => {
+  login: async ({ email, password, providerName }: LoginParams) => {
     // 1. Social provider login (Google)
     if (providerName === 'google') {
       try {
@@ -110,16 +120,31 @@ export const authProvider: AuthProvider = {
         }
 
         // We successfully logged in with real auth!
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.roles && (data.roles.includes('super_administrator') || data.roles.includes('administrator'))) {
+              return {
+                success: true,
+                redirectTo: '/admin',
+              };
+            }
+          }
+        } catch {
+          // Ignore
+        }
+
         return {
           success: true,
-          redirectTo: '/', // Will be redirected to admin or dashboard based on role later if needed, or let app handle
+          redirectTo: '/', // Will be redirected to dashboard
         };
-      } catch (err: any) {
+      } catch (error: unknown) {
         return {
           success: false,
           error: {
             name: 'LoginError',
-            message: err.message || 'Terjadi kesalahan pada server auth.',
+            message: getErrorMessage(error, 'Terjadi kesalahan pada server auth.'),
           },
         };
       }
@@ -183,7 +208,7 @@ export const authProvider: AuthProvider = {
     }
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         if (data.roles && data.roles.length > 0) {
@@ -217,7 +242,7 @@ export const authProvider: AuthProvider = {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         if (data.user) {

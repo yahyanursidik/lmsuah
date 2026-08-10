@@ -84,9 +84,21 @@ function netlifyFunctionsPlugin(): Plugin {
 
           if (webResponse && webResponse instanceof Response) {
             res.statusCode = webResponse.status;
+
+            // Handle set-cookie explicitly to prevent merging multiple cookies into one string
+            if (typeof webResponse.headers.getSetCookie === 'function') {
+              const cookies = webResponse.headers.getSetCookie();
+              if (cookies && cookies.length > 0) {
+                res.setHeader('set-cookie', cookies);
+              }
+            }
+
             webResponse.headers.forEach((val, key) => {
-              res.setHeader(key, val);
+              if (key.toLowerCase() !== 'set-cookie') {
+                res.setHeader(key, val);
+              }
             });
+
             const buffer = await webResponse.arrayBuffer();
             res.end(Buffer.from(buffer));
             return;

@@ -4,7 +4,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { requireRole, requirePermission, ForbiddenError, UserSession, getDevelopmentDemoSession } from '../netlify/functions/middleware/auth.js';
 import { verifyCompatiblePassword } from '../netlify/functions/utils/auth.js';
 import * as permissionsModule from '../netlify/functions/utils/permissions.js';
-import { authProvider } from '../src/providers/authProvider.js';
+import { authProvider, hasAdminRole, isAdminRole, unwrapAuthMePayload } from '../src/providers/authProvider.js';
 
 describe('Auth & Security Unit Tests', () => {
   it('1. Participant tidak dapat mengakses endpoint admin (requireRole / requirePermission menolak)', async () => {
@@ -103,5 +103,19 @@ describe('Auth & Security Unit Tests', () => {
     await expect(verifyCompatiblePassword({ hash: bcryptHash, password })).resolves.toBe(true);
     await expect(verifyCompatiblePassword({ hash: betterAuthHash, password })).resolves.toBe(true);
     await expect(verifyCompatiblePassword({ hash: bcryptHash, password: 'salah' })).resolves.toBe(false);
+  });
+
+  it('7. Role admin dari endpoint /api/auth/me terbaca meski payload dibungkus data', () => {
+    const payload = unwrapAuthMePayload({
+      data: {
+        user: { id: 'admin-1', email: 'admin@abuhaidar.my.id' },
+        roles: ['super_administrator'],
+      },
+    });
+
+    expect(payload.roles).toEqual(['super_administrator']);
+    expect(hasAdminRole(payload.roles)).toBe(true);
+    expect(isAdminRole('administrator')).toBe(true);
+    expect(isAdminRole('participant')).toBe(false);
   });
 });

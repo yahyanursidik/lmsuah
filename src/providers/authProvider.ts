@@ -9,6 +9,33 @@ type LoginParams = {
   providerName?: string;
 };
 
+type AuthMePayload = {
+  user?: {
+    id?: string;
+    authUserId?: string;
+    name?: string;
+    email?: string;
+    avatarUrl?: string | null;
+  } | null;
+  roles?: string[];
+};
+
+type WrappedAuthMePayload = AuthMePayload | { data?: AuthMePayload };
+
+export function isAdminRole(role?: string | null): boolean {
+  return role === 'admin' || role === 'administrator' || role === 'super_administrator';
+}
+
+export function hasAdminRole(roles?: string[] | null): boolean {
+  return Array.isArray(roles) && roles.some(isAdminRole);
+}
+
+export function unwrapAuthMePayload(payload: WrappedAuthMePayload): AuthMePayload {
+  const maybeWrapped = payload as { data?: AuthMePayload };
+  if (maybeWrapped.data) return maybeWrapped.data;
+  return payload as AuthMePayload;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
@@ -123,8 +150,8 @@ export const authProvider: AuthProvider = {
         try {
           const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
           if (response.ok) {
-            const data = await response.json();
-            if (data.roles && (data.roles.includes('super_administrator') || data.roles.includes('administrator'))) {
+            const data = unwrapAuthMePayload(await response.json());
+            if (hasAdminRole(data.roles)) {
               return {
                 success: true,
                 redirectTo: '/admin',
@@ -137,7 +164,7 @@ export const authProvider: AuthProvider = {
 
         return {
           success: true,
-          redirectTo: '/', // Will be redirected to dashboard
+          redirectTo: '/dashboard',
         };
       } catch (error: unknown) {
         return {
@@ -210,7 +237,7 @@ export const authProvider: AuthProvider = {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
       if (response.ok) {
-        const data = await response.json();
+        const data = unwrapAuthMePayload(await response.json());
         if (data.roles && data.roles.length > 0) {
           if (data.roles.includes('super_administrator')) return 'super_administrator';
           if (data.roles.includes('administrator')) return 'administrator';
@@ -244,13 +271,13 @@ export const authProvider: AuthProvider = {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
       if (response.ok) {
-        const data = await response.json();
+        const data = unwrapAuthMePayload(await response.json());
         if (data.user) {
           let role = 'participant';
           if (data.roles && data.roles.length > 0) {
             if (data.roles.includes('super_administrator')) role = 'super_administrator';
             else if (data.roles.includes('administrator')) role = 'administrator';
-            else role = data.roles[0];
+            else role = data.roles[0] || 'participant';
           }
           return {
             id: data.user.authUserId || data.user.id,

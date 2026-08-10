@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useGetIdentity } from '@refinedev/core';
+import { isAdminRole } from '../../providers/authProvider';
 
 type Identity = { id: string; name?: string; email?: string; role?: string; avatar?: string };
 
@@ -10,7 +11,8 @@ export function PublicLayout() {
   const storedDemo = typeof window !== 'undefined' ? localStorage.getItem('lms_demo_user') : null;
   const demoUser = storedDemo ? JSON.parse(storedDemo) : null;
   const user = identity || demoUser;
-  const dashboardLink = user?.role === 'admin' ? '/admin' : '/dashboard';
+  const isAdmin = isAdminRole(user?.role);
+  const dashboardLink = isAdmin ? '/admin' : '/dashboard';
 
   const navLinks = [
     { label: 'Beranda', path: '/' },
@@ -59,7 +61,7 @@ export function PublicLayout() {
       ),
     },
     {
-      label: user ? (user.role === 'admin' ? 'Admin' : 'Belajar') : 'Masuk',
+      label: user ? (isAdmin ? 'Admin' : 'Belajar') : 'Masuk',
       path: user ? dashboardLink : '/login',
       icon: (
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -130,7 +132,7 @@ export function PublicLayout() {
                 className="flex items-center gap-2 rounded-xl bg-emerald-950 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-900 transition-all border border-emerald-800"
               >
                 <img src={user.avatar || '/logo-abu-haidar.jpg'} alt="" className="h-5 w-5 rounded-full object-cover border border-amber-400/60" />
-                <span>{user.role === 'admin' ? 'Portal Admin' : (user.name || 'Ruang Belajar')}</span>
+                <span>{isAdmin ? 'Portal Admin' : (user.name || 'Ruang Belajar')}</span>
               </Link>
             ) : (
               <Link

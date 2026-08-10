@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useGetIdentity, useLogout, usePermissions } from '@refinedev/core';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Bookmark, BookOpen, CalendarDays, ChevronRight, CircleUserRound, Gauge, Home, LogOut, MapPin, Menu, ShieldCheck, TrendingUp, X } from 'lucide-react';
+import { isAdminRole } from '../../providers/authProvider';
 
 type Identity = { id: string; name?: string; email?: string; role?: string; avatar?: string };
 type NavItem = { label: string; href: string; icon: typeof Home; end?: boolean };
@@ -41,7 +42,7 @@ export function ParticipantLayout() {
   const { data: identity } = useGetIdentity<Identity>();
   const { data: permissions } = usePermissions<string>({});
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
-  const isAdmin = permissions === 'admin' || permissions === 'super_administrator' || identity?.role === 'admin';
+  const isAdmin = isAdminRole(permissions) || isAdminRole(identity?.role);
 
   useEffect(() => setMobileMenuOpen(false), [location.pathname]);
   useEffect(() => {

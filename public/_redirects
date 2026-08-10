@@ -1,3 +1,4 @@
+/api/auth/register /.netlify/functions/auth-register 200
 /api/auth/* /.netlify/functions/auth 200
 /api/admin/roles/assign /.netlify/functions/admin-role-assign 200
 /api/admin/roles /.netlify/functions/admin-roles 200

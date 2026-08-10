@@ -3,6 +3,7 @@ import { hash as hashBcryptPassword } from 'bcryptjs';
 import { hashPassword } from 'better-auth/crypto';
 import { requireRole, requirePermission, ForbiddenError, UserSession, getDevelopmentDemoSession } from '../netlify/functions/middleware/auth.js';
 import { verifyCompatiblePassword } from '../netlify/functions/utils/auth.js';
+import { hashCredentialPassword } from '../netlify/functions/utils/password.js';
 import * as permissionsModule from '../netlify/functions/utils/permissions.js';
 import { authProvider, hasAdminRole, isAdminRole, unwrapAuthMePayload } from '../src/providers/authProvider.js';
 
@@ -95,14 +96,18 @@ describe('Auth & Security Unit Tests', () => {
 
   it('6. Password lama bcrypt dan password Better Auth sama-sama dapat diverifikasi', async () => {
     const password = 'contoh-password-kuat';
-    const [bcryptHash, betterAuthHash] = await Promise.all([
+    const [bcryptHash, betterAuthHash, credentialHash] = await Promise.all([
       hashBcryptPassword(password, 4),
       hashPassword(password),
+      hashCredentialPassword(password),
     ]);
 
     await expect(verifyCompatiblePassword({ hash: bcryptHash, password })).resolves.toBe(true);
     await expect(verifyCompatiblePassword({ hash: betterAuthHash, password })).resolves.toBe(true);
+    await expect(verifyCompatiblePassword({ hash: credentialHash, password })).resolves.toBe(true);
+    await expect(verifyCompatiblePassword({ hash: password, password })).resolves.toBe(true);
     await expect(verifyCompatiblePassword({ hash: bcryptHash, password: 'salah' })).resolves.toBe(false);
+    await expect(verifyCompatiblePassword({ hash: password, password: 'salah' })).resolves.toBe(false);
   });
 
   it('7. Role admin dari endpoint /api/auth/me terbaca meski payload dibungkus data', () => {

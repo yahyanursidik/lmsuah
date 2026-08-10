@@ -48,6 +48,7 @@ export function RegisterPage() {
 
   // Strength indicator
   const passwordLengthOk = password.length >= 6;
+  const canUseLocalFallback = import.meta.env.DEV;
   
 
   const handleSubmit = async (e: FormEvent) => {
@@ -102,27 +103,28 @@ export function RegisterPage() {
         }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (res.ok) {
         setIsSuccess(true);
         setIsLoading(false);
         return;
       }
 
-      // Jika res not ok, periksa status
-      if (res.status === 400) {
-        const data = await res.json();
-        throw new Error(data?.error?.message || 'Gagal mendaftar.');
-      }
-    } catch (err: any) {
-      // Jika terjadi error API (misal 404/offline backend), fallback ke LocalStore
-      if (err.message && !err.message.includes('Failed to fetch')) {
-        setErrorMsg(err.message);
+      const message = data?.error?.message || data?.message || 'Pendaftaran belum berhasil diproses.';
+      setErrorMsg(message);
+      setIsLoading(false);
+      return;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Pendaftaran gagal. Coba beberapa saat lagi.';
+      if (!canUseLocalFallback) {
+        setErrorMsg(message);
         setIsLoading(false);
         return;
       }
     }
 
-    // 2. Fallback localStore register
+    // 2. Fallback localStore register hanya untuk development/offline demo
     const localRes = registerParticipant({
       name: name.trim(),
       email: email.trim(),

@@ -7,6 +7,28 @@ import {
 
 export const API_URL = '/api';
 
+const NETWORK_STATUS_EVENT = 'lms:network-status';
+let activeRequestCount = 0;
+
+function emitNetworkStatus() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(NETWORK_STATUS_EVENT, {
+    detail: { active: activeRequestCount > 0, count: activeRequestCount },
+  }));
+}
+
+function beginNetworkRequest() {
+  activeRequestCount += 1;
+  emitNetworkStatus();
+}
+
+function endNetworkRequest() {
+  activeRequestCount = Math.max(0, activeRequestCount - 1);
+  emitNetworkStatus();
+}
+
+export { NETWORK_STATUS_EVENT };
+
 /**
  * Custom fetch wrapper untuk memfasilitasi auth (credentials),
  * Error handling standar, dan penambahan X-Request-ID (Opsional).
@@ -37,24 +59,29 @@ export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: 'include', // Kunci utama integrasi auth cookie HTTP-only
-  });
+  beginNetworkRequest();
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include', // Kunci utama integrasi auth cookie HTTP-only
+    });
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
 
-    const error: HttpError = {
-      message: errorBody?.error?.message || response.statusText,
-      statusCode: response.status,
-    };
+      const error: HttpError = {
+        message: errorBody?.error?.message || response.statusText,
+        statusCode: response.status,
+      };
 
-    throw error;
+      throw error;
+    }
+
+    return response;
+  } finally {
+    endNetworkRequest();
   }
-
-  return response;
 };
 
 // Helper untuk menghasilkan parameter pengurutan (Sorting)

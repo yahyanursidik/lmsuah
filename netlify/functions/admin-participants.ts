@@ -6,6 +6,7 @@ import { user, profiles, userRoles, account, enrollments } from './db/schema/ind
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
+import { hashCredentialPassword } from './utils/password.js';
 
 const addParticipantSchema = z.object({
   action: z.literal('create'),
@@ -40,6 +41,10 @@ const updateParticipantSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
 });
+
+type ActionBody = {
+  action?: string;
+};
 
 const adminParticipantsHandler = async (request: Request) => {
   const session = await requireAuth(request);
@@ -115,7 +120,7 @@ const adminParticipantsHandler = async (request: Request) => {
   // POST: Add Manual or Batch Import
   if (request.method === 'POST') {
     const rawBody = await request.clone().json();
-    const action = (rawBody as any)?.action;
+    const action = (rawBody as ActionBody)?.action;
 
     if (action === 'create') {
       const body = await validateBody(request, addParticipantSchema);
@@ -136,10 +141,11 @@ const adminParticipantsHandler = async (request: Request) => {
 
       const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const now = new Date();
+      const passwordHash = await hashCredentialPassword(body.password);
 
       const assignedBy = session.isDevelopmentDemo ? null : session.userId;
       await db.insert(user).values({ id: userId, name: body.name, email: normalizedEmail, emailVerified: false, createdAt: now, updatedAt: now });
-      await db.insert(account).values({ id: `acc_${Date.now()}`, accountId: userId, providerId: 'credential', userId, password: body.password, createdAt: now, updatedAt: now });
+      await db.insert(account).values({ id: `acc_${userId}`, accountId: userId, providerId: 'credential', userId, password: passwordHash, createdAt: now, updatedAt: now });
       await db.insert(profiles).values({ authUserId: userId, name: body.name, email: normalizedEmail, phone: body.phone || null, createdAt: now, updatedAt: now });
       await db.insert(userRoles).values({ userId, roleId: 'participant', assignedBy, assignedAt: now });
 
@@ -173,14 +179,15 @@ const adminParticipantsHandler = async (request: Request) => {
 
         try {
           const assignedBy = session.isDevelopmentDemo ? null : session.userId;
+          const passwordHash = await hashCredentialPassword(p.password || '12345678');
           await db.insert(user).values({ id: userId, name: p.name, email: normalizedEmail, emailVerified: false, createdAt: now, updatedAt: now });
-          await db.insert(account).values({ id: `acc_${Date.now()}`, accountId: userId, providerId: 'credential', userId, password: p.password || '12345678', createdAt: now, updatedAt: now });
+          await db.insert(account).values({ id: `acc_${userId}`, accountId: userId, providerId: 'credential', userId, password: passwordHash, createdAt: now, updatedAt: now });
           await db.insert(profiles).values({ authUserId: userId, name: p.name, email: normalizedEmail, phone: p.phone || null, createdAt: now, updatedAt: now });
           await db.insert(userRoles).values({ userId, roleId: 'participant', assignedBy, assignedAt: now });
           results.inserted++;
-        } catch (err: any) {
+        } catch (err: unknown) {
           results.failed++;
-          results.errors.push({ email: normalizedEmail, reason: err.message || 'Gagal menyimpan ke database' });
+          results.errors.push({ email: normalizedEmail, reason: err instanceof Error ? err.message : 'Gagal menyimpan ke database' });
         }
       }
 
@@ -195,14 +202,15 @@ const adminParticipantsHandler = async (request: Request) => {
   // PUT: Password Reset or Profile Update
   if (request.method === 'PUT') {
     const rawBody = await request.clone().json();
-    const action = (rawBody as any)?.action;
+    const action = (rawBody as ActionBody)?.action;
 
     if (action === 'reset-password') {
       const body = await validateBody(request, resetPasswordSchema);
+      const passwordHash = await hashCredentialPassword(body.newPassword);
 
       await db
         .update(account)
-        .set({ password: body.newPassword, updatedAt: new Date() })
+        .set({ password: passwordHash, updatedAt: new Date() })
         .where(eq(account.userId, body.userId));
 
       return {

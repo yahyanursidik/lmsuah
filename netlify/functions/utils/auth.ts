@@ -1,17 +1,10 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { hashPassword, verifyPassword } from 'better-auth/crypto';
-import { compare as verifyBcryptPassword } from 'bcryptjs';
 import { db } from './db.js';
 import * as schema from '../db/schema/index.js';
+import { hashCredentialPassword, verifyCompatiblePassword } from './password.js';
 
-export async function verifyCompatiblePassword({ hash, password }: { hash: string; password: string }) {
-  if (/^\$2[aby]\$/.test(hash)) {
-    return verifyBcryptPassword(password, hash);
-  }
-
-  return verifyPassword({ hash, password });
-}
+export { verifyCompatiblePassword } from './password.js';
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -38,7 +31,7 @@ export const auth = betterAuth({
     password: {
       // Keep Better Auth's current hash format for new passwords while allowing
       // legacy bcrypt credentials to keep working during migration.
-      hash: hashPassword,
+      hash: hashCredentialPassword,
       verify: verifyCompatiblePassword,
     },
   },

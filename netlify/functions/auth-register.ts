@@ -5,6 +5,7 @@ import { user, profiles, userRoles, account } from './db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
+import { hashCredentialPassword } from './utils/password.js';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
@@ -45,6 +46,7 @@ const registerHandler = async (request: Request) => {
 
   const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const now = new Date();
+  const passwordHash = await hashCredentialPassword(body.password);
 
   // 1. Simpan user utama
   await db.insert(user).values({
@@ -58,11 +60,11 @@ const registerHandler = async (request: Request) => {
 
   // 2. Simpan kredensial password
   await db.insert(account).values({
-    id: `acc_${Date.now()}`,
+    id: `acc_${userId}`,
     accountId: userId,
     providerId: 'credential',
     userId: userId,
-    password: body.password,
+    password: passwordHash,
     createdAt: now,
     updatedAt: now,
   });

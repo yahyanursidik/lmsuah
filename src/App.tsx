@@ -2,6 +2,7 @@ import { Refine, Authenticated } from '@refinedev/core';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { dataProvider } from './providers/dataProvider';
 import { authProvider } from './providers/authProvider';
+import { GlobalNetworkIndicator } from './components/ui/GlobalNetworkIndicator';
 import { PublicLayout } from './pages/public/PublicLayout';
 import { HomePage } from './pages/public/HomePage';
 import { LoginPage } from './pages/public/LoginPage';
@@ -121,6 +122,7 @@ export function App() {
           {/* 404 Route */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <GlobalNetworkIndicator />
       </Refine>
     </BrowserRouter>
   );

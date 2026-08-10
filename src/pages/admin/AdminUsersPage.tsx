@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
-import { BookOpen, KeyRound, Mail, RefreshCw, Search, ShieldCheck, Upload, UserCheck, UserPlus, Users, Edit, Eye } from 'lucide-react';
+import { BookOpen, CalendarDays, Clock, KeyRound, Mail, RefreshCw, Search, ShieldCheck, Upload, UserCheck, UserPlus, Users, Edit, Eye } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { fetchWrapper } from '@/providers/dataProvider';
 import { AdminParticipantAddModal } from './components/AdminParticipantAddModal';
@@ -37,6 +37,11 @@ type UserRoleItem = {
   userId: string;
   name?: string;
   email?: string;
+  phone?: string | null;
+  createdAt?: string | null;
+  lastLoginAt?: string | null;
+  enrollmentCount?: number;
+  roles?: string[];
   roleId?: string | null;
   assignedAt?: string | null;
 };
@@ -82,6 +87,23 @@ async function readJsonPayload<T extends object>(response: Response, fallbackMes
   return 'data' in body && body.data !== undefined ? body.data : body as T;
 }
 
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return 'Belum pernah';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '-';
+  }
+}
+
 export function AdminUsersPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'enrollments'>('users');
   const [query, setQuery] = useState('');
@@ -110,10 +132,12 @@ export function AdminUsersPage() {
   const enrollments = useList<EnrollmentItem>({
     resource: 'enrollments',
     pagination: { mode: 'off' },
+    queryOptions: { enabled: activeTab === 'enrollments' },
   });
   const programs = useList<ProgramItem>({
     resource: 'programs',
     pagination: { mode: 'off' },
+    queryOptions: { enabled: activeTab === 'enrollments' },
   });
 
   const refreshRoles = async () => {
@@ -138,35 +162,51 @@ export function AdminUsersPage() {
   const enrollmentsData = useMemo(() => enrollments.result.data || [], [enrollments.result.data]);
 
   const groupedUsers = useMemo(() => {
-    const map = new Map<string, { userId: string; name: string; email: string; roles: string[]; latestAssignedAt?: string | null; enrollments: EnrollmentItem[] }>();
+    const map = new Map<string, {
+      userId: string;
+      name: string;
+      email: string;
+      roles: string[];
+      createdAt?: string | null;
+      lastLoginAt?: string | null;
+      enrollmentCount: number;
+      enrollments: EnrollmentItem[];
+    }>();
 
     rolesPayload.userRoles.forEach((item) => {
+      const parsedRoles = Array.isArray(item.roles)
+        ? item.roles
+        : item.roleId
+        ? [item.roleId]
+        : [];
+      
       const existing = map.get(item.userId) || {
         userId: item.userId,
         name: item.name || 'Tanpa nama',
         email: item.email || '-',
         roles: [],
-        latestAssignedAt: item.assignedAt,
+        createdAt: item.createdAt,
+        lastLoginAt: item.lastLoginAt,
+        enrollmentCount: item.enrollmentCount ?? 0,
         enrollments: [],
       };
-      if (item.roleId && !existing.roles.includes(item.roleId)) existing.roles.push(item.roleId);
-      if (item.assignedAt) existing.latestAssignedAt = item.assignedAt;
+
+      parsedRoles.forEach((r) => {
+        if (r && !existing.roles.includes(r)) existing.roles.push(r);
+      });
+
+      if (item.createdAt) existing.createdAt = item.createdAt;
+      if (item.lastLoginAt) existing.lastLoginAt = item.lastLoginAt;
+      if (typeof item.enrollmentCount === 'number') existing.enrollmentCount = item.enrollmentCount;
+
       map.set(item.userId, existing);
     });
 
     enrollmentsData.forEach((item) => {
-      const existing = map.get(item.userId) || {
-        userId: item.userId,
-        name: item.userName || 'Tanpa nama',
-        email: item.userEmail || '-',
-        roles: [],
-        latestAssignedAt: null,
-        enrollments: [],
-      };
-      existing.enrollments.push(item);
-      if (item.userName) existing.name = item.userName;
-      if (item.userEmail) existing.email = item.userEmail;
-      map.set(item.userId, existing);
+      const existing = map.get(item.userId);
+      if (existing) {
+        existing.enrollments.push(item);
+      }
     });
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -387,6 +427,8 @@ export function AdminUsersPage() {
                   <tr>
                     <th className="px-6 py-3.5">Nama Pengguna</th>
                     <th className="px-6 py-3.5">Kontak</th>
+                    <th className="px-6 py-3.5">Terdaftar</th>
+                    <th className="px-6 py-3.5">Terakhir Login</th>
                     <th className="px-6 py-3.5">Peran & Akses</th>
                     <th className="px-6 py-3.5 text-right">Aksi</th>
                   </tr>
@@ -401,13 +443,27 @@ export function AdminUsersPage() {
                           </div>
                           <div>
                             <div className="font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors cursor-pointer" onClick={() => setSelectedUserId(item.userId)}>{item.name}</div>
-                            <div className="text-xs text-slate-400">{item.enrollments.length} program diikuti</div>
+                            <div className="text-xs text-slate-400">{item.enrollmentCount || item.enrollments.length} program diikuti</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-slate-600 text-xs">
                           <Mail className="h-3.5 w-3.5 text-slate-400" /> {item.email}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarDays className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span>{formatDate(item.createdAt)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className={item.lastLoginAt ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}>
+                            {formatDate(item.lastLoginAt)}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -486,7 +542,7 @@ export function AdminUsersPage() {
                   ))}
                   {filteredUsers.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">Tidak ada pengguna yang cocok dengan pencarian Anda.</td>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 text-sm">Tidak ada pengguna yang cocok dengan pencarian Anda.</td>
                     </tr>
                   )}
                 </tbody>

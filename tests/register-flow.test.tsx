@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { registerParticipant, getRegisteredParticipants } from '../src/lib/userStore';
 import { RegisterPage } from '../src/pages/public/RegisterPage';
@@ -51,7 +51,7 @@ describe('Register Flow & UserStore', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('heading', { name: /Daftar Mandiri/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Buat akun peserta/i })).toBeDefined();
     expect(screen.getByPlaceholderText(/Ahmad Abdullah/i)).toBeDefined();
     expect(screen.getByPlaceholderText(/nama@email.com/i)).toBeDefined();
     expect(screen.getByPlaceholderText(/081234567890/i)).toBeDefined();

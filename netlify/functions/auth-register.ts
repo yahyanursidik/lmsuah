@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
 import { hashCredentialPassword } from './utils/password.js';
+import { isSelfRegistrationAllowed } from './utils/registration-policy.js';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
@@ -23,6 +24,9 @@ const registerHandler = async (request: Request) => {
   }
 
   const body = await validateBody(request, registerSchema);
+  if (!await isSelfRegistrationAllowed()) {
+    return Response.json({ error: { code: 'REGISTRATION_CLOSED', message: 'Pendaftaran peserta baru sedang ditutup. Silakan masuk dengan akun yang sudah terdaftar.' } }, { status: 403 });
+  }
   const normalizedEmail = body.email.trim().toLowerCase();
 
   // Periksa apakah email sudah terdaftar

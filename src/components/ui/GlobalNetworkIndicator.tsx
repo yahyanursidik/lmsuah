@@ -1,46 +1,22 @@
 import { useEffect, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
-import { NETWORK_STATUS_EVENT } from '@/providers/dataProvider';
-
-type NetworkStatusDetail = {
-  active?: boolean;
-  count?: number;
-};
+import { getActiveRequestCount, NETWORK_STATUS_EVENT } from '@/providers/dataProvider';
+import './portal.css';
 
 export function GlobalNetworkIndicator() {
-  const [isActive, setIsActive] = useState(false);
-
+  const [active, setActive] = useState(() => getActiveRequestCount() > 0);
+  const [slow, setSlow] = useState(false);
   useEffect(() => {
-    let hideTimer: number | undefined;
-
-    const handleStatus = (event: Event) => {
-      const detail = (event as CustomEvent<NetworkStatusDetail>).detail;
-      if (detail?.active) {
-        if (hideTimer) window.clearTimeout(hideTimer);
-        setIsActive(true);
-        return;
-      }
-
-      hideTimer = window.setTimeout(() => setIsActive(false), 180);
-    };
-
-    window.addEventListener(NETWORK_STATUS_EVENT, handleStatus);
-    return () => {
-      if (hideTimer) window.clearTimeout(hideTimer);
-      window.removeEventListener(NETWORK_STATUS_EVENT, handleStatus);
-    };
+    const update = (event: Event) => setActive(Boolean((event as CustomEvent<{ active: boolean }>).detail?.active));
+    window.addEventListener(NETWORK_STATUS_EVENT, update);
+    setActive(getActiveRequestCount() > 0);
+    return () => window.removeEventListener(NETWORK_STATUS_EVENT, update);
   }, []);
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-200 bg-white/95 px-3 py-2 text-xs font-bold text-emerald-900 shadow-lg shadow-slate-900/10 backdrop-blur transition duration-200 ${
-        isActive ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
-      }`}
-    >
-      <LoaderCircle className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-      Memuat data...
-    </div>
-  );
+  useEffect(() => {
+    if (!active) { setSlow(false); return; }
+    const timer = window.setTimeout(() => setSlow(true), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+  if (!active) return null;
+  return <div role="status" aria-live="polite" className="portal-network"><LoaderCircle size={16} className="shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" /><span>{slow ? 'Koneksi memerlukan waktu lebih lama. Data masih dimuat…' : 'Memuat data…'}</span></div>;
 }

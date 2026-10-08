@@ -1,5 +1,4 @@
 import { useList } from '@refinedev/core';
-import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_VENUES } from '@/mock/publicData';
 
 export interface PortalProgram {
   id: string;
@@ -55,32 +54,7 @@ export interface PortalVenue {
   status?: 'active' | 'inactive';
 }
 
-const fallbackPrograms: PortalProgram[] = MOCK_PROGRAMS.map((program) => ({
-  id: program.id,
-  slug: program.id,
-  title: program.title,
-  description: program.description,
-  status: 'published',
-  instructor: program.instructor,
-  coverImage: program.coverImage,
-}));
-
-const fallbackLessons: PortalLesson[] = MOCK_PROGRAMS.flatMap((program) =>
-  program.lessons.map((lesson) => ({
-    id: lesson.id,
-    programId: program.id,
-    title: lesson.title,
-    sequence: lesson.meetingNumber,
-    status: 'published' as const,
-    date: lesson.date,
-    description: lesson.summary,
-    materialCount: 1 + (lesson.pdfUrl ? 1 : 0),
-    hasQuiz: false,
-  })),
-);
-
-const fallbackSchedules: PortalSchedule[] = MOCK_SCHEDULES.map((schedule) => ({ ...schedule }));
-const fallbackVenues: PortalVenue[] = MOCK_VENUES.map((venue) => ({ ...venue, status: 'active' }));
+const portalQueryOptions = { staleTime: 30_000, retry: 1 };
 
 export function useParticipantPortalData() {
   const programsQuery = useList<PortalProgram>({
@@ -88,58 +62,49 @@ export function useParticipantPortalData() {
     filters: [{ field: 'status', operator: 'eq', value: 'published' }],
     sorters: [{ field: 'updatedAt', order: 'desc' }],
     pagination: { mode: 'off' },
+    queryOptions: portalQueryOptions,
   });
   const lessonsQuery = useList<PortalLesson>({
     resource: 'lessons',
     filters: [{ field: 'status', operator: 'eq', value: 'published' }],
     sorters: [{ field: 'sequence', order: 'asc' }],
     pagination: { mode: 'off' },
+    queryOptions: portalQueryOptions,
   });
   const schedulesQuery = useList<PortalSchedule>({
     resource: 'schedules',
     sorters: [{ field: 'date', order: 'asc' }],
     pagination: { mode: 'off' },
+    queryOptions: portalQueryOptions,
   });
   const venuesQuery = useList<PortalVenue>({
     resource: 'venues',
     filters: [{ field: 'status', operator: 'eq', value: 'active' }],
     pagination: { mode: 'off' },
+    queryOptions: portalQueryOptions,
   });
-
-  const apiPrograms = programsQuery.result.data || [];
-  const apiLessons = lessonsQuery.result.data || [];
-  const apiSchedules = schedulesQuery.result.data || [];
-  const apiVenues = venuesQuery.result.data || [];
-
-  const isProgramsReady = programsQuery.query.isFetched || apiPrograms.length > 0;
-  const isLessonsReady = lessonsQuery.query.isFetched || apiLessons.length > 0;
-  const isSchedulesReady = schedulesQuery.query.isFetched || apiSchedules.length > 0;
-  const isVenuesReady = venuesQuery.query.isFetched || apiVenues.length > 0;
-
-  const programs = isProgramsReady ? apiPrograms : (programsQuery.query.isError ? fallbackPrograms : []);
-  const lessons = isLessonsReady ? apiLessons : (lessonsQuery.query.isError ? fallbackLessons : []);
-  const venues = isVenuesReady ? apiVenues : (venuesQuery.query.isError ? fallbackVenues : []);
-  const rawSchedules = isSchedulesReady ? apiSchedules : (schedulesQuery.query.isError ? fallbackSchedules : []);
-
-  const schedules = rawSchedules.map((schedule) => ({
+  const venues = venuesQuery.result.data || [];
+  const schedules = (schedulesQuery.result.data || []).map(schedule => ({
     ...schedule,
-    venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name,
+    venueName: schedule.venueName || venues.find(venue => venue.id === schedule.venueId)?.name,
   }));
-
+  const queries = [programsQuery, lessonsQuery, schedulesQuery, venuesQuery];
   return {
-    programs: programs.length > 0 ? programs : (programsQuery.query.isLoading ? [] : fallbackPrograms),
-    lessons: lessons.length > 0 ? lessons : (lessonsQuery.query.isLoading ? [] : fallbackLessons),
+    programs: programsQuery.result.data || [],
+    lessons: lessonsQuery.result.data || [],
     schedules,
     venues,
-    isLoading: programsQuery.query.isLoading || lessonsQuery.query.isLoading || schedulesQuery.query.isLoading || venuesQuery.query.isLoading,
-    isFallback: isProgramsReady && apiPrograms.length === 0,
-    isError: programsQuery.query.isError || lessonsQuery.query.isError || schedulesQuery.query.isError || venuesQuery.query.isError,
-    refetch: () => void Promise.all([
-      programsQuery.query.refetch(),
-      lessonsQuery.query.refetch(),
-      schedulesQuery.query.refetch(),
-      venuesQuery.query.refetch(),
-    ]),
+    isLoading: queries.some(item => item.query.isLoading),
+    isProgramsLoading: programsQuery.query.isLoading,
+    isLessonsLoading: lessonsQuery.query.isLoading,
+    isSchedulesLoading: schedulesQuery.query.isLoading,
+    isRefreshing: queries.some(item => item.query.isFetching),
+    isFallback: false,
+    isError: queries.some(item => item.query.isError),
+    programsError: programsQuery.query.isError,
+    lessonsError: lessonsQuery.query.isError,
+    schedulesError: schedulesQuery.query.isError,
+    refetch: () => Promise.all(queries.map(item => item.query.refetch())),
   };
 }
 

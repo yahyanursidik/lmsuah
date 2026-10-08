@@ -7,8 +7,10 @@ import { ProgramDetailPage } from '../src/pages/public/ProgramDetailPage';
 import { AdminProgramsPage } from '../src/pages/admin/AdminProgramsPage';
 
 const mockDataProvider = {
-  getList: vi.fn().mockResolvedValue({
-    data: [
+  getList: vi.fn().mockImplementation(async ({ resource }: { resource: string }) => ({
+    data: resource === 'lessons' ? [
+      { id: 'l1', programId: 'bulughul-maram', meetingNumber: 1, title: 'Bab Thaharah', summary: 'Pengenalan Kitab', status: 'published' },
+    ] : [
       {
         id: 'bulughul-maram',
         slug: 'bulughul-maram',
@@ -25,7 +27,7 @@ const mockDataProvider = {
       }
     ],
     total: 1,
-  }),
+  })),
   getOne: vi.fn().mockResolvedValue({
     data: {
       id: 'bulughul-maram',
@@ -77,8 +79,9 @@ describe('Public Portal & Admin Integration UI Tests', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText(/Syarah Bulughul Maram/i)).toBeDefined();
-    expect(screen.getByText(/Bab Thaharah/i)).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Syarah Bulughul Maram' })).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'Bab Thaharah' })).toBeDefined();
+    expect(screen.getByRole('link', { name: /Buka Pertemuan/i }).getAttribute('href')).toBe('/lesson/l1');
   });
 
   it('renders AdminProgramsPage CRUD management interface', async () => {

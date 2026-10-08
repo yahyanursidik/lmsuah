@@ -2,6 +2,9 @@
 :root {
   --color-paper: oklch(98% 0.008 90);
   --color-paper-2: oklch(95% 0.012 90);
+  --color-surface: oklch(99% 0.004 90);
+  --color-error: oklch(43% 0.15 25);
+  --color-error-paper: oklch(97% 0.012 25);
   --color-ink: oklch(20% 0.025 165);
   --color-ink-2: oklch(44% 0.018 165);
   --color-rule: oklch(86% 0.012 165);

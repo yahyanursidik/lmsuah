@@ -6,6 +6,7 @@ import { db } from './utils/db.js';
 import { profiles } from './db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import registerHandler from './auth-register.js';
+import { getOAuthConfig } from './utils/oauth-config.js';
 
 const meHandler = createHandler(async (request: Request) => {
   const session = await requireAuth(request);
@@ -23,6 +24,11 @@ const meHandler = createHandler(async (request: Request) => {
 
 export default async function handler(request: Request, context: Context) {
   const url = new URL(request.url);
+  if (url.pathname === '/api/auth/providers' && request.method === 'GET') {
+    return Response.json({ google: getOAuthConfig().googleEnabled }, {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }
   if (url.pathname === '/api/auth/me') {
     return meHandler(request, context);
   }

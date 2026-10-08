@@ -1,5 +1,6 @@
 import type { AuthProvider } from '@refinedev/core';
 import { authClient, signIn, signOut } from '../lib/auth-client';
+import { startGoogleLogin } from '../lib/google-auth';
 
 const DEMO_STORAGE_KEY = 'lms_demo_user';
 
@@ -41,6 +42,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 function getStoredDemo(): string | null {
+  if (!import.meta.env.DEV) return null;
   if (typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function') {
     try {
       return localStorage.getItem(DEMO_STORAGE_KEY);
@@ -76,13 +78,10 @@ export const authProvider: AuthProvider = {
     // 1. Social provider login (Google)
     if (providerName === 'google') {
       try {
-        await signIn.social({
-          provider: 'google',
-          callbackURL: '/',
-        });
-        return { success: true };
-      } catch {
-        // Fallback for demo
+        await startGoogleLogin();
+        return { success: true, redirectTo: '/auth/complete' };
+      } catch (error) {
+        return { success: false, error: { name: 'GoogleLoginError', message: getErrorMessage(error, 'Login Google belum berhasil.') } };
       }
     }
 
@@ -91,11 +90,11 @@ export const authProvider: AuthProvider = {
       const lowerEmail = String(email).trim().toLowerCase();
       
       // Admin demo login bypass
-      if (
+      if (import.meta.env.DEV && (
         lowerEmail === 'admin@abutaidar.id' ||
         lowerEmail === 'admin@lms.id' ||
         lowerEmail === 'admin'
-      ) {
+      )) {
         const user = {
           id: 'demo-admin-1',
           name: 'Administrator UAH',
@@ -111,10 +110,10 @@ export const authProvider: AuthProvider = {
       }
 
       // Peserta demo login bypass
-      if (
+      if (import.meta.env.DEV && (
         lowerEmail === 'peserta@abutaidar.id' ||
         lowerEmail === 'peserta'
-      ) {
+      )) {
         const user = {
           id: 'demo-peserta-1',
           name: 'Jamaah Penuntut Ilmu',
@@ -145,6 +144,8 @@ export const authProvider: AuthProvider = {
             },
           };
         }
+
+        removeStoredDemo();
 
         // We successfully logged in with real auth!
         try {

@@ -1,0 +1,37 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Split Access · design-system: design.md · designed-as-app
+ * pre-emit critique: P4 H5 E4 S5 R5 V4 */
+.access-page { background: var(--color-paper); color: var(--color-ink); padding: var(--space-lg) var(--space-sm) var(--space-xl); font-family: var(--font-body); }
+.access-shell { max-width: 68rem; margin-inline: auto; display: grid; gap: var(--space-md); min-width: 0; }
+.access-welcome { padding: 0 var(--space-2xs); min-width: 0; }
+.access-salutation { color: var(--color-accent); font-weight: 600; font-size: var(--text-sm); }
+.access-welcome h1 { margin-block: var(--space-xs); font-family: var(--font-display); font-size: clamp(1.5rem, 3vw, 2.75rem); font-weight: 700; line-height: 1.18; letter-spacing: -0.035em; overflow-wrap: anywhere; }
+.access-description { display: none; color: var(--color-ink-2); line-height: 1.75; max-width: 45ch; }
+.access-guide { display: none; margin-block: var(--space-xl); }
+.access-guide > p { font-size: var(--text-sm); color: var(--color-ink-2); margin-bottom: var(--space-xs); }
+.access-guide a { display: flex; gap: var(--space-xs); align-items: center; min-height: 3rem; border-bottom: var(--rule-thin) solid var(--color-rule); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+.access-guide a span { flex: 1; }
+.access-guide svg { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--color-accent); }
+.access-signature { display: none; font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.7; }
+.access-panel { background: var(--color-surface); border: var(--rule-thin) solid var(--color-rule); border-radius: var(--radius-panel); padding: var(--space-md); min-width: 0; }
+.access-panel h2 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.025em; overflow-wrap: anywhere; }
+.access-panel p { line-height: 1.65; }
+.access-tabs { display: flex; gap: var(--space-sm); border-bottom: var(--rule-thin) solid var(--color-rule); margin-bottom: var(--space-md); }
+.access-tabs a { min-height: 2.75rem; display: flex; align-items: center; border-bottom: 2px solid transparent; font-weight: 600; font-size: var(--text-sm); color: var(--color-ink-2); white-space: nowrap; }
+.access-tabs a[aria-current] { border-color: var(--color-accent); color: var(--color-accent); }
+.access-button { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 3rem; width: 100%; padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-input); border: var(--rule-thin) solid var(--color-accent); background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; font-size: var(--text-sm); white-space: nowrap; cursor: pointer; }
+.access-button--google { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-rule); }
+.access-button:active { background: var(--color-ink); color: var(--color-accent-ink); }
+.access-button:disabled { opacity: .55; cursor: not-allowed; }
+.access-panel input:not([type='checkbox']) { background: var(--color-paper); color: var(--color-ink); }
+.access-panel input:not([type='checkbox'])::placeholder { color: var(--color-ink-2); }
+.access-panel input[aria-invalid='true'] { border-color: var(--color-error); }
+.access-panel input:not([type='checkbox']):focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.access-page :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.access-page .access-button:focus-visible { outline-offset: 4px; }
+.access-error { padding: var(--space-xs) var(--space-sm); margin-top: var(--space-sm); border-radius: var(--radius-input); border: var(--rule-thin) solid var(--color-error); background: var(--color-error-paper); color: var(--color-error); font-size: var(--text-sm); }
+.access-divider { display: flex; align-items: center; gap: var(--space-xs); margin-block: var(--space-md); font-size: var(--text-sm); color: var(--color-ink-2); }
+.access-divider::before, .access-divider::after { content: ''; height: 1px; flex: 1; background: var(--color-rule); }
+.google-mark { font-weight: 700; font-size: var(--text-lg); font-family: var(--font-display); }
+@media (hover: hover) { .access-button:not(:disabled):hover { background: var(--color-ink); color: var(--color-accent-ink); } .access-button--google:not(:disabled):hover { background: var(--color-paper-2); color: var(--color-ink); } .access-guide a:hover { color: var(--color-accent); } }
+@media (min-width: 40rem) { .access-page { padding: var(--space-xl) var(--space-md); } .access-panel { padding: var(--space-lg); } .access-description { display: block; } }
+@media (min-width: 60rem) { .access-shell { grid-template-columns: minmax(0,.9fr) minmax(0,1fr); align-items: start; gap: var(--space-xl); } .access-welcome { padding-block: var(--space-xl); } .access-guide, .access-signature { display: block; } .access-panel { padding: var(--space-xl); } }

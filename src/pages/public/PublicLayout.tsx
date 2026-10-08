@@ -1,220 +1,65 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+/* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4 · design-system: design.md */
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
 import { useGetIdentity } from '@refinedev/core';
+import { BookOpen, CalendarDays, Home, MapPin, Menu, UserRound, ArrowRight } from 'lucide-react';
 import { isAdminRole } from '../../providers/authProvider';
 
 type Identity = { id: string; name?: string; email?: string; role?: string; avatar?: string };
+const destinations = [
+  { label: 'Beranda', path: '/', icon: Home },
+  { label: 'Program', path: '/programs', icon: BookOpen },
+  { label: 'Jadwal', path: '/schedules', icon: CalendarDays },
+  { label: 'Lokasi', path: '/venues', icon: MapPin },
+  { label: 'Pemateri', path: '/speaker', icon: UserRound },
+];
+const navClass = ({ isActive }: { isActive: boolean }) => `inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${isActive ? 'bg-[var(--color-paper-2)] text-[var(--color-accent)] underline underline-offset-4' : 'text-[var(--color-ink-2)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)]'}`;
 
 export function PublicLayout() {
   const location = useLocation();
-  const { data: identity } = useGetIdentity<Identity>();
-  
-  const storedDemo = typeof window !== 'undefined' ? localStorage.getItem('lms_demo_user') : null;
-  const demoUser = storedDemo ? JSON.parse(storedDemo) : null;
-  const user = identity || demoUser;
+  const { data: user } = useGetIdentity<Identity>();
   const isAdmin = isAdminRole(user?.role);
-  const dashboardLink = isAdmin ? '/admin' : '/dashboard';
+  const dashboard = isAdmin ? '/admin' : '/dashboard';
+  const accessPage = ['/login', '/register', '/auth/complete'].includes(location.pathname);
+  const mobileLinks = [...destinations.slice(0, 4), { label: user ? (isAdmin ? 'Admin' : 'Belajar') : 'Masuk', path: user ? dashboard : '/login', icon: UserRound }];
 
-  const navLinks = [
-    { label: 'Beranda', path: '/' },
-    { label: 'Program', path: '/programs' },
-    { label: 'Jadwal', path: '/schedules' },
-    { label: 'Lokasi', path: '/venues' },
-    { label: 'Pemateri', path: '/speaker' },
-  ];
-
-  const bottomNavItems = [
-    {
-      label: 'Beranda',
-      path: '/',
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Program',
-      path: '/programs',
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Jadwal',
-      path: '/schedules',
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Lokasi',
-      path: '/venues',
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-    },
-    {
-      label: user ? (isAdmin ? 'Admin' : 'Belajar') : 'Masuk',
-      path: user ? dashboardLink : '/login',
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-    },
-  ];
-
-  return (
-    <div className="flex min-h-screen flex-col bg-[#FDFCF7] text-slate-900 font-sans pb-16 md:pb-0">
-      {/* Accessibility Skip Link */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-emerald-900 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
-      >
-        Skip to main content
-      </a>
-
-      {/* Announcement Bar */}
-      <div className="bg-emerald-950 px-4 py-2 text-center text-xs font-medium text-emerald-200">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          <span>Kajian Rutin Pekanan Ustadz Abu Haidar As-Sundawy (hafizhahullah) • Sabtu & Minggu 09:00 WIB</span>
-        </span>
-      </div>
-
-      {/* Primary Header */}
-      <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-white/90 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-3">
-            <img
-              src="/logo-abu-haidar.jpg"
-              alt="Logo Ustadz Abu Haidar As-Sundawy"
-              className="h-10 w-10 rounded-xl object-cover border border-amber-500/30 shadow-xs"
-            />
-            <div>
-              <span className="block font-bold leading-tight text-slate-900 sm:text-base">
-                Kajian Ustadz Abu Haidar
-              </span>
-              <span className="block text-[11px] font-medium text-slate-500">
-                Portal Pembelajaran Syar'i & Rekaman Kitab
-              </span>
-            </div>
+  return <div className="flex min-h-dvh flex-col bg-[var(--color-paper)] text-[var(--color-ink)] pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-[var(--color-accent)] focus:px-4 focus:py-3 focus:text-[var(--color-accent-ink)]">Lewati ke konten utama</a>
+    <header className="sticky top-0 z-30 border-b border-[var(--color-rule)] bg-[var(--color-surface)]">
+      <div className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <Link to="/" className="flex min-h-11 min-w-0 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]">
+          <img src="/logo-abu-haidar.jpg" alt="" width="44" height="44" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+          <span className="min-w-0"><span className="block truncate text-sm font-bold sm:text-base">Kajian Abu Haidar</span><span className="block text-xs text-[var(--color-ink-2)]">Ruang belajar bersama</span></span>
+        </Link>
+        <nav aria-label="Navigasi utama" className="hidden items-center gap-1 lg:flex">
+          {destinations.map(item => <NavLink key={item.path} to={item.path} end={item.path === '/'} className={navClass}>{item.label}</NavLink>)}
+        </nav>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link to={user ? dashboard : accessPage ? (location.pathname === '/register' ? '/login' : '/register') : '/login'} className="hidden min-h-11 items-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)] sm:inline-flex">
+            {user ? (isAdmin ? 'Portal admin' : 'Ruang belajar') : accessPage ? (location.pathname === '/register' ? 'Masuk' : 'Daftar akun') : 'Masuk'}<ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
-
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map((link) => {
-              const isActive = location.pathname === link.path;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'text-emerald-900 font-semibold border-b-2 border-emerald-900 pb-1'
-                      : 'text-slate-600 hover:text-emerald-900'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-            {user ? (
-              <Link
-                to={dashboardLink}
-                className="flex items-center gap-2 rounded-xl bg-emerald-950 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-900 transition-all border border-emerald-800"
-              >
-                <img src={user.avatar || '/logo-abu-haidar.jpg'} alt="" className="h-5 w-5 rounded-full object-cover border border-amber-400/60" />
-                <span>{isAdmin ? 'Portal Admin' : (user.name || 'Ruang Belajar')}</span>
-              </Link>
-            ) : (
-              <Link
-                to="/login"
-                className="rounded-lg bg-emerald-900 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 transition-all"
-              >
-                Masuk
-              </Link>
-            )}
-          </nav>
+          <details key={location.pathname} className="relative lg:hidden">
+            <summary aria-label="Buka menu utama" className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-[var(--color-rule)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"><Menu className="h-5 w-5" aria-hidden="true" /></summary>
+            <nav aria-label="Menu seluler" className="absolute right-0 top-full mt-2 flex w-52 flex-col rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-2">
+              {destinations.map(item => <NavLink key={item.path} to={item.path} end={item.path === '/'} className={navClass}>{item.label}</NavLink>)}
+              <Link to={user ? dashboard : '/login'} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-bold text-[var(--color-accent)]">{user ? (isAdmin ? 'Portal admin' : 'Ruang belajar') : 'Masuk ke akun'}</Link>
+            </nav>
+          </details>
         </div>
-      </header>
-
-      {/* Main Page Slot */}
-      <main id="main-content" className="flex-1">
-        <Outlet />
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-stone-200/80 bg-stone-100 py-12 text-slate-600 text-xs">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-start md:justify-between gap-8">
-          <div className="space-y-3 max-w-md">
-            <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
-              <img
-                src="/logo-abu-haidar.jpg"
-                alt="Logo Ustadz Abu Haidar As-Sundawy"
-                className="h-8 w-8 rounded-lg object-cover border border-amber-500/30"
-              />
-              Kajian Ustadz Abu Haidar As-Sundawy
-            </div>
-            <p className="text-slate-500 leading-relaxed">
-              Portal majelis ilmu syar'i murni, modul rujukan kitab-kitab induk, transkrip resmi, dan rekaman kajian Ustadz Abu Haidar As-Sundawy (hafizhahullah).
-            </p>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-3 text-sm">Navigasi Utama</h4>
-            <ul className="space-y-2">
-              <li><Link to="/programs" className="hover:text-emerald-900">Semua Program Kajian</Link></li>
-              <li><Link to="/schedules" className="hover:text-emerald-900">Jadwal Pekanan</Link></li>
-              <li><Link to="/venues" className="hover:text-emerald-900">Daftar Lokasi Majelis</Link></li>
-              <li><Link to="/speaker" className="hover:text-emerald-900">Biografi Pemateri</Link></li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 pt-6 border-t border-stone-200 text-center text-slate-500">
-          <p>
-            Disusun dan dikembangkan oleh{' '}
-            <a
-              href="https://yahyanursidik.my.id/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-emerald-900 hover:underline"
-            >
-              Yahya Nursidik
-            </a>
-          </p>
-        </div>
-      </footer>
-
-      {/* Mobile Bottom Navigation Bar (< 768px) */}
-      <nav
-        aria-label="Mobile Navigation"
-        className="fixed bottom-0 left-0 right-0 z-40 flex h-16 border-t border-stone-200 bg-white/95 backdrop-blur-md md:hidden"
-      >
-        {bottomNavItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium min-h-[44px] transition-colors ${
-                isActive ? 'text-emerald-900 font-bold' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
-  );
+      </div>
+    </header>
+    <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none"><Outlet /></main>
+    <footer className="border-t border-[var(--color-rule)] px-4 py-6 text-sm text-[var(--color-ink-2)] sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p>Kajian Ustadz Abu Haidar As-Sundawy hafizhahullah</p>
+        <nav aria-label="Informasi portal" className="flex flex-wrap gap-x-5">
+          <Link to="/privacy" className="inline-flex min-h-11 items-center whitespace-nowrap hover:underline">Privasi</Link>
+          <Link to="/terms" className="inline-flex min-h-11 items-center whitespace-nowrap hover:underline">Ketentuan</Link>
+          <a href="https://yahyanursidik.my.id/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center whitespace-nowrap hover:underline">Yahya Nursidik</a>
+        </nav>
+      </div>
+    </footer>
+    <nav aria-label="Navigasi cepat seluler" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[var(--color-rule)] bg-[var(--color-surface)] pb-[env(safe-area-inset-bottom)] lg:hidden">
+      {mobileLinks.map(item => { const Icon = item.icon; return <NavLink key={item.path} to={item.path} end={item.path === '/'} className={({ isActive }) => `flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 whitespace-nowrap text-[11px] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] ${isActive ? 'font-bold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}><Icon className="h-5 w-5" aria-hidden="true" /><span>{item.label}</span></NavLink>; })}
+    </nav>
+  </div>;
 }

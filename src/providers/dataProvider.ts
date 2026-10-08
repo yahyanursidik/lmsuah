@@ -28,6 +28,7 @@ function endNetworkRequest() {
 }
 
 export { NETWORK_STATUS_EVENT };
+export const getActiveRequestCount = () => activeRequestCount;
 
 /**
  * Custom fetch wrapper untuk memfasilitasi auth (credentials),

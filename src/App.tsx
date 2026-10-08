@@ -40,6 +40,7 @@ import { AdminLessonsPage } from './pages/admin/AdminLessonsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { AuthCompletePage } from './pages/public/AuthCompletePage';
 
 export function App() {
   return (
@@ -62,6 +63,7 @@ export function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/complete" element={<AuthCompletePage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/programs" element={<ProgramsPage />} />

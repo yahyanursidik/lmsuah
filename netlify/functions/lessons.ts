@@ -319,8 +319,7 @@ const lessonsHandler = async (request: Request) => {
   throw new Error(`Method ${method} tidak didukung`);
 };
 
-export const handler = createHandler(lessonsHandler);
-export default handler;
+export default createHandler(lessonsHandler);
 
 export const config: Config = {
   path: ['/api/lessons', '/api/lessons/*'],

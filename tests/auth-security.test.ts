@@ -6,8 +6,16 @@ import { verifyCompatiblePassword } from '../netlify/functions/utils/auth.js';
 import { hashCredentialPassword } from '../netlify/functions/utils/password.js';
 import * as permissionsModule from '../netlify/functions/utils/permissions.js';
 import { authProvider, hasAdminRole, isAdminRole, unwrapAuthMePayload } from '../src/providers/authProvider.js';
+import { ApiResponseError } from '../src/lib/api-response';
 
 describe('Auth & Security Unit Tests', () => {
+  it('HTML fallback 200 is not treated as an expired session', async () => {
+    const error = new ApiResponseError('Respons API bukan JSON', new Response('<html>'));
+    const result = await authProvider.onError?.(error);
+    expect(result?.logout).not.toBe(true);
+    expect(result?.redirectTo).toBeUndefined();
+    expect(result?.error).toBe(error);
+  });
   it('1. Participant tidak dapat mengakses endpoint admin (requireRole / requirePermission menolak)', async () => {
     const participantSession: UserSession = {
       userId: 'user-participant-123',

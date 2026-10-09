@@ -35,7 +35,7 @@ const quizzesHandler = async (request: Request) => {
     const quiz = quizResult[0];
 
     if (!quiz) {
-      return new Response(JSON.stringify({ error: { message: 'Quiz not found' } }), { status: 404 });
+      return Response.json({ error: { message: 'Quiz not found' } }, { status: 404 });
     }
 
     if (!quiz.isPublished && isGuest(session)) {
@@ -74,12 +74,12 @@ const quizzesHandler = async (request: Request) => {
       };
     });
 
-    return new Response(JSON.stringify({
+    return Response.json({
       data: {
         ...quiz,
         questions: formattedQuestions
       }
-    }), { status: 200 });
+    }, { status: 200 });
   }
 
   // POST /api/quizzes/:id/attempts (Start Attempt)
@@ -89,7 +89,7 @@ const quizzesHandler = async (request: Request) => {
 
     const quizResult = await db.select().from(quizzes).where(eq(quizzes.id, resourceId)).limit(1);
     const quiz = quizResult[0];
-    if (!quiz) return new Response(JSON.stringify({ error: { message: 'Quiz not found' } }), { status: 404 });
+    if (!quiz) return Response.json({ error: { message: 'Quiz not found' } }, { status: 404 });
 
     // Check max attempts
     const previousAttempts = await db.select().from(quizAttempts)
@@ -102,7 +102,7 @@ const quizzesHandler = async (request: Request) => {
     // Check if there is an existing in-progress attempt
     const inProgress = previousAttempts.find(a => a.status === 'in_progress');
     if (inProgress) {
-      return new Response(JSON.stringify({ data: inProgress }), { status: 200 }); // Return existing
+      return Response.json({ data: inProgress }, { status: 200 }); // Return existing
     }
 
     const newAttempt = await db.insert(quizAttempts).values({
@@ -111,7 +111,7 @@ const quizzesHandler = async (request: Request) => {
       status: 'in_progress'
     }).returning();
 
-    return new Response(JSON.stringify({ data: newAttempt[0] }), { status: 201 });
+    return Response.json({ data: newAttempt[0] }, { status: 201 });
   }
 
   // POST /api/quizzes/:id/attempts/:attemptId/submit
@@ -124,7 +124,7 @@ const quizzesHandler = async (request: Request) => {
     const attemptRes = await db.select().from(quizAttempts).where(eq(quizAttempts.id, attemptId)).limit(1);
     const attempt = attemptRes[0];
 
-    if (!attempt) return new Response(JSON.stringify({ error: { message: 'Attempt not found' } }), { status: 404 });
+    if (!attempt) return Response.json({ error: { message: 'Attempt not found' } }, { status: 404 });
     if (attempt.userId !== userId) throw new ForbiddenError('You can only submit your own attempts.');
     if (attempt.status === 'submitted') throw new ForbiddenError('This attempt has already been submitted.');
 
@@ -187,13 +187,13 @@ const quizzesHandler = async (request: Request) => {
       .where(eq(quizAttempts.id, attempt.id))
       .returning();
 
-    return new Response(JSON.stringify({
+    return Response.json({
       data: {
         ...updatedAttempt[0],
         maxScore,
         rawScore: totalScore
       }
-    }), { status: 200 });
+    }, { status: 200 });
   }
   
   // GET /api/quizzes/:id/attempts/:attemptId (Result view with feedback)
@@ -204,29 +204,29 @@ const quizzesHandler = async (request: Request) => {
     const attemptRes = await db.select().from(quizAttempts).where(eq(quizAttempts.id, attemptId)).limit(1);
     const attempt = attemptRes[0];
     
-    if (!attempt) return new Response(JSON.stringify({ error: { message: 'Attempt not found' } }), { status: 404 });
+    if (!attempt) return Response.json({ error: { message: 'Attempt not found' } }, { status: 404 });
     if (attempt.userId !== userId) throw new ForbiddenError('You can only view your own attempts.');
     
     // Only return answers/explanations if submitted
     if (attempt.status !== 'submitted') {
-      return new Response(JSON.stringify({ data: attempt }), { status: 200 });
+      return Response.json({ data: attempt }, { status: 200 });
     }
     
     const answers = await db.select().from(quizAnswers).where(eq(quizAnswers.attemptId, attempt.id));
     
     // Return attempt with answers
-    return new Response(JSON.stringify({
+    return Response.json({
       data: {
         ...attempt,
         answers
       }
-    }), { status: 200 });
+    }, { status: 200 });
   }
 
-  return new Response(JSON.stringify({ error: { message: 'Method or route not allowed' } }), { status: 405 });
+  return Response.json({ error: { message: 'Method or route not allowed' } }, { status: 405 });
 };
 
-export const handler = createHandler(quizzesHandler);
+export default createHandler(quizzesHandler);
 
 export const config: Config = {
   path: ['/api/quizzes', '/api/quizzes/*'],

@@ -4,6 +4,7 @@ import {
   CrudFilters,
   CrudSorting,
 } from '@refinedev/core';
+import { assertJsonResponse, readJsonResponse } from '../lib/api-response';
 
 export const API_URL = '/api';
 
@@ -69,16 +70,17 @@ export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
     });
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
+      const errorBody = await readJsonResponse(response, url).catch(() => null);
 
       const error: HttpError = {
-        message: errorBody?.error?.message || response.statusText,
+        message: errorBody?.error?.message || response.statusText || `Permintaan API gagal (${response.status}). Silakan coba lagi.`,
         statusCode: response.status,
       };
 
       throw error;
     }
 
+    assertJsonResponse(response, url);
     return response;
   } finally {
     endNetworkRequest();
@@ -142,7 +144,7 @@ export const dataProvider = (): DataProvider => ({
       headers: meta?.headers,
     });
     
-    const body = await response.json();
+    const body = await readJsonResponse(response, url.toString());
     const payload = body.data !== undefined ? body.data : body;
     const items = Array.isArray(payload) ? payload : (payload.items || []);
     const total = (typeof payload === 'object' && payload?.total) || body.meta?.total || items.length;
@@ -156,7 +158,7 @@ export const dataProvider = (): DataProvider => ({
   getOne: async ({ resource, id, meta }) => {
     const url = `${API_URL}/${resource}/${id}`;
     const response = await fetchWrapper(url, { headers: meta?.headers });
-    const body = await response.json();
+    const body = await readJsonResponse(response, url);
     const payload = body.data !== undefined ? body.data : body;
 
     return { data: payload };
@@ -169,7 +171,7 @@ export const dataProvider = (): DataProvider => ({
       body: JSON.stringify(variables),
       headers: meta?.headers,
     });
-    const body = await response.json();
+    const body = await readJsonResponse(response, url);
     const payload = body.data !== undefined ? body.data : body;
 
     return { data: payload };
@@ -182,7 +184,7 @@ export const dataProvider = (): DataProvider => ({
       body: JSON.stringify(variables),
       headers: meta?.headers,
     });
-    const body = await response.json();
+    const body = await readJsonResponse(response, url);
     const payload = body.data !== undefined ? body.data : body;
 
     return { data: payload };
@@ -194,7 +196,7 @@ export const dataProvider = (): DataProvider => ({
       method: 'DELETE',
       headers: meta?.headers,
     });
-    const body = await response.json();
+    const body = await readJsonResponse(response, url);
     const payload = body.data !== undefined ? body.data : body;
 
     return { data: payload };
@@ -234,7 +236,7 @@ export const dataProvider = (): DataProvider => ({
       headers: headers as HeadersInit,
     });
 
-    const body = await response.json();
+    const body = await readJsonResponse(response, requestUrl.toString());
     const resPayload = body.data !== undefined ? body.data : body;
 
     return { data: resPayload };

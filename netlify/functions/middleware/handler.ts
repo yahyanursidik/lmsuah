@@ -31,6 +31,19 @@ export function createHandler(handler: RouteHandler) {
     try {
       // 4. Execute handler
       const result = await handler(request, context, requestId);
+
+      // Modern functions may already provide a response, including non-200 statuses.
+      // Preserve its body and headers instead of serializing Response into { data: {} }.
+      if (result instanceof Response) {
+        logger.info('REQUEST_COMPLETED', { requestId, status: result.status });
+        const headers = new Headers(result.headers);
+        headers.set('x-request-id', requestId);
+        return new Response(result.body, {
+          status: result.status,
+          statusText: result.statusText,
+          headers,
+        });
+      }
       
       logger.info('REQUEST_COMPLETED', { requestId, status: 200 });
 

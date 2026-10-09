@@ -70,11 +70,10 @@ const enrollmentsHandler = async (request: Request) => {
     };
   }
 
-  return new Response(JSON.stringify({ error: { message: 'Method not allowed' } }), { status: 405 });
+  return Response.json({ error: { message: 'Method not allowed' } }, { status: 405 });
 };
 
-export const handler = createHandler(enrollmentsHandler);
-export default handler;
+export default createHandler(enrollmentsHandler);
 
 export const config: Config = {
   path: ['/api/enrollments', '/api/enrollments/*'],

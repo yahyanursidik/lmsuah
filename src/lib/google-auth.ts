@@ -1,4 +1,5 @@
 import { signIn } from './auth-client';
+import { readJsonResponse } from './api-response';
 
 export const GOOGLE_CALLBACK_PATH = '/auth/complete';
 
@@ -15,7 +16,7 @@ export async function startGoogleLogin(): Promise<void> {
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) throw new Error('Layanan login Google belum dapat dihubungi. Silakan coba lagi.');
-  const providers = await response.json();
+  const providers = await readJsonResponse(response, '/api/auth/providers');
   if (!providers.google) throw new Error('Login Google belum tersedia. Silakan masuk menggunakan email dan password.');
 
   const { data, error } = await signIn.social({

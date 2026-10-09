@@ -2,6 +2,20 @@
 
 Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git memakai awalan `v` dan menunjuk commit rilis pada `main`. `package.json` dan `package-lock.json` harus memakai versi yang sama. Changelog di `lms-kajian-yts-docs` merupakan riwayat dokumen, bukan versi aplikasi.
 
+## [0.2.1] — 2026-10-09
+
+### Diperbaiki
+
+- Endpoint pertemuan, pendaftaran program, dan kuis menggunakan default export Netlify Functions modern agar rute API tidak jatuh ke halaman HTML aplikasi.
+- Pembungkus API mempertahankan status HTTP, body, dan header respons yang sudah dibuat handler, termasuk respons kuis dan error 404/405.
+- Portal dan penyelesaian login Google menangani respons HTML/JSON rusak dengan pesan yang jelas, tanpa menyamarkannya sebagai sesi kedaluwarsa.
+
+### Verifikasi
+
+- Seluruh 106 tes dalam 17 file lulus, termasuk regresi format respons, ekspor handler modern, pembatasan akses, dan retry callback Google.
+- Build produksi, lint pada file perubahan, dan pemeriksaan diff lulus. Peringatan ukuran bundle masih ada.
+- Keberhasilan deploy produksi, OAuth Google end-to-end, dan konfigurasi kredensial tetap perlu diverifikasi setelah rilis; tes lokal bukan bukti keberhasilan login produksi.
+
 ## [0.2.0] — 2026-10-08
 
 ### Ditambahkan

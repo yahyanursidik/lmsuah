@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
 import { authClient } from '../../lib/auth-client';
+import { readJsonResponse } from '../../lib/api-response';
 import { hasAdminRole, unwrapAuthMePayload } from '../../providers/authProvider';
 import { AccessLayout } from '../../components/auth/AccessLayout';
 
@@ -21,7 +22,7 @@ export function AuthCompletePage() {
           credentials: 'include', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
         });
         if (!response.ok) throw new Error('Informasi akun belum dapat dimuat. Silakan coba lagi.');
-        const account = unwrapAuthMePayload(await response.json());
+        const account = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
         if (!account.user || !account.roles?.length) throw new Error('Profil akun belum siap. Silakan coba lagi.');
         if (controller.signal.aborted) return;
         navigate(hasAdminRole(account.roles) ? '/admin' : '/dashboard', { replace: true });

@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { handleCors } from './cors.js';
 import { ValidationError } from './validation.js';
 import { AuthError, ForbiddenError } from './auth.js';
+import { HttpError } from '../utils/http-error.js';
 
 export type RouteHandler = (
   request: Request,
@@ -31,6 +32,19 @@ export function createHandler(handler: RouteHandler) {
     try {
       // 4. Execute handler
       const result = await handler(request, context, requestId);
+
+      // Modern functions may already provide a response, including non-200 statuses.
+      // Preserve its body and headers instead of serializing Response into { data: {} }.
+      if (result instanceof Response) {
+        logger.info('REQUEST_COMPLETED', { requestId, status: result.status });
+        const headers = new Headers(result.headers);
+        headers.set('x-request-id', requestId);
+        return new Response(result.body, {
+          status: result.status,
+          statusText: result.statusText,
+          headers,
+        });
+      }
       
       logger.info('REQUEST_COMPLETED', { requestId, status: 200 });
 
@@ -51,7 +65,11 @@ export function createHandler(handler: RouteHandler) {
       let errorCode = 'INTERNAL_ERROR';
       let errorMessage = 'Terjadi kesalahan pada server';
 
-      if (error instanceof ValidationError) {
+      if (error instanceof HttpError) {
+        statusCode = error.statusCode;
+        errorCode = error.code;
+        errorMessage = error.message;
+      } else if (error instanceof ValidationError) {
         statusCode = 400;
         errorCode = 'VALIDATION_ERROR';
         errorMessage = error.message;

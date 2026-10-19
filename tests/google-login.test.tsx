@@ -14,6 +14,26 @@ beforeEach(() => { vi.clearAllMocks(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('Google login', () => {
+  it('reports a routing error and does not start OAuth when providers returns HTML', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<!doctype html>', { headers: { 'Content-Type': 'text/html' } })));
+    await expect(startGoogleLogin()).rejects.toThrow('/api/auth/providers bukan JSON');
+    expect(mocks.social).not.toHaveBeenCalled();
+  });
+
+  it('allows retry rather than redirecting to a portal when the callback receives HTML', async () => {
+    mocks.getSession.mockResolvedValue({ data: { user: { id: 'u1' } } });
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response('<!doctype html>', { headers: { 'Content-Type': 'text/html' } }))
+      .mockResolvedValueOnce(Response.json({ data: { user: { id: 'u1' }, roles: ['administrator'] } })));
+    render(<MemoryRouter initialEntries={['/auth/complete']}><Routes>
+      <Route path="/auth/complete" element={<AuthCompletePage />} />
+      <Route path="/admin" element={<h1>Dashboard admin</h1>} />
+    </Routes></MemoryRouter>);
+    expect((await screen.findByRole('alert')).textContent).toContain('/api/auth/me bukan JSON');
+    expect(screen.queryByText('Dashboard admin')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Coba lagi' }));
+    expect(await screen.findByText('Dashboard admin')).toBeDefined();
+  });
   it('does not start OAuth when credentials are unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ google: false })));
     await expect(startGoogleLogin()).rejects.toThrow('belum tersedia');

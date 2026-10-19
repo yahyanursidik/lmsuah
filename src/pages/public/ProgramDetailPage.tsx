@@ -4,6 +4,7 @@ import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { Bookmark, CheckCircle2, PlayCircle, BookOpen, UserCheck, PlusCircle } from 'lucide-react';
 import { MOCK_PROGRAMS, Program } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
+import type { PublicLessonSummary } from '../../types';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import {
   isEnrolled,
@@ -27,7 +28,7 @@ export function ProgramDetailPage() {
     },
   });
 
-  const { result: lessonsListResult } = useList({
+  const { result: lessonsListResult } = useList<PublicLessonSummary>({
     resource: 'lessons',
     filters: id ? [{ field: 'programId', operator: 'eq', value: id }] : [],
     sorters: [{ field: 'sequence', order: 'asc' }],
@@ -41,7 +42,7 @@ export function ProgramDetailPage() {
   const isError = oneQuery.isError;
   const refetch = oneQuery.refetch;
 
-  const apiLessons = (lessonsListResult?.data || []) as any[];
+  const apiLessons = lessonsListResult?.data || [];
   const lessons = apiLessons.length > 0
     ? apiLessons.map((l, index) => ({
         id: l.id,

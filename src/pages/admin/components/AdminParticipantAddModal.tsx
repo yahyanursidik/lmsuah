@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, UserPlus, Mail, Phone, Lock, Save } from 'lucide-react';
 
-type ParticipantFormData = {
+export type ParticipantFormData = {
   name: string;
   email: string;
   phone: string;

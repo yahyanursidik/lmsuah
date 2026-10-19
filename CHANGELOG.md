@@ -2,6 +2,23 @@
 
 Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git memakai awalan `v` dan menunjuk commit rilis pada `main`. `package.json` dan `package-lock.json` harus memakai versi yang sama. Changelog di `lms-kajian-yts-docs` merupakan riwayat dokumen, bukan versi aplikasi.
 
+## [0.2.1] — 2026-10-19
+
+### Diperbaiki
+
+- Endpoint pertemuan, pendaftaran program, dan kuis menggunakan default export Netlify Functions modern agar rute API tidak jatuh ke halaman HTML aplikasi.
+- Pembungkus API mempertahankan status HTTP, body, dan header respons yang sudah dibuat handler, termasuk respons kuis dan error 404/405.
+- Portal dan penyelesaian login Google menangani respons HTML/JSON rusak dengan pesan yang jelas, tanpa menyamarkannya sebagai sesi kedaluwarsa.
+- Tipe data daftar publik, pengelolaan peserta, role, dan pengumuman diperjelas; error ditangani sebagai `unknown` tanpa menonaktifkan aturan lint.
+- Endpoint pengumuman memverifikasi sesi dan role admin saat menulis, menyimpan identitas pembuat yang valid, dan membatasi pembaca umum ke pengumuman terbit.
+- Konfigurasi Netlify disimpan dalam repository; hanya `BETTER_AUTH_URL` (origin publik, bukan kredensial) dikecualikan dari secret scanning untuk mengatasi false positive pada dokumentasi. Secret scanning lainnya tetap aktif.
+
+### Verifikasi
+
+- Seluruh 128 tes dalam 20 file lulus, mencakup regresi respons JSON, ekspor handler modern, akses pengumuman, pesan error, dan batas pengecualian secret scanning.
+- Lint seluruh repository lulus dengan 0 error dan 0 warning; build produksi dan pemeriksaan diff lulus. Peringatan ukuran bundle tetap dicatat terpisah dari kegagalan deploy.
+- Keberhasilan deploy produksi, OAuth Google end-to-end, dan konfigurasi kredensial tetap perlu diverifikasi setelah rilis; tes lokal bukan bukti keberhasilan login produksi.
+
 ## [0.2.0] — 2026-10-08
 
 ### Ditambahkan

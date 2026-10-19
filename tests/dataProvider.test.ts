@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { dataProvider, fetchWrapper } from '../src/providers/dataProvider.js';
+import { dataProvider, fetchWrapper, getActiveRequestCount } from '../src/providers/dataProvider.js';
 import { HttpError } from '@refinedev/core';
 
 // Buat mock global.fetch
@@ -24,11 +24,29 @@ describe('Custom Refine REST Data Provider', () => {
   });
 
   describe('fetchWrapper', () => {
-    it('Harus menyertakan credentials: "include" dan X-Request-ID', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'success' }),
+    it('menolak fallback HTML 200 sebagai error server, bukan sesi kedaluwarsa', async () => {
+      fetchMock.mockResolvedValueOnce(new Response('<!doctype html><html>SPA</html>', {
+        headers: { 'Content-Type': 'text/html' },
+      }));
+      await expect(fetchWrapper('/api/lessons?token=private')).rejects.toMatchObject({
+        name: 'ApiResponseError', statusCode: 502,
+        message: expect.stringContaining('/api/lessons bukan JSON'),
       });
+      expect(getActiveRequestCount()).toBe(0);
+    });
+
+    it.each([401, 403, 502])('mempertahankan status %s walaupun body error berupa HTML', async (status) => {
+      fetchMock.mockResolvedValueOnce(new Response('<!doctype html>', {
+        status, headers: { 'Content-Type': 'text/html' },
+      }));
+      await expect(fetchWrapper('/api/lessons')).rejects.toMatchObject({
+        statusCode: status, message: expect.any(String),
+      });
+      expect(getActiveRequestCount()).toBe(0);
+    });
+
+    it('Harus menyertakan credentials: "include" dan X-Request-ID', async () => {
+      fetchMock.mockResolvedValueOnce(Response.json({ data: 'success' }));
 
       await fetchWrapper('/api/test');
 
@@ -46,14 +64,9 @@ describe('Custom Refine REST Data Provider', () => {
     });
 
     it('Harus melemparkan HttpError yang sesuai ketika response tidak ok (Error Mapping)', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        statusText: 'Forbidden',
-        json: async () => ({
-          error: { message: 'Akses tidak diizinkan', code: 'FORBIDDEN' }
-        }),
-      });
+      fetchMock.mockResolvedValueOnce(Response.json({
+        error: { message: 'Akses tidak diizinkan', code: 'FORBIDDEN' },
+      }, { status: 403, statusText: 'Forbidden' }));
 
       try {
         await fetchWrapper('/api/test');
@@ -66,7 +79,7 @@ describe('Custom Refine REST Data Provider', () => {
 
     it('mengirim identitas demo admin pada localhost agar API lokal mengenali sesi', async () => {
       window.localStorage.setItem('lms_demo_user', JSON.stringify({ id: 'demo-admin-1', role: 'admin' }));
-      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'success' }) });
+      fetchMock.mockResolvedValueOnce(Response.json({ data: 'success' }));
 
       await fetchWrapper('/api/test');
 
@@ -76,7 +89,7 @@ describe('Custom Refine REST Data Provider', () => {
 
     it('mengirim identitas demo peserta agar akses pertemuan lokal tidak dianggap guest', async () => {
       window.localStorage.setItem('lms_demo_user', JSON.stringify({ id: 'demo-peserta-1', role: 'participant' }));
-      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'success' }) });
+      fetchMock.mockResolvedValueOnce(Response.json({ data: 'success' }));
 
       await fetchWrapper('/api/lessons/lesson-1');
 
@@ -88,14 +101,22 @@ describe('Custom Refine REST Data Provider', () => {
   describe('dataProvider', () => {
     const provider = dataProvider();
 
-    it('getList - Harus merangkai query parameter dengan benar', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          data: [{ id: 1, title: 'Item 1' }],
-          meta: { total: 100 },
-        }),
+    it('getList menangani JSON rusak tanpa membocorkan isi respons', async () => {
+      fetchMock.mockResolvedValueOnce(new Response('<!doctype html>private-content', {
+        headers: { 'Content-Type': 'application/json' },
+      }));
+      await expect(provider.getList({ resource: 'lessons' })).rejects.toMatchObject({
+        name: 'ApiResponseError', statusCode: 502,
+        message: 'Respons JSON API /api/lessons tidak valid. Silakan coba lagi atau hubungi pengelola.',
       });
+      expect(getActiveRequestCount()).toBe(0);
+    });
+
+    it('getList - Harus merangkai query parameter dengan benar', async () => {
+      fetchMock.mockResolvedValueOnce(Response.json({
+        data: [{ id: 1, title: 'Item 1' }],
+        meta: { total: 100 },
+      }));
 
       await provider.getList({
         resource: 'posts',
@@ -116,10 +137,7 @@ describe('Custom Refine REST Data Provider', () => {
     });
 
     it('create - Harus mengirimkan metode POST dan body JSON', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: { id: 1, title: 'Baru' } }),
-      });
+      fetchMock.mockResolvedValueOnce(Response.json({ data: { id: 1, title: 'Baru' } }));
 
       const result = await provider.create({
         resource: 'posts',

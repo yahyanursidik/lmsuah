@@ -3,10 +3,11 @@ import { useList } from '@refinedev/core';
 import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES, type ScheduleItem, type Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { KnowledgeJourney } from '../../components/public/KnowledgeJourney';
+import type { PublicLessonSummary, PublicProgramSummary } from '../../types';
 
 export function HomePage() {
-  const { query: programsQuery, result: programsResult } = useList<any>({ resource: 'programs', pagination: { mode: 'off' } });
-  const { result: lessonsResult } = useList<any>({ resource: 'lessons', pagination: { mode: 'off' } });
+  const { query: programsQuery, result: programsResult } = useList<PublicProgramSummary>({ resource: 'programs', pagination: { mode: 'off' } });
+  const { result: lessonsResult } = useList<PublicLessonSummary>({ resource: 'lessons', pagination: { mode: 'off' } });
   const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({ resource: 'schedules', pagination: { mode: 'off' } });
   const { query: venuesQuery, result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
 
@@ -23,8 +24,8 @@ export function HomePage() {
   const rawSchedules = isSchedulesReady ? apiSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : []);
   const rawVenues = isVenuesReady ? apiVenues : (venuesQuery.isError ? MOCK_VENUES : []);
 
-  const programs = (rawPrograms.length > 0 ? rawPrograms : (programsQuery.isError ? MOCK_PROGRAMS : [])).map((prog: any) => {
-    const progLessons = apiLessons.filter((l: any) => l.programId === prog.id);
+  const programs = (rawPrograms.length > 0 ? rawPrograms : (programsQuery.isError ? MOCK_PROGRAMS : [])).map((prog) => {
+    const progLessons = apiLessons.filter((l) => l.programId === prog.id);
     return {
       id: prog.id,
       title: prog.title,
@@ -36,8 +37,8 @@ export function HomePage() {
     };
   });
 
-  const venues = (rawVenues.length > 0 ? rawVenues : (venuesQuery.isError ? MOCK_VENUES : [])).map((v: any) => {
-    const activeKajians = apiSchedules.filter((s: any) => s.venueId === v.id).length;
+  const venues = (rawVenues.length > 0 ? rawVenues : (venuesQuery.isError ? MOCK_VENUES : [])).map((v) => {
+    const activeKajians = apiSchedules.filter((s) => s.venueId === v.id).length;
     return {
       ...v,
       image: v.image || '/masjid-umar-bin-khattab.jpg',
@@ -45,9 +46,9 @@ export function HomePage() {
     };
   });
 
-  const schedules = (rawSchedules.length > 0 ? rawSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : [])).map((schedule: any) => ({
+  const schedules = (rawSchedules.length > 0 ? rawSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : [])).map((schedule) => ({
     ...schedule,
-    venueName: schedule.venueName || venues.find((v: any) => v.id === schedule.venueId)?.name || 'Masjid Umar bin Khattab Bandung',
+    venueName: schedule.venueName || venues.find((v) => v.id === schedule.venueId)?.name || 'Masjid Umar bin Khattab Bandung',
   }));
 
   const speaker = {
@@ -103,7 +104,7 @@ export function HomePage() {
                     Live Stream
                   </span>
                 </div>
-                {schedules.slice(0, 2).map((sch: any) => (
+                {schedules.slice(0, 2).map((sch) => (
                   <div key={sch.id} className="rounded-xl bg-stone-50 p-4 border border-stone-200/60 space-y-2">
                     <div className="flex items-center justify-between text-xs text-stone-500 font-medium">
                       <span>{sch.day}, {sch.date}</span>
@@ -141,7 +142,7 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {programs.map((prog: any) => (
+          {programs.map((prog) => (
             <div
               key={prog.id}
               className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs hover:border-emerald-900/30"
@@ -246,7 +247,7 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {venues.slice(0, 4).map((v: any) => (
+          {venues.slice(0, 4).map((v) => (
             <div key={v.id} className="space-y-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30">
               <div className="h-44 w-full bg-stone-100 overflow-hidden">
                 <img src={v.image} alt={v.name} className="h-full w-full object-cover" />

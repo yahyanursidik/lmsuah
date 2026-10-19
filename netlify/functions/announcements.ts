@@ -2,9 +2,14 @@ import type { Config } from '@netlify/functions';
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { announcements } from './db/schema/index.js';
-import { eq, desc } from 'drizzle-orm';
+import { and, eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
+import { requireAuth, requireRole } from './middleware/auth.js';
+import { getDatabaseActorId, getOptionalAuth } from './utils/contentHelper.js';
+import { HttpError } from './utils/http-error.js';
+
+const ADMIN_ROLES = ['admin', 'administrator', 'super_administrator'];
 
 const announcementSchema = z.object({
   title: z.string().min(1, 'Judul wajib diisi'),
@@ -20,6 +25,9 @@ const announcementsHandler = async (request: Request) => {
   
   // Format: /api/announcements/:id
   const id = pathParts.length > 2 ? pathParts[2] : null;
+  const session = request.method === 'GET' ? await getOptionalAuth(request) : await requireAuth(request);
+  const canManage = session?.roles.some(role => ADMIN_ROLES.includes(role));
+  if (request.method !== 'GET') requireRole(session!, ADMIN_ROLES);
 
   switch (request.method) {
     case 'GET': {
@@ -27,17 +35,17 @@ const announcementsHandler = async (request: Request) => {
         const item = await db
           .select()
           .from(announcements)
-          .where(eq(announcements.id, id))
+          .where(and(eq(announcements.id, id), canManage ? undefined : eq(announcements.status, 'published')))
           .limit(1);
           
         if (item.length === 0) {
-          throw new Error('Not found');
+          throw new HttpError(404, 'Pengumuman tidak ditemukan.');
         }
         return item[0];
       }
 
       // Check for query params
-      const status = url.searchParams.get('status');
+      const status = canManage ? url.searchParams.get('status') : 'published';
       
       const allAnnouncements = await db
         .select()
@@ -50,8 +58,6 @@ const announcementsHandler = async (request: Request) => {
 
     case 'POST': {
       const body = await validateBody(request, announcementSchema);
-      // @ts-ignore
-      const session = request.userSession; // asumsi ada session handler
       
       const newItem = await db.insert(announcements).values({
         title: body.title,
@@ -59,7 +65,7 @@ const announcementsHandler = async (request: Request) => {
         linkUrl: body.linkUrl || null,
         imageUrl: body.imageUrl || null,
         status: body.status,
-        createdBy: session?.userId || null, // Sebaiknya diambil dari session
+        createdBy: getDatabaseActorId(session!),
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
@@ -70,7 +76,7 @@ const announcementsHandler = async (request: Request) => {
     case 'PUT':
     case 'PATCH': {
       if (!id) {
-        throw new Error('ID is required');
+        throw new HttpError(400, 'ID pengumuman diperlukan.');
       }
       
       const body = await validateBody(request, announcementSchema);
@@ -85,7 +91,7 @@ const announcementsHandler = async (request: Request) => {
       }).where(eq(announcements.id, id)).returning();
       
       if (updatedItem.length === 0) {
-        throw new Error('Not found');
+        throw new HttpError(404, 'Pengumuman tidak ditemukan.');
       }
       
       return updatedItem[0];
@@ -93,7 +99,7 @@ const announcementsHandler = async (request: Request) => {
 
     case 'DELETE': {
       if (!id) {
-        throw new Error('ID is required');
+        throw new HttpError(400, 'ID pengumuman diperlukan.');
       }
       
       await db.delete(announcements).where(eq(announcements.id, id));
@@ -101,7 +107,7 @@ const announcementsHandler = async (request: Request) => {
     }
 
     default:
-      throw new Error('Method not allowed');
+      throw new HttpError(405, 'Metode tidak didukung.');
   }
 };
 

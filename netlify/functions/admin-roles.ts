@@ -41,7 +41,7 @@ const adminRolesHandler = async (request: Request) => {
     ORDER BY u.created_at DESC;
   `);
 
-  const userRolesData = Array.isArray(result) ? result : (result as any).rows || [];
+  const userRolesData = Array.isArray(result) ? result : result.rows;
 
   return {
     roles: allRoles,

@@ -1,6 +1,7 @@
 import type { AuthProvider } from '@refinedev/core';
 import { authClient, signIn, signOut } from '../lib/auth-client';
 import { startGoogleLogin } from '../lib/google-auth';
+import { readJsonResponse } from '../lib/api-response';
 
 const DEMO_STORAGE_KEY = 'lms_demo_user';
 
@@ -151,7 +152,7 @@ export const authProvider: AuthProvider = {
         try {
           const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
           if (response.ok) {
-            const data = unwrapAuthMePayload(await response.json());
+            const data = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
             if (hasAdminRole(data.roles)) {
               return {
                 success: true,
@@ -238,7 +239,7 @@ export const authProvider: AuthProvider = {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
       if (response.ok) {
-        const data = unwrapAuthMePayload(await response.json());
+        const data = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
         if (data.roles && data.roles.length > 0) {
           if (data.roles.includes('super_administrator')) return 'super_administrator';
           if (data.roles.includes('administrator')) return 'administrator';
@@ -272,7 +273,7 @@ export const authProvider: AuthProvider = {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
       if (response.ok) {
-        const data = unwrapAuthMePayload(await response.json());
+        const data = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
         if (data.user) {
           let role = 'participant';
           if (data.roles && data.roles.length > 0) {

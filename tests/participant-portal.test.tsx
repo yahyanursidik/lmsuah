@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ParticipantLayout } from '../src/pages/participant/ParticipantLayout';
 import { DashboardPage } from '../src/pages/participant/DashboardPage';
@@ -40,10 +40,25 @@ function renderPortal(path: string, element: React.ReactNode) {
 }
 
 describe('Participant portal experience', () => {
-  beforeEach(() => { memoryStorage.clear(); logout.mockClear(); });
+  beforeEach(() => {
+    memoryStorage.clear(); logout.mockClear();
+    apiData.enrollments = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      const resource = new URL(url, 'http://localhost').pathname.split('/')[2];
+      if (resource === 'enrollments' && options?.method === 'POST') {
+        const body = JSON.parse(String(options.body));
+        const item = { id: 'enrollment-1', userId: 'participant-1', programId: body.programId, status: body.status, enrolledAt: new Date().toISOString() };
+        apiData.enrollments = [item];
+        return Response.json({ data: item });
+      }
+      const items = resource === 'enrollments' ? apiData.enrollments : [];
+      return Response.json({ data: { items, total: items.length, limit: 100 } });
+    }));
+  });
 
-  it('menyediakan menu dan submenu peserta dengan tujuan yang valid', () => {
+  it('menyediakan menu dan submenu peserta dengan tujuan yang valid', async () => {
     renderPortal('/dashboard', <DashboardPage />);
+    await waitFor(() => expect(screen.queryByText(/Menyinkronkan pendaftaran/i)).toBeNull());
     expect(screen.getAllByRole('link', { name: /Ringkasan/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /Kajian Saya/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /Progres Belajar/i }).length).toBeGreaterThan(0);
@@ -52,20 +67,23 @@ describe('Participant portal experience', () => {
     expect(screen.queryByRole('link', { name: /ruang admin/i })).toBeNull();
   });
 
-  it('dashboard menggunakan program, pertemuan, dan jadwal terbaru dari API', () => {
+  it('dashboard menggunakan program, pertemuan, dan jadwal terbaru dari API', async () => {
     renderPortal('/dashboard', <DashboardPage />);
+    await waitFor(() => expect(screen.queryByText(/Menyinkronkan pendaftaran/i)).toBeNull());
     expect(screen.getAllByText('Program API Terbaru').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Pertemuan API Pertama/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Jadwal API')).toBeDefined();
     expect(screen.getByRole('link', { name: /Lanjutkan belajar/i }).getAttribute('href')).toBe('/belajar/lesson/lesson-1');
   });
 
-  it('kajian tersedia dapat diikuti dan profil menyimpan preferensi', () => {
+  it('kajian tersedia dapat diikuti melalui API dan profil menyimpan preferensi', async () => {
     const { unmount } = renderPortal('/belajar', <MyProgramsPage />);
+    await waitFor(() => expect(screen.queryByText(/Menyinkronkan pendaftaran/i)).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: /^Tersedia$/i }));
     fireEvent.click(screen.getByRole('button', { name: /Ikuti kajian/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Diikuti$/i }));
-    expect(screen.getByRole('button', { name: /Berhenti mengikuti/i })).toBeDefined();
+    expect(await screen.findByRole('button', { name: /Berhenti mengikuti/i })).toBeDefined();
+    expect(apiData.enrollments).toMatchObject([{ programId: 'program-1', status: 'active' }]);
     unmount();
 
     renderPortal('/akun', <ProfilePage />);

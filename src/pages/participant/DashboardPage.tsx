@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useGetIdentity, useList } from '@refinedev/core';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Bookmark, BookOpen, CalendarDays, CheckCircle2, CircleAlert, Clock3, FileText, MapPin, Play, RefreshCw } from 'lucide-react';
-import { getProgramProgress, getUserBookmarks, getUserEnrollments, getUserLessonProgress, getUserNotes } from '@/lib/userStore';
+import { getProgramProgress, getUserBookmarks, getUserNotes } from '@/lib/userStore';
+import { useLearningData } from '@/lib/useLearningData';
+import { LearningSyncNotice } from '@/components/ui/LearningSyncNotice';
 import { PortalPanel, PortalSkeleton } from '@/components/ui/PortalNavigation';
 import { getLessonsForProgram, useParticipantPortalData } from './useParticipantPortalData';
 
@@ -21,8 +23,8 @@ export function DashboardPage() {
   const { data: identity } = useGetIdentity<Identity>();
   const userId = identity?.id || '';
   const { programs, lessons, schedules, isProgramsLoading, isLessonsLoading, isSchedulesLoading, isRefreshing, isError, programsError, lessonsError, schedulesError, refetch } = useParticipantPortalData();
-  const [progress, setProgress] = useState(() => getUserLessonProgress(userId));
-  const [enrollments, setEnrollments] = useState(() => getUserEnrollments(userId));
+  const learning = useLearningData(userId);
+  const { progress, enrollments } = learning;
   const [notes, setNotes] = useState(() => getUserNotes(userId));
   const [bookmarks, setBookmarks] = useState(() => getUserBookmarks(userId));
   const { query: announcementsQuery, result: announcementsResult } = useList<Announcement>({
@@ -30,7 +32,6 @@ export function DashboardPage() {
     sorters: [{ field: 'createdAt', order: 'desc' }], pagination: { pageSize: 5 }, queryOptions: { staleTime: 30_000, retry: 1 },
   });
   useEffect(() => {
-    setProgress(getUserLessonProgress(userId)); setEnrollments(getUserEnrollments(userId));
     setNotes(getUserNotes(userId)); setBookmarks(getUserBookmarks(userId));
   }, [userId]);
   const enrolledPrograms = useMemo(() => programs.filter(program => enrollments.some(item => item.programId === program.id && item.status === 'active')), [enrollments, programs]);
@@ -52,6 +53,7 @@ export function DashboardPage() {
     { label: 'Tersimpan', value: bookmarks.length, suffix: 'item', icon: Bookmark, href: '/tersimpan' },
   ];
   return <div className="portal-dashboard">
+    <LearningSyncNotice {...learning} />
     <section className="portal-welcome">
       <h1>Assalamu’alaikum, {identity?.name || 'Peserta'}</h1>
       <p>Senang Anda kembali. Lanjutkan belajar atau pilih kajian yang ingin Anda ikuti.</p>
@@ -89,7 +91,7 @@ export function DashboardPage() {
         <PortalPanel title="Agenda kajian" action={<Link to="/belajar/jadwal" className="portal-button">Semua jadwal</Link>}>
           {isSchedulesLoading ? <PortalSkeleton label="Memuat jadwal…" /> : nextSchedule ? <div><h3 className="font-semibold">{nextSchedule.title}</h3><p className="portal-muted mt-2">{nextSchedule.day} · {nextSchedule.date}</p><p className="portal-muted">{nextSchedule.time || [nextSchedule.startTime, nextSchedule.endTime].filter(Boolean).join(' – ') || 'Waktu menyusul'}</p>{nextSchedule.status && nextSchedule.status !== 'Rutin' && <p className="portal-feedback mt-3">{nextSchedule.status}: {nextSchedule.statusReason || 'Periksa pembaruan jadwal.'}</p>}<Link to={nextSchedule.venueId ? '/belajar/lokasi/' + nextSchedule.venueId : '/belajar/lokasi'} className="portal-button mt-4"><MapPin size={16} aria-hidden="true" />Lihat lokasi</Link></div> : <div className="portal-empty"><CalendarDays size={24} aria-hidden="true" /><strong>{schedulesError ? 'Jadwal belum dapat dimuat' : 'Belum ada agenda tersedia'}</strong><p>{schedulesError ? 'Periksa koneksi dan coba Segarkan.' : 'Jadwal yang dipublikasikan akan tampil di sini.'}</p></div>}
         </PortalPanel>
-        <p className="portal-muted">Progres, catatan, dan koleksi tersimpan mengikuti akun Anda pada browser ini.</p>
+        <p className="portal-muted">Pendaftaran dan progres akun nyata disinkronkan ke server. Catatan serta koleksi tersimpan tetap berada di browser ini; akun demo memakai data lokal.</p>
       </aside>
     </div>
   </div>;

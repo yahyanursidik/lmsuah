@@ -1,0 +1,23 @@
+/* Hallmark · design-system: design.md · scoped program workbench corrections */
+.program-workspace {
+  --program-warning-ink: oklch(38% 0.08 70);
+  --program-control-size: 2.75rem;
+}
+.program-workspace :is(button, [role="button"]) {
+  min-height: var(--program-control-size);
+  min-width: var(--program-control-size);
+}
+.program-workspace :is(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.program-workspace :is(.text-emerald-200, .text-emerald-300, .text-emerald-600) { color: var(--color-accent); }
+.program-workspace :is(.text-amber-200, .text-amber-300, .text-amber-600) { color: var(--program-warning-ink); }
+.program-workspace :is(.text-rose-200, .text-rose-300, .text-rose-400) { color: var(--color-error); }
+.program-workspace .text-slate-500 { color: var(--color-ink-2); }
+.program-workspace .bg-slate-700 { color: var(--color-admin-ink); }
+.program-workspace .bg-rose-950\/40 { background: var(--color-error-paper); }
+.program-workspace label:focus-within { outline-color: var(--color-accent); }
+.program-workspace label:has(input[type="radio"]:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.program-workspace :is(.bg-slate-950, .bg-slate-900) .text-emerald-600 { color: var(--color-focus); }
+.program-workspace [role="dialog"] { outline: none; }

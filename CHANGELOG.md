@@ -2,26 +2,88 @@
 
 Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git memakai awalan `v` dan menunjuk commit rilis pada `main`. `package.json` dan `package-lock.json` harus memakai versi yang sama. Changelog di `lms-kajian-yts-docs` merupakan riwayat dokumen, bukan versi aplikasi.
 
+## [Unreleased]
+
+## [0.3.0] — 2026-10-20
+
+- Menyelesaikan workspace Program Kajian lanjutan, persiapan/referensi program, revisi snapshot dengan review independen, multi-materi/kuis, serta progres dan riwayat evaluasi peserta di server.
+- Menambahkan PDF privat dengan izin akses, review, versi immutable, pembacaan range dan publikasi atomik bersama revisi program. Netlify Blobs staging tetap perlu diverifikasi sebelum aktivasi produksi.
+- Menyertakan migrasi aditif 0010–0013, preflight SELECT-only, migrator atomik dengan journal terverifikasi, dan alat baseline/smoke copy-only. Baseline/upgrade sudah diuji pada salinan Neon; database sumber tidak dimigrasi.
+- Paket rilis terisolasi lulus 281 tes dalam 44 file; lint 0 error/0 warning, typecheck/build dan bundling 26 fungsi Netlify lulus.
+- Kedua flag server tetap opt-in: `LMS_PROGRAM_REVISIONS_ENABLED` dan `LMS_PRIVATE_PDF_ENABLED` tidak diaktifkan oleh rilis atau build. Tidak ada migrasi otomatis, pengangkatan role, atau perubahan secret produksi.
+- Catatan aktivasi dan batas rilis: `docs/releases/v0.3.0.md` dan `docs/program-kajian-release-readiness.md`.
+
+### Catatan pengembangan dan verifikasi sebelum rilis
+
+### Baseline dan uji migrasi salinan — 2026-10-20
+
+- Membuat salinan Neon terisolasi dan membuktikan baseline 0000–0009 sesuai dengan 33 tabel aktual tanpa perbaikan DDL. Mencatat baseline hanya pada salinan, lalu menerapkan 0010–0013 hingga 40 tabel/14 entri journal/3 trigger aktif, tanpa perbedaan katalog.
+- Mengganti migrator HTTP terpasang dengan batch transaksi atomik untuk semua DDL dan journal yang pending. Verifikasi prefix/hash, advisory lock dan guard journal mencegah migrasi sebagian atau rencana basi. Hash LF kanonis konsisten lintas Windows/Linux dengan kompatibilitas hash CRLF historis.
+- Menambahkan CLI copy-only dan fixture smoke test rollback. Upgrade/perintah baseline yang diulang menerapkan 0 migrasi; jumlah baris lama tetap sama. Uji Neon langsung membuktikan review independen, immutability, FK lintas program, indeks unik progres/enrollment, serta pemulihan PDF setelah kegagalan penggantian, tanpa fixture tersimpan.
+- Database sumber tidak dimigrasi, flag/Blobs produksi tidak diaktifkan. Salinan dipertahankan untuk tinjauan. Target, bukti dan prosedur ulang tercatat di `docs/database-baseline-copy-2026-10-20.md`.
+- Verifikasi: 281 tes dalam 44 file lulus; lint 0 error/0 warning; typecheck/build produksi dan bundling 26 fungsi Netlify lulus. Belum ada push/merge/deploy baru.
+
+### Program Kajian lanjutan, progres server, dan PDF privat — 2026-10-19
+
+- Menghubungkan menu/route Review & Revisi; editor lama mengikuti mode revisi aktif. Penyuntingan snapshot mencakup modul, seri/kitab, multi-materi, timestamp, kuis, dan pemilihan PDF yang telah disetujui.
+- Membuka backend revisi hanya setelah flag server dan pemeriksaan kolom, trigger aktif, indeks unik, serta FK terpenuhi. Capabilities membedakan fitur nonaktif dengan migrasi belum lengkap.
+- Menyelesaikan kebuntuan PDF pada publikasi pertama: versi PDF approved diterbitkan atomik bersama snapshot program, dengan izin publisher dan riwayat tindakan.
+- Mempertahankan versi publik, progres, percobaan dan jawaban lama; menolak self-approval, draft basi, akses lintas akun, dan penulisan setelah penarikan program. Publikasi gagal di tengah transaksi tidak meninggalkan perubahan sebagian.
+- Progres akun nyata disimpan di server; update posisi diantrikan, tombol selesai menunjukkan status simpan, dan respons akun lama tidak diterapkan pada akun baru.
+- Progres Belajar menyediakan kuis berjalan dan hasil terdahulu, termasuk halaman evaluasi mandiri untuk percobaan versi lama yang sudah tidak tampil dalam kurikulum terbaru. Akses riwayat dibatasi pemilik dan tidak membuka percobaan baru pada versi lama.
+- Menambahkan pemeriksaan akses/pratinjau PDF privat, pesan sesi/error yang jelas, dan tombol coba lagi. PDF tetap memakai endpoint terautentikasi dengan range dan no-store.
+- Migrasi 0013 menambahkan indeks keunikan enrollment/progres serta indeks baca penilaian. Migrasi 0010–0012 tetap diperlukan untuk revisi dan PDF privat.
+- Menambahkan `db:preflight` SELECT-only dan pengaman migrator. Database `.env` memiliki tabel dasar tanpa entri journal migrasi, sehingga baseline harus direkonsiliasi sebelum migrasi disetujui; pada tahap 19 Oktober belum ada perubahan database terhubung atau aktivasi flag. Rekonsiliasi salinan diselesaikan terpisah pada catatan 20 Oktober.
+- Panduan aktivasi, izin, batas Git, dan rollback tersedia di `docs/program-kajian-release-readiness.md`.
+- Verifikasi akhir tahap ini: 260 tes dalam 41 file lulus, lint seluruh repository 0 error/0 warning, typecheck/build produksi lulus tanpa warning ukuran bundle, serta 26 fungsi server berhasil dibundel lokal tanpa error/warning. Migrasi upgrade dengan data lama, rollback transaksi, PDF privat, dan riwayat kuis diuji pada PostgreSQL terisolasi; pengujian ini tidak mengaktifkan fitur atau penyimpanan Blobs produksi.
+
+### Loading, navigasi, dan jadwal — 2026-10-19
+
+Catatan: perbaikan yang kompatibel dengan skema produksi sudah dirilis terpisah sebagai v0.2.2 di bawah. Sinkronisasi belajar server lanjutan dan pengembangan Program Kajian pada workspace ini tetap Unreleased.
+
+- Cache query selama 30 detik mengurangi pengambilan ulang data saat berpindah menu; cache dibersihkan saat login/logout dan data terkait diperbarui setelah mutasi. Sinkronisasi belajar peserta memakai cache terpisah per akun, dengan refresh paksa dan invalidasi setelah penyimpanan.
+- Identitas dan izin berbagi request akun yang sedang berjalan. Gangguan layanan izin ditampilkan sebagai error yang dapat dicoba ulang, bukan dianggap sebagai akun peserta.
+- Pembacaan materi, kuis, dan detail soal yang independen dijalankan paralel setelah pemeriksaan akses. Daftar besar dimuat dengan maksimal tiga request halaman paralel, tetap menjaga urutan dan kelengkapan data.
+- Jadwal menerima program kosong/null sebagai agenda umum, mendukung pelepasan relasi program, dan tidak menulis ID demo ke foreign key pembuat. Form menampilkan sukses/error, mempertahankan isian saat gagal, menunggu pilihan lokasi/program, dan mencegah submit berulang.
+- Loading lokal/global mencakup query autentikasi, refresh, serta penerimaan body respons. Request dibatasi 20 detik untuk pembacaan dan 45 detik untuk mutasi; mutasi tidak dicoba ulang otomatis saat timeout karena perubahan mungkin sudah tersimpan.
+- Membatalkan form pertemuan tidak mengambil ulang seluruh kurikulum. Kegagalan materi tidak lagi ditampilkan sebagai daftar kosong.
+- Paket framework, data, dan autentikasi dipisahkan dari bundle aplikasi; tidak ada aturan peringatan ukuran bundle yang dinonaktifkan. Perubahan masih lokal, tanpa deploy atau migrasi produksi.
+- Verifikasi akhir: 237 tes dalam 36 file lulus; lint seluruh repository bersih; build/typecheck lulus tanpa peringatan ukuran bundle. Browser memverifikasi navigasi dashboard–jadwal peserta, halaman build produksi, dan pesan/tombol coba lagi pada pertemuan yang tidak ditemukan. Uji penyimpanan jadwal menggunakan fixture database terisolasi, bukan database produksi.
+
+### Stabilisasi pengembangan — 2026-10-19
+
+- Pratinjau materi menerima durasi `null` dari snapshot revisi tanpa menggagalkan build TypeScript.
+- Sinkronisasi pendaftaran dan progres peserta mengabaikan respons akun lama, refresh yang sudah digantikan, dan respons setelah halaman ditutup.
+- Penulisan progres dan pendaftaran menunggu sinkronisasi awal berhasil; respons mutasi akun lama tidak diterapkan pada akun yang sedang aktif.
+- Tes PDF privat disesuaikan dengan pembaca snapshot publik dan diperluas untuk memastikan referensi dokumen, reviewer independen, dan penarikan publikasi diperiksa sebelum mengambil isi berkas.
+- Fitur revisi terpisah tetap nonaktif; tidak ada migrasi atau perubahan konfigurasi database produksi yang dijalankan.
+
+### Verifikasi tahap stabilisasi
+
+- Seluruh 182 tes dalam 27 file lulus, termasuk pengujian migrasi pada PostgreSQL in-memory yang tidak memakai database produksi.
+- Build produksi, lint file tahap ini, dan pemeriksaan diff lulus. Peringatan ukuran bundle masih ada.
+- Pada pemeriksaan awal tahap ini, lint repository gagal dengan 26 error lama dan 1 warning; semuanya kemudian diperbaiki tanpa mematikan aturan lint, termasuk dua error pada berkas diagnostik lokal di `scratch/`.
+- Deploy preview PR #9 sempat gagal pada secret scanning; perbaikannya dirilis terpisah dalam v0.2.1. Pengembangan Program Kajian pada bagian Unreleased ini tetap lokal dan belum diaktifkan di produksi.
+
+### Kualitas dan deploy — 2026-10-19
+
+- Menghilangkan `any` pada data publik, pengelolaan peserta/role, dan pengumuman; penanganan error memakai tipe `unknown` serta pesan fallback yang aman.
+- Endpoint pengumuman memverifikasi sesi/role admin dan membatasi pembaca umum ke pengumuman terbit.
+- Mengatasi false positive secret scanning Netlify dengan pengecualian hanya untuk `BETTER_AUTH_URL` sebagai origin publik; kredensial dan OAuth secret tidak dikecualikan.
+- Perbaikan rilis disiapkan pada worktree terpisah agar perubahan Program Kajian yang memerlukan migrasi tidak ikut diterbitkan sebelum siap.
+- Validasi lanjutan workspace: 204 tes dalam 30 file lulus, build/typecheck lulus, lint seluruh repository bersih (0 error, 0 warning).
+
 ## [0.2.2] — 2026-10-19
 
-### Diperbaiki
-
-- Cache query portal selama 30 detik mengurangi pengambilan ulang saat kembali ke menu. Cache dibersihkan saat login/logout dan mutasi menginvalidasi data terkait.
-- Identitas dan izin berbagi request akun yang sedang berjalan. Gangguan pemeriksaan izin ditampilkan dengan pesan error dan tombol coba lagi, bukan dianggap sebagai akun peserta.
-- Pembacaan materi, kuis, dan detail soal yang independen dijalankan paralel setelah pemeriksaan akses. Pembaca umum/peserta hanya menerima metadata kuis, tanpa jawaban benar melalui detail pertemuan.
-- Daftar tanpa pagination memuat seluruh halaman dengan maksimal tiga request paralel, tetap menjaga urutan.
-- Jadwal menerima program kosong/null sebagai agenda umum, dapat melepas relasi program, dan tidak menggunakan ID demo untuk foreign key pembuat.
-- Form jadwal menampilkan hasil sukses/gagal, mempertahankan isian saat gagal, menunggu pilihan lokasi/program, dan mencegah submit ganda. Pesan validasi menyebut field yang perlu diperbaiki.
-- Loading lokal/global mencakup autentikasi, refresh, dan penerimaan body respons. Pembacaan dibatasi 20 detik dan mutasi 45 detik, tanpa pengulangan otomatis mutasi yang mungkin sudah tersimpan.
-- Pembatalan form pertemuan tidak memuat ulang kurikulum; kegagalan materi tidak lagi ditampilkan sebagai daftar kosong.
-- Route dipisahkan secara lazy; paket framework, data, dan autentikasi dipisahkan dari bundle aplikasi tanpa menonaktifkan peringatan ukuran.
-
-### Verifikasi dan batas rilis
-
-- Paket rilis diuji terpisah dari workspace pengembangan: 162 tes dalam 26 file lulus; lint bersih (0 error/0 warning); typecheck/build dan pemeriksaan diff lulus tanpa peringatan ukuran bundle.
-- Rilis tidak memerlukan migrasi, perubahan kredensial, atau aktivasi fitur baru di database produksi.
-- Wizard/referensi Program Kajian, sinkronisasi belajar server lanjutan, progres baru, revisi terpisah, PDF privat/transkrip, serta migrasi 0010–0012 tetap berada di workspace pengembangan dan tidak termasuk paket ini.
-- Kecepatan produksi dan alur login akun nyata tetap perlu diperiksa setelah deploy; tes lokal bukan bukti keberhasilan OAuth produksi.
+- Cache navigasi 30 detik, penggabungan request akun, pembersihan cache saat login/logout, dan invalidasi setelah mutasi.
+- Pembacaan materi/kuis paralel; pembaca umum/peserta menerima metadata kuis tanpa jawaban melalui detail pertemuan.
+- Perbaikan jadwal tanpa program, pelepasan relasi program, pesan validasi, indikator simpan, pencegahan submit ganda, dan pemeliharaan isian saat gagal.
+- Loading, refresh, timeout, serta tombol coba lagi diperjelas. Pembatalan form pertemuan tidak memuat ulang kurikulum.
+- Route dan dependency dipisahkan; build tanpa peringatan ukuran bundle.
+- Paket rilis terisolasi lulus 162 tes dalam 26 file, lint 0 error/0 warning, typecheck/build, dan pemeriksaan diff. Hasil 237 tes di workspace pengembangan bukan jumlah tes paket rilis.
+- PR #10 di-merge ke main pada commit aa73e93; tag v0.2.2 menunjuk commit merge tersebut. Catatan rilis: https://github.com/yahyanursidik/lmsuah/releases/tag/v0.2.2.
+- Deploy preview dan produksi Netlify berstatus Ready. Smoke test GET domain utama memverifikasi halaman 200, API pertemuan/jadwal 200 JSON, akun tanpa sesi 401 JSON, dan pertemuan tidak ditemukan 404 JSON; tidak ada penulisan data produksi atau pengujian login akun nyata.
+- Migrasi 0010–0012, wizard/referensi Program Kajian, sinkronisasi belajar server lanjutan, progres baru, revisi terpisah, dan PDF privat/transkrip tidak disertakan. Tidak ada migrasi database produksi yang dijalankan.
 
 ## [0.2.1] — 2026-10-19
 
@@ -36,9 +98,10 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ### Verifikasi
 
-- Seluruh 128 tes dalam 20 file lulus, mencakup regresi respons JSON, ekspor handler modern, akses pengumuman, pesan error, dan batas pengecualian secret scanning.
-- Lint seluruh repository lulus dengan 0 error dan 0 warning; build produksi dan pemeriksaan diff lulus. Peringatan ukuran bundle tetap dicatat terpisah dari kegagalan deploy.
-- Keberhasilan deploy produksi, OAuth Google end-to-end, dan konfigurasi kredensial tetap perlu diverifikasi setelah rilis; tes lokal bukan bukti keberhasilan login produksi.
+- Seluruh 128 tes dalam 20 file lulus pada salinan rilis, mencakup regresi respons JSON, ekspor handler modern, akses pengumuman, pesan error, dan batas pengecualian secret scanning.
+- Lint seluruh repository rilis lulus dengan 0 error dan 0 warning; build produksi dan pemeriksaan diff lulus. Peringatan ukuran bundle tetap dicatat terpisah dari kegagalan deploy.
+- PR #9 sudah di-merge ke main dan tag v0.2.1 menunjuk commit merge 2850666. Deploy preview dan produksi Netlify berstatus Ready.
+- OAuth Google end-to-end dan konfigurasi kredensial tetap perlu diverifikasi terpisah; tes lokal dan deploy Ready bukan bukti keberhasilan login akun produksi.
 
 ## [0.2.0] — 2026-10-08
 

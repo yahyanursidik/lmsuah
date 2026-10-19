@@ -71,6 +71,34 @@
       "when": 1786286761044,
       "tag": "0009_charming_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792326527244,
+      "tag": "0010_majestic_eddie_brock",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792327514293,
+      "tag": "0011_stormy_freak",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792387545605,
+      "tag": "0012_curved_talon",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792425820250,
+      "tag": "0013_slim_mulholland_black",
+      "breakpoints": true
     }
   ]
 }

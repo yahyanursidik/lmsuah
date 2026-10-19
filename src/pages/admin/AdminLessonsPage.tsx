@@ -45,7 +45,7 @@ export function AdminLessonsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="program-workspace space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-slate-900">Pengelolaan Materi (Lessons)</h1>
         <button

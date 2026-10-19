@@ -1,4 +1,6 @@
-import { pgTable, text, timestamp, boolean, uuid, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, uuid, integer, jsonb, uniqueIndex, index, check, foreignKey } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import type { ProgramPublicationSnapshot } from '../../../../shared/program-publication.js';
 
 export const user = pgTable("user", {
 	id: text("id").primaryKey(),
@@ -305,7 +307,7 @@ export const enrollments = pgTable('enrollments', {
   enrolledAt: timestamp('enrolled_at').defaultNow().notNull(),
   completedAt: timestamp('completed_at'),
 }, (t) => [
-  { uniqueUserProgram: { columns: [t.userId, t.programId] } }
+  uniqueIndex('enrollments_user_program_unique').on(t.userId, t.programId),
 ]);
 
 // Peserta: Lesson Progress (Progres Setiap Pelajaran)
@@ -318,7 +320,8 @@ export const lessonProgress = pgTable('lesson_progress', {
   completedAt: timestamp('completed_at'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => [
-  { uniqueUserLessonProgress: { columns: [t.userId, t.lessonId] } }
+  uniqueIndex('lesson_progress_user_lesson_unique').on(t.userId, t.lessonId),
+  index('lesson_progress_user_updated_idx').on(t.userId, t.updatedAt, t.id),
 ]);
 
 // Peserta: User Notes (Catatan Privat Peserta)
@@ -357,7 +360,7 @@ export const quizzes = pgTable('quizzes', {
   isPublished: boolean('is_published').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, t => [index('quizzes_lesson_idx').on(t.lessonId)]);
 
 export const questions = pgTable('questions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -368,7 +371,7 @@ export const questions = pgTable('questions', {
   points: integer('points').default(10).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, t => [index('questions_quiz_idx').on(t.quizId)]);
 
 export const questionOptions = pgTable('question_options', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -376,7 +379,7 @@ export const questionOptions = pgTable('question_options', {
   text: text('text').notNull(),
   isCorrect: boolean('is_correct').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, t => [index('question_options_question_idx').on(t.questionId)]);
 
 export const quizAttempts = pgTable('quiz_attempts', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -387,7 +390,7 @@ export const quizAttempts = pgTable('quiz_attempts', {
   passed: boolean('passed'),
   startedAt: timestamp('started_at').defaultNow().notNull(),
   submittedAt: timestamp('submitted_at'),
-});
+}, t => [index('quiz_attempts_user_quiz_status_idx').on(t.userId, t.quizId, t.status)]);
 
 export const quizAnswers = pgTable('quiz_answers', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -396,7 +399,104 @@ export const quizAnswers = pgTable('quiz_answers', {
   optionId: uuid('option_id').references(() => questionOptions.id), // Can be null if unanswered
   isCorrectSnapshot: boolean('is_correct_snapshot'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+}, t => [index('quiz_answers_attempt_idx').on(t.attemptId)]);
+
+// Additive preparation only. Deployment must apply the generated migration
+// before enabling a feature that queries these tables. No runtime DDL.
+export const programRevisions = pgTable('program_revisions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  programId: uuid('program_id').notNull().references(() => programs.id),
+  baseRevisionId: uuid('base_revision_id'),
+  version: integer('version').notNull(),
+  status: text('status').notNull().default('draft'),
+  snapshot: jsonb('snapshot').$type<ProgramPublicationSnapshot>().notNull(),
+  contentHash: text('content_hash').notNull(),
+  changeNote: text('change_note').notNull(),
+  submittedBy: text('submitted_by').references(() => user.id),
+  reviewedBy: text('reviewed_by').references(() => user.id),
+  reviewNote: text('review_note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+}, table => [
+  foreignKey({ columns: [table.programId, table.baseRevisionId], foreignColumns: [table.programId, table.id], name: 'program_revisions_base_program_fk' }),
+  uniqueIndex('program_revisions_program_version_unique').on(table.programId, table.version),
+  uniqueIndex('program_revisions_program_id_unique').on(table.programId, table.id),
+  index('program_revisions_program_status_idx').on(table.programId, table.status),
+  check('program_revisions_status_check', sql`${table.status} in ('capturing', 'draft', 'submitted', 'approved', 'revision_requested', 'published', 'superseded', 'cancelled')`),
+  check('program_revisions_version_check', sql`${table.version} > 0`),
+  check('program_revisions_hash_check', sql`${table.contentHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+export const programPublications = pgTable('program_publications', {
+  programId: uuid('program_id').primaryKey().references(() => programs.id),
+  revisionId: uuid('revision_id').notNull(),
+  snapshot: jsonb('snapshot').$type<ProgramPublicationSnapshot>().notNull(),
+  publishedBy: text('published_by').references(() => user.id),
+  publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
+}, table => [foreignKey({ columns: [table.programId, table.revisionId], foreignColumns: [programRevisions.programId, programRevisions.id], name: 'program_publications_revision_program_fk' })]);
+
+export const programRevisionEvents = pgTable('program_revision_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  revisionId: uuid('revision_id').notNull().references(() => programRevisions.id),
+  actorId: text('actor_id').references(() => user.id),
+  action: text('action').notNull(),
+  note: text('note').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, table => [index('program_revision_events_revision_idx').on(table.revisionId)]);
+
+// The editor's quiz pointer is separate from immutable published quiz versions.
+// A null pointer explicitly means no quiz in the working version.
+export const lessonQuizDrafts = pgTable('lesson_quiz_drafts', {
+  lessonId: uuid('lesson_id').primaryKey().references(() => lessons.id),
+  quizId: uuid('quiz_id').references(() => quizzes.id),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const transcriptDocuments = pgTable('transcript_documents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  lessonId: uuid('lesson_id').notNull().references(() => lessons.id),
+  title: text('title').notNull(),
+  createdBy: text('created_by').references(() => user.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, table => [index('transcript_documents_lesson_idx').on(table.lessonId)]);
+
+export const transcriptVersions = pgTable('transcript_versions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  documentId: uuid('document_id').notNull().references(() => transcriptDocuments.id),
+  version: integer('version').notNull(),
+  blobKey: text('blob_key').notNull(),
+  filename: text('filename').notNull(),
+  mime: text('mime').notNull().default('application/pdf'),
+  sizeBytes: integer('size_bytes').notNull(),
+  sha256: text('sha256').notNull(),
+  status: text('status').notNull().default('draft'),
+  isDownloadable: boolean('is_downloadable').notNull().default(false),
+  uploadedBy: text('uploaded_by').references(() => user.id),
+  reviewedBy: text('reviewed_by').references(() => user.id),
+  reviewNote: text('review_note'),
+  uploadedAt: timestamp('uploaded_at', { withTimezone: true }).defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+}, table => [
+  uniqueIndex('transcript_versions_document_version_unique').on(table.documentId, table.version),
+  uniqueIndex('transcript_versions_blob_key_unique').on(table.blobKey),
+  uniqueIndex('transcript_versions_one_published_unique').on(table.documentId).where(sql`${table.status} = 'published'`),
+  index('transcript_versions_document_status_idx').on(table.documentId, table.status),
+  check('transcript_versions_status_check', sql`${table.status} in ('draft', 'submitted', 'approved', 'published', 'revision_requested', 'archived')`),
+  check('transcript_versions_size_check', sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 4194304`),
+  check('transcript_versions_version_check', sql`${table.version} > 0`),
+  check('transcript_versions_mime_check', sql`${table.mime} = 'application/pdf'`),
+  check('transcript_versions_hash_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+]);
+
+export const transcriptVersionEvents = pgTable('transcript_version_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  versionId: uuid('version_id').notNull().references(() => transcriptVersions.id),
+  actorId: text('actor_id').references(() => user.id),
+  action: text('action').notNull(),
+  note: text('note').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, table => [index('transcript_version_events_version_idx').on(table.versionId)]);
 
 // ----------------------------------------------------
 // PENGUMUMAN (ANNOUNCEMENTS)

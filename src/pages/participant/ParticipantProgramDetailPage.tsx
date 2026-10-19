@@ -3,12 +3,14 @@ import { useParams, Link } from 'react-router-dom';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { BookOpen, CheckCircle2, ChevronRight, Play } from 'lucide-react';
 import { getProgramProgress, getUserLessonProgress } from '@/lib/userStore';
-import type { PublicLessonSummary } from '../../types';
+import { useLearningData } from '@/lib/useLearningData';
+import { LearningSyncNotice } from '@/components/ui/LearningSyncNotice';
 
 export function ParticipantProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: identity } = useGetIdentity<{ id: string }>();
-  const userId = identity?.id || 'demo-peserta-1';
+  const userId = identity?.id || '';
+  const learning = useLearningData(userId);
 
   const { query: programQuery, result: program } = useOne({
     resource: 'programs',
@@ -16,12 +18,12 @@ export function ParticipantProgramDetailPage() {
     queryOptions: { enabled: !!id },
   });
 
-  const { query: lessonsQuery, result: lessons } = useList<PublicLessonSummary>({
+  const { query: lessonsQuery, result: lessons } = useList<{ id: string; title: string; description?: string; sequence: number; status: string }>({
     resource: 'lessons',
     pagination: { mode: 'off' },
-    filters: [{ field: 'programId', operator: 'eq', value: id }],
+    filters: [{ field: 'programId', operator: 'eq', value: program?.id }, { field: 'status', operator: 'eq', value: 'published' }],
     sorters: [{ field: 'sequence', order: 'asc' }],
-    queryOptions: { enabled: !!id },
+    queryOptions: { enabled: !!program?.id },
   });
 
   const programLessons = lessons?.data || [];
@@ -38,6 +40,8 @@ export function ParticipantProgramDetailPage() {
 
   return (
     <div className="space-y-6 pb-12">
+      <LearningSyncNotice {...learning} />
+      {lessonsQuery.isError && <p role="alert" className="text-rose-800">Pertemuan gagal dimuat. <button onClick={() => lessonsQuery.refetch()} className="min-h-11 underline">Coba lagi</button></p>}
       <div className="mb-4 text-sm font-semibold text-slate-500">
         <Link to="/belajar" className="hover:text-emerald-700">Kajian Saya</Link>
         <span className="mx-2">/</span>

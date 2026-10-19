@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useLearningData } from '../../lib/useLearningData';
+import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { Bookmark, CheckCircle2, PlayCircle, BookOpen, UserCheck, PlusCircle } from 'lucide-react';
 import { MOCK_PROGRAMS, Program } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
-import type { PublicLessonSummary } from '../../types';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import {
   isEnrolled,
-  toggleEnrollment,
   isBookmarked,
   toggleBookmark,
   getProgramProgress,
@@ -18,7 +18,10 @@ import {
 export function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: identity } = useGetIdentity<{ id: string; name: string }>();
-  const userId = identity?.id || 'demo-peserta-1'; // Fallback for interactive demo
+  const userId = identity?.id || '';
+  const learning = useLearningData(userId);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const { query: oneQuery, result: refineProgram } = useOne<Program>({
     resource: 'programs',
@@ -28,12 +31,12 @@ export function ProgramDetailPage() {
     },
   });
 
-  const { result: lessonsListResult } = useList<PublicLessonSummary>({
+  const { query: lessonsQuery, result: lessonsListResult } = useList<{ id: string; title: string; sequence: number; date?: string; duration?: string; description?: string; status: string }>({
     resource: 'lessons',
-    filters: id ? [{ field: 'programId', operator: 'eq', value: id }] : [],
+    filters: refineProgram?.id ? [{ field: 'programId', operator: 'eq', value: refineProgram.id }, { field: 'status', operator: 'eq', value: 'published' }] : [],
     sorters: [{ field: 'sequence', order: 'asc' }],
     pagination: { mode: 'off' },
-    queryOptions: { enabled: !!id },
+    queryOptions: { enabled: !!refineProgram?.id },
   });
 
   const mockItem = MOCK_PROGRAMS.find((p) => p.id === id);
@@ -42,9 +45,8 @@ export function ProgramDetailPage() {
   const isError = oneQuery.isError;
   const refetch = oneQuery.refetch;
 
-  const apiLessons = lessonsListResult?.data || [];
-  const lessons = apiLessons.length > 0
-    ? apiLessons.map((l, index) => ({
+  const lessons = useMemo(() => (lessonsListResult?.data || []).length > 0
+    ? lessonsListResult.data.map((l, index) => ({
         id: l.id,
         title: l.title,
         meetingNumber: l.sequence || index + 1,
@@ -52,7 +54,7 @@ export function ProgramDetailPage() {
         duration: l.duration || 'Video',
         summary: l.description || 'Materi pertemuan kajian syar\'i.',
       }))
-    : (displayProgram?.lessons || []);
+    : (displayProgram?.lessons || []), [lessonsListResult?.data, displayProgram?.lessons]);
 
   const [enrolled, setEnrolled] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -62,16 +64,14 @@ export function ProgramDetailPage() {
     if (displayProgram?.id && userId) {
       setEnrolled(isEnrolled(userId, displayProgram.id));
       setBookmarked(isBookmarked(userId, 'program', displayProgram.id));
-      if (displayProgram.lessons) {
-        setProgressInfo(getProgramProgress(userId, displayProgram.lessons));
-      }
+      setProgressInfo(getProgramProgress(userId, lessons));
     }
-  }, [displayProgram?.id, displayProgram?.lessons, userId]);
+  }, [displayProgram?.id, lessons, userId, learning.revision]);
 
-  const handleEnrollToggle = () => {
+  const handleEnrollToggle = async () => {
     if (!displayProgram?.id) return;
-    const newState = toggleEnrollment(userId, displayProgram.id);
-    setEnrolled(newState);
+    if (!userId) { navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`); return; }
+    if (await learning.follow(displayProgram.id)) setEnrolled(isEnrolled(userId, displayProgram.id));
   };
 
   const handleBookmarkToggle = () => {
@@ -116,6 +116,8 @@ export function ProgramDetailPage() {
   }
 
   const userProgressList = getUserLessonProgress(userId);
+  const nextLesson = lessons.find(lesson => !userProgressList.some(progress => progress.lessonId === lesson.id && progress.isCompleted)) || lessons[0];
+  const lessonPrefix = location.pathname.startsWith('/belajar') ? '/belajar/lesson' : '/lesson';
 
   return (
     <div className="space-y-12 pb-16">
@@ -123,6 +125,8 @@ export function ProgramDetailPage() {
         title={displayProgram.title}
         description={displayProgram.description}
       />
+      <LearningSyncNotice {...learning} />
+      {lessonsQuery?.isError && <ErrorAlert message="Pertemuan gagal dimuat. Daftar belum dapat dipastikan lengkap." onRetry={() => lessonsQuery.refetch()} />}
 
       {/* Program Header */}
       <section className="bg-stone-900 text-white py-12 sm:py-16 border-b border-stone-800">
@@ -189,6 +193,7 @@ export function ProgramDetailPage() {
                 <button
                   type="button"
                   onClick={handleEnrollToggle}
+                  disabled={learning.loading || learning.pending}
                   className={`rounded-xl px-6 py-3 text-sm font-bold shadow-lg transition-all min-h-[44px] flex items-center gap-2 ${
                     enrolled
                       ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
@@ -210,7 +215,7 @@ export function ProgramDetailPage() {
 
                 {lessons.length > 0 && lessons[0] && (
                   <Link
-                    to={`/lesson/${lessons[0].id}`}
+                     to={`${lessonPrefix}/${nextLesson?.id}`}
                     className="rounded-xl border border-stone-700 bg-stone-800 px-6 py-3 text-sm font-semibold text-stone-200 hover:bg-stone-700 transition-all min-h-[44px] flex items-center gap-2"
                   >
                     <PlayCircle size={18} className="text-emerald-400" />
@@ -228,7 +233,7 @@ export function ProgramDetailPage() {
                 <div className="space-y-3 text-xs text-stone-300">
                   <div>
                     <span className="block text-stone-400">Pemateri:</span>
-                    <span className="font-bold text-stone-100 text-sm">{displayProgram.instructor || 'Ustadz Abu Haidar As-Sundawy'}</span>
+                    <span className="font-bold text-stone-100 text-sm">{displayProgram.instructor || 'Belum diatur'}</span>
                   </div>
                   <div>
                     <span className="block text-stone-400">Kitab Rujukan:</span>
@@ -241,7 +246,7 @@ export function ProgramDetailPage() {
                   </div>
                   <div>
                     <span className="block text-stone-400">Lokasi Majelis:</span>
-                    <span className="font-semibold text-stone-200">{displayProgram.venueName || 'Masjid Umar bin Khattab'}</span>
+                    <span className="font-semibold text-stone-200">{displayProgram.venueName || 'Belum diatur'}</span>
                   </div>
                 </div>
               </div>
@@ -291,7 +296,7 @@ export function ProgramDetailPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Link
-                      to={`/lesson/${lesson.id}`}
+                       to={`${lessonPrefix}/${lesson.id}`}
                       className="rounded-xl bg-emerald-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-950 transition-colors min-h-[44px] flex items-center gap-2"
                     >
                       <PlayCircle size={16} />

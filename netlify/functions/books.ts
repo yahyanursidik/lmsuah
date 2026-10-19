@@ -6,6 +6,8 @@ import { eq, and, asc, desc, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
 import { ForbiddenError } from './middleware/auth.js';
+import { canReadDrafts } from './utils/content-policy.js';
+import { HttpError } from './utils/http-error.js';
 import {
   getOptionalAuth,
   parseQueryParams,
@@ -13,21 +15,21 @@ import {
   requireContentUpdateAccess,
   requireContentDeleteAccess,
   logMutationAudit,
-  isGuest,
+  getDatabaseActorId,
 } from './utils/contentHelper.js';
 
 const ALLOWED_FILTERS = ['status', 'title', 'slug', 'author'];
 const ALLOWED_SORTS = ['createdAt', 'updatedAt', 'title'];
 
 const bookSchema = z.object({
-  slug: z.string().min(1),
-  title: z.string().min(1),
-  author: z.string().optional(),
-  description: z.string().optional(),
+  slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug kitab tidak valid'),
+  title: z.string().trim().min(1).max(180),
+  author: z.string().trim().max(180).optional(),
+  description: z.string().trim().max(2000).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional().default('draft'),
 });
 
-const bookUpdateSchema = bookSchema.partial();
+const bookUpdateSchema = bookSchema.partial().extend({ expectedUpdatedAt: z.string().datetime().optional() });
 
 const booksHandler = async (request: Request) => {
   const url = new URL(request.url);
@@ -38,7 +40,7 @@ const booksHandler = async (request: Request) => {
   const resourceId = pathParts.length > 2 ? pathParts[2] : null;
 
   if (method === 'GET') {
-    const isGuestUser = isGuest(session);
+    const isGuestUser = !canReadDrafts(session);
 
     if (resourceId) {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resourceId);
@@ -48,7 +50,7 @@ const booksHandler = async (request: Request) => {
       const item = items[0];
 
       if (!item) {
-        throw new Error('Buku/Kitab tidak ditemukan');
+        throw new HttpError(404, 'Kitab tidak ditemukan');
       }
 
       if (isGuestUser && item.status !== 'published') {
@@ -93,7 +95,7 @@ const booksHandler = async (request: Request) => {
         .select()
         .from(books)
         .where(whereClause)
-        .orderBy(orderByClause)
+        .orderBy(orderByClause, asc(books.id))
         .limit(query.limit)
         .offset(query.offset),
       db
@@ -115,6 +117,8 @@ const booksHandler = async (request: Request) => {
   if (method === 'POST') {
     const body = await validateBody(request, bookSchema);
     const authSession = requireContentCreateAccess(session, body.status);
+    const duplicate = await db.select({ id: books.id }).from(books).where(eq(books.slug, body.slug)).limit(1);
+    if (duplicate.length) throw new HttpError(409, 'Slug kitab sudah digunakan. Pilih alamat lain.');
 
     const [newBook] = await db
       .insert(books)
@@ -124,8 +128,8 @@ const booksHandler = async (request: Request) => {
         author: body.author,
         description: body.description,
         status: body.status,
-        createdBy: authSession.userId,
-        updatedBy: authSession.userId,
+        createdBy: getDatabaseActorId(authSession),
+        updatedBy: getDatabaseActorId(authSession),
       })
       .returning();
 
@@ -151,6 +155,10 @@ const booksHandler = async (request: Request) => {
     }
 
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
+    if (body.slug && body.slug !== existing[0].slug) {
+      const duplicate = await db.select({ id: books.id }).from(books).where(eq(books.slug, body.slug)).limit(1);
+      if (duplicate.length) throw new HttpError(409, 'Slug kitab sudah digunakan. Pilih alamat lain.');
+    }
 
     const [updatedBook] = await db
       .update(books)
@@ -160,11 +168,12 @@ const booksHandler = async (request: Request) => {
         ...(body.author !== undefined && { author: body.author }),
         ...(body.description !== undefined && { description: body.description }),
         ...(body.status && { status: body.status }),
-        updatedBy: authSession.userId,
+        updatedBy: getDatabaseActorId(authSession),
         updatedAt: new Date(),
       })
-      .where(eq(books.id, resourceId))
+      .where(and(eq(books.id, resourceId), body.expectedUpdatedAt ? sql`floor(extract(epoch from ${books.updatedAt}) * 1000) = ${Date.parse(body.expectedUpdatedAt)}` : undefined))
       .returning();
+    if (!updatedBook) throw new HttpError(409, 'Kitab berubah sejak editor dibuka. Muat ulang sebelum menyimpan.');
 
     logMutationAudit('UPDATE', 'books', resourceId, authSession.userId, {
       previousStatus: existing[0].status,

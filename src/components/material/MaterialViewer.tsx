@@ -10,7 +10,10 @@ export type ViewableMaterial = {
   type: string;
   url: string;
   filename?: string;
-  duration?: string;
+  duration?: string | null;
+  isDownloadable?: boolean;
+  downloadUrl?: string;
+  requiresAuth?: boolean;
 };
 
 type MaterialViewerProps = {
@@ -33,14 +36,44 @@ function withPdfPreferences(url: string) {
 export function MaterialViewer({ material, tone = 'participant', compact = false, allowDownload = true, startAtSeconds = 0 }: MaterialViewerProps) {
   const [expanded, setExpanded] = useState(false);
   const [frameLoaded, setFrameLoaded] = useState(false);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
+  const [pdfCheck, setPdfCheck] = useState<{ url: string; state: 'ready' | 'error'; message?: string } | null>(null);
   const isAdmin = tone === 'admin';
   const videoId = material.type === 'youtube' ? youtubeId(material.url) : undefined;
   const label = material.filename || typeLabel(material.type);
+  const downloadAllowed = allowDownload && material.isDownloadable !== false;
   const pdfUrl = useMemo(() => withPdfPreferences(material.url), [material.url]);
+  const managedPdf = material.type === 'PDF' && /^\/api\/transcript-file\/[a-f0-9-]{36}(?:\?[^#]*)?$/.test(material.url);
+  const checkingPdf = managedPdf && !material.requiresAuth && pdfCheck?.url !== material.url;
+  const pdfError = managedPdf && pdfCheck?.url === material.url && pdfCheck.state === 'error' ? pdfCheck.message : '';
+
+  useEffect(() => {
+    if (!managedPdf || material.requiresAuth) return;
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 20_000);
+    let live = true;
+    setPdfCheck(null);
+    void (async () => {
+      try {
+        const response = await fetch(material.url, { credentials: 'include', headers: { Range: 'bytes=0-7' }, cache: 'no-store', signal: abort.signal });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(response.status === 401 ? 'Sesi berakhir. Masuk kembali untuk membaca PDF privat.' : body?.error?.message || 'PDF belum dapat dibuka. Periksa akses atau coba lagi.');
+        }
+        if (!response.headers.get('content-type')?.includes('application/pdf')) throw new Error('Server tidak mengirim dokumen PDF. Hubungi pengelola.');
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Isi dokumen PDF tidak valid. Hubungi pengelola.');
+        if (live) setPdfCheck({ url: material.url, state: 'ready' });
+      } catch (error) {
+        if (live) setPdfCheck({ url: material.url, state: 'error', message: abort.signal.aborted ? 'Waktu memuat PDF habis. Coba lagi saat koneksi stabil.' : error instanceof Error ? error.message : 'PDF belum dapat dimuat.' });
+      } finally { clearTimeout(timeout); }
+    })();
+    return () => { live = false; clearTimeout(timeout); abort.abort(); };
+  }, [managedPdf, material.url, material.requiresAuth, previewAttempt]);
 
   useEffect(() => {
     setFrameLoaded(false);
-  }, [material.url]);
+  }, [material.url, previewAttempt]);
 
   useEffect(() => {
     if (!expanded) return undefined;
@@ -61,6 +94,7 @@ export function MaterialViewer({ material, tone = 'participant', compact = false
     ? 'border-slate-700 text-slate-200 hover:bg-slate-800 focus-visible:ring-emerald-400 active:bg-slate-700'
     : 'border-stone-300 text-slate-700 hover:bg-stone-100 focus-visible:ring-emerald-700 active:bg-stone-200';
 
+  if (material.requiresAuth) return <div className="rounded-xl border border-stone-300 bg-white p-5 text-slate-800"><p className="font-semibold">Masuk untuk membaca PDF privat</p><p className="mt-2 text-sm text-slate-600">Berkas hanya dikirim melalui endpoint yang memeriksa sesi dan akses Anda.</p><a className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-stone-300 px-4 text-sm font-semibold" href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}>Masuk & lanjutkan membaca</a></div>;
   if (videoId) {
     return <div className={`aspect-video overflow-hidden rounded-xl border bg-slate-950 ${isAdmin ? 'border-slate-700' : 'border-stone-300'}`}>
       <iframe className="h-full w-full" src={`https://www.youtube-nocookie.com/embed/${videoId}?start=${Math.floor(startAtSeconds)}&rel=0&modestbranding=1`} title={label} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
@@ -84,12 +118,14 @@ export function MaterialViewer({ material, tone = 'participant', compact = false
         {!fullScreen && <button type="button" onClick={() => setExpanded(true)} aria-label="Perbesar pratinjau PDF" className={`flex h-10 w-10 items-center justify-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 ${action}`}><Maximize2 className="h-4 w-4" aria-hidden="true" /></button>}
         {fullScreen && <button type="button" onClick={() => setExpanded(false)} aria-label="Keluar dari layar penuh" className={`flex h-10 w-10 items-center justify-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 ${action}`}><Minimize2 className="h-4 w-4" aria-hidden="true" /></button>}
         <a href={material.url} target="_blank" rel="noreferrer" aria-label="Buka PDF di tab baru" className={`flex h-10 w-10 items-center justify-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 ${action}`}><ExternalLink className="h-4 w-4" aria-hidden="true" /></a>
-        {allowDownload && <a href={material.url} download aria-label="Unduh PDF" className={`hidden h-10 w-10 items-center justify-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 sm:flex ${action}`}><Download className="h-4 w-4" aria-hidden="true" /></a>}
+        {downloadAllowed && <a href={material.downloadUrl || material.url} download aria-label="Unduh PDF" className={`hidden h-10 w-10 items-center justify-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 sm:flex ${action}`}><Download className="h-4 w-4" aria-hidden="true" /></a>}
       </div>
     </div>
     <div className="relative min-h-0 flex-1 bg-stone-200">
-      {!frameLoaded && <div className="absolute inset-0 flex items-center justify-center bg-stone-100 text-center"><div><FileText className="mx-auto h-7 w-7 text-slate-400" /><p className="mt-3 text-sm font-semibold text-slate-700">Memuat dokumen…</p></div></div>}
-      <iframe src={pdfUrl} title={`Pratinjau PDF ${label}`} onLoad={() => setFrameLoaded(true)} className={`relative w-full bg-white ${fullScreen ? 'h-full' : compact ? 'h-[28rem] sm:h-[34rem]' : 'h-[65dvh] min-h-[30rem] max-h-[52rem]'}`} />
+      {pdfError ? <div role="alert" className="flex min-h-64 flex-col items-center justify-center gap-3 p-6 text-center text-slate-900"><p className="max-w-lg text-sm">{pdfError}</p><button type="button" className="min-h-11 rounded-lg border border-slate-400 bg-white px-4 text-sm font-semibold" onClick={() => setPreviewAttempt(value => value + 1)}>Coba muat PDF lagi</button></div> : <>
+        {!frameLoaded && <div role="status" className="absolute inset-0 flex items-center justify-center bg-stone-100 text-center"><div><FileText className="mx-auto h-7 w-7 text-slate-400" /><p className="mt-3 text-sm font-semibold text-slate-700">{checkingPdf ? 'Memeriksa akses PDF…' : 'Memuat dokumen…'}</p></div></div>}
+        {checkingPdf ? <div className="min-h-64" /> : <iframe key={previewAttempt} src={pdfUrl} title={`Pratinjau PDF ${label}`} onLoad={() => setFrameLoaded(true)} className={`relative w-full bg-white ${fullScreen ? 'h-full' : compact ? 'h-[28rem] sm:h-[34rem]' : 'h-[65dvh] min-h-[30rem] max-h-[52rem]'}`} />}
+      </>}
     </div>
     <div className={`flex min-h-11 items-center justify-between gap-3 border-t px-3 text-[11px] sm:px-4 ${toolbar} ${muted}`}><span className="min-w-0 truncate">Jika pratinjau kosong, sumber mungkin melarang penyematan.</span><a href={material.url} target="_blank" rel="noreferrer" className="shrink-0 whitespace-nowrap font-bold text-emerald-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Buka langsung</a></div>
   </div>;

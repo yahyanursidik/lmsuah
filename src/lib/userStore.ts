@@ -4,6 +4,26 @@ const ENROLLMENTS_KEY = 'uah_lms_enrollments';
 const LESSON_PROGRESS_KEY = 'uah_lms_lesson_progress';
 const USER_NOTES_KEY = 'uah_lms_user_notes';
 const BOOKMARKS_KEY = 'uah_lms_bookmarks';
+export const LEARNING_CHANGED = 'lms:learning-changed';
+
+export function cacheLearningData(userId: string, enrollments: EnrollmentItem[], progress: LessonProgressItem[], backupLocal = false) {
+  const localEnrollments = getItem<EnrollmentItem[]>(ENROLLMENTS_KEY, []).filter(item => item.userId === userId);
+  const localProgress = getItem<LessonProgressItem[]>(LESSON_PROGRESS_KEY, []).filter(item => item.userId === userId);
+  const differs = JSON.stringify(localEnrollments) !== JSON.stringify(enrollments) || JSON.stringify(localProgress) !== JSON.stringify(progress);
+  const backupKey = `uah_lms_learning_backup_${userId}`;
+  if (backupLocal && !getItem(`uah_lms_learning_server_${userId}`, false) && differs && (localEnrollments.length || localProgress.length) && !getItem(backupKey, null)) {
+    setItem(backupKey, { createdAt: new Date().toISOString(), enrollments: localEnrollments, progress: localProgress });
+    if (!getItem(backupKey, null)) throw new Error('Cadangan data lama gagal disimpan. Kosongkan ruang penyimpanan browser sebelum menyinkronkan.');
+  }
+  setItem(ENROLLMENTS_KEY, [...getItem<EnrollmentItem[]>(ENROLLMENTS_KEY, []).filter(item => item.userId !== userId), ...enrollments]);
+  setItem(LESSON_PROGRESS_KEY, [...getItem<LessonProgressItem[]>(LESSON_PROGRESS_KEY, []).filter(item => item.userId !== userId), ...progress]);
+  setItem(`uah_lms_learning_server_${userId}`, true);
+  window.dispatchEvent(new Event(LEARNING_CHANGED));
+}
+
+export function getLearningBackup(userId: string): unknown {
+  return userId ? getItem(`uah_lms_learning_backup_${userId}`, null) : null;
+}
 
 // Safe localStorage getters/setters
 function getItem<T>(key: string, defaultVal: T): T {

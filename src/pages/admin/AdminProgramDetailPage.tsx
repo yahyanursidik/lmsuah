@@ -4,6 +4,7 @@
 import { useList, useOne } from '@refinedev/core';
 import { ArrowRight, BookOpenCheck, Files, FileQuestion, Users } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
+import { ErrorAlert } from '../../components/public/UIStates';
 
 interface ProgramSummary { id: string; title: string; description?: string; status: 'draft' | 'published' | 'archived' }
 interface EnrollmentSummary { id: string }
@@ -24,9 +25,11 @@ export function AdminProgramDetailPage() {
   ];
 
   if (isLoading) return <div className="h-64 animate-pulse rounded-xl bg-slate-200 motion-reduce:animate-none" />;
+  if (programQuery.isError || enrollments.query.isError || lessons.query.isError) return <ErrorAlert message="Ringkasan program belum dapat dimuat lengkap." onRetry={() => { void programQuery.refetch(); void enrollments.query.refetch(); void lessons.query.refetch(); }} />;
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-3"><Link className="inline-flex min-h-11 items-center rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900" to={`/admin/programs/${id}/setup`}>Lanjutkan persiapan / edit informasi</Link><Link className="inline-flex min-h-11 items-center px-4 text-sm font-semibold text-slate-700 underline" to={`/admin/schedules?programId=${id}`}>Jadwal program</Link></div>
       <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div><h2 className="text-xl font-bold text-slate-900">Ringkasan program</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Lihat kesiapan isi program lalu lanjutkan penyusunan pertemuan, materi, dan evaluasi.</p></div>
         <Link to={`/admin/programs/${id}/curriculum`} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 text-sm font-bold text-slate-900 hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 active:bg-emerald-700">Kelola pertemuan <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>

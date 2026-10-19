@@ -2,6 +2,7 @@ import type { AuthProvider } from '@refinedev/core';
 import { authClient, signIn, signOut } from '../lib/auth-client';
 import { startGoogleLogin } from '../lib/google-auth';
 import { readJsonResponse } from '../lib/api-response';
+import { clearRevisionDraftCache } from '../lib/revision-draft-cache';
 import { fetchWrapper } from './dataProvider';
 import { clearPortalQueryCache } from '../lib/query-client';
 
@@ -209,6 +210,7 @@ export const authProvider: AuthProvider = {
   logout: async () => {
     accountRequest = undefined;
     await clearPortalQueryCache();
+    clearRevisionDraftCache();
     removeStoredDemo();
     try {
       await signOut();

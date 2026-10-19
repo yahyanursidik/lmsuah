@@ -4,6 +4,9 @@
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useOne } from '@refinedev/core';
 import { ArrowLeft, BookOpenCheck, LayoutDashboard, Users } from 'lucide-react';
+import { ErrorAlert } from '../../components/public/UIStates';
+import { DataLoading } from '../../components/ui/DataLoading';
+import { getErrorMessage } from '../../lib/error-message';
 
 interface ProgramHeader { id: string; title: string; status: 'draft' | 'published' | 'archived' }
 
@@ -18,7 +21,8 @@ export function AdminKajianLayout() {
     { label: 'Peserta', href: `/admin/programs/${id}/participants`, icon: Users },
   ];
 
-  if (query.isLoading) return <div className="h-72 animate-pulse rounded-xl bg-slate-100 motion-reduce:animate-none" />;
+  if (query.isLoading) return <DataLoading label="Memuat program kajian…" />;
+  if (query.isError || !program) return <ErrorAlert message={getErrorMessage(query.error, 'Program tidak ditemukan atau tidak dapat dimuat.')} onRetry={() => query.refetch()} />;
 
   return (
     <div className="mx-auto max-w-[90rem] space-y-6">

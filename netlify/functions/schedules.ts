@@ -12,15 +12,17 @@ import {
   requireContentUpdateAccess,
   requireContentDeleteAccess,
   logMutationAudit,
+  getDatabaseActorId,
 } from './utils/contentHelper.js';
+import { HttpError } from './utils/http-error.js';
 
 const ALLOWED_FILTERS = ['venueId', 'programId', 'status', 'category', 'type', 'day', 'date'];
 const ALLOWED_SORTS = ['createdAt', 'updatedAt', 'date', 'startTime', 'title'];
 
 const scheduleSchema = z.object({
-  programId: z.string().uuid().optional(),
-  venueId: z.string().uuid(),
-  title: z.string().min(1),
+  programId: z.preprocess(value => value === '' ? null : value, z.string().uuid('Program terkait tidak valid').nullable().optional()),
+  venueId: z.string().uuid('Pilih lokasi majelis yang valid'),
+  title: z.string().trim().min(1, 'Judul kajian wajib diisi'),
   speaker: z.string().min(1),
   category: z.string().optional(),
   type: z.enum(['Rutin', 'Tematik', 'Special']).optional().default('Rutin'),
@@ -51,7 +53,7 @@ const schedulesHandler = async (request: Request) => {
       const item = items[0];
 
       if (!item) {
-        throw new Error('Jadwal tidak ditemukan');
+        throw new HttpError(404, 'Jadwal tidak ditemukan');
       }
 
       return item;
@@ -141,8 +143,8 @@ const schedulesHandler = async (request: Request) => {
         statusReason: body.statusReason,
         isLiveStream: body.isLiveStream,
         streamUrl: body.streamUrl,
-        createdBy: authSession.userId,
-        updatedBy: authSession.userId,
+        createdBy: getDatabaseActorId(authSession),
+        updatedBy: getDatabaseActorId(authSession),
       })
       .returning();
 
@@ -156,14 +158,14 @@ const schedulesHandler = async (request: Request) => {
 
   if (method === 'PATCH' || method === 'PUT') {
     if (!resourceId) {
-      throw new Error('ID jadwal diperlukan untuk memperbarui');
+      throw new HttpError(400, 'ID jadwal diperlukan untuk memperbarui');
     }
 
     const body = await validateBody(request, scheduleUpdateSchema);
     const existing = await db.select().from(schedules).where(eq(schedules.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Jadwal tidak ditemukan');
+      throw new HttpError(404, 'Jadwal tidak ditemukan');
     }
 
     const authSession = requireContentUpdateAccess(session);
@@ -186,7 +188,7 @@ const schedulesHandler = async (request: Request) => {
         ...(body.statusReason !== undefined && { statusReason: body.statusReason }),
         ...(body.isLiveStream !== undefined && { isLiveStream: body.isLiveStream }),
         ...(body.streamUrl !== undefined && { streamUrl: body.streamUrl }),
-        updatedBy: authSession.userId,
+        updatedBy: getDatabaseActorId(authSession),
         updatedAt: new Date(),
       })
       .where(eq(schedules.id, resourceId))
@@ -203,14 +205,14 @@ const schedulesHandler = async (request: Request) => {
 
   if (method === 'DELETE') {
     if (!resourceId) {
-      throw new Error('ID jadwal diperlukan untuk menghapus');
+      throw new HttpError(400, 'ID jadwal diperlukan untuk menghapus');
     }
 
     const authSession = requireContentDeleteAccess(session);
     const existing = await db.select().from(schedules).where(eq(schedules.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Jadwal tidak ditemukan');
+      throw new HttpError(404, 'Jadwal tidak ditemukan');
     }
 
     await db.delete(schedules).where(eq(schedules.id, resourceId));
@@ -222,7 +224,7 @@ const schedulesHandler = async (request: Request) => {
     return { message: 'Jadwal berhasil dihapus', id: resourceId };
   }
 
-  throw new Error(`Method ${method} tidak didukung`);
+  throw new HttpError(405, `Method ${method} tidak didukung`);
 };
 
 export default createHandler(schedulesHandler);

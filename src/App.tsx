@@ -1,7 +1,10 @@
 import { Refine, Authenticated } from '@refinedev/core';
+import { lazy } from 'react';
+import { RouteLoadingBoundary } from './components/ui/RouteLoadingBoundary';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { dataProvider } from './providers/dataProvider';
 import { authProvider } from './providers/authProvider';
+import { portalQueryClient } from './lib/query-client';
 import { GlobalNetworkIndicator } from './components/ui/GlobalNetworkIndicator';
 import { PublicLayout } from './pages/public/PublicLayout';
 import { HomePage } from './pages/public/HomePage';
@@ -10,7 +13,7 @@ import { RegisterPage } from './pages/public/RegisterPage';
 import { OnboardingPage } from './pages/public/OnboardingPage';
 import { ProgramsPage } from './pages/public/ProgramsPage';
 import { ProgramDetailPage } from './pages/public/ProgramDetailPage';
-import { LessonDetailPage } from './pages/public/LessonDetailPage';
+const LessonDetailPage = lazy(() => import('./pages/public/LessonDetailPage').then(module => ({ default: module.LessonDetailPage })));
 import { SchedulesPage } from './pages/public/SchedulesPage';
 import { VenuesPage } from './pages/public/VenuesPage';
 import { VenueDetailPage } from './pages/public/VenueDetailPage';
@@ -27,27 +30,31 @@ import { ProgressPage } from './pages/participant/ProgressPage';
 import { ParticipantSchedulePage } from './pages/participant/ParticipantSchedulePage';
 import { ProfilePage } from './pages/participant/ProfilePage';
 import { AdminLayout } from './pages/admin/AdminLayout';
+import { AdminAccessGuard } from './components/ui/AdminAccessGuard';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
-import { AdminProgramsPage } from './pages/admin/AdminProgramsPage';
+const AdminProgramsPage = lazy(() => import('./pages/admin/AdminProgramsPage').then(module => ({ default: module.AdminProgramsPage })));
 import { AdminKajianLayout } from './pages/admin/AdminKajianLayout';
 import { AdminProgramDetailPage } from './pages/admin/AdminProgramDetailPage';
-import { AdminCurriculumPage } from './pages/admin/AdminCurriculumPage';
+const AdminCurriculumPage = lazy(() => import('./pages/admin/AdminCurriculumPage').then(module => ({ default: module.AdminCurriculumPage })));
 import { AdminParticipantsPage } from './pages/admin/AdminParticipantsPage';
-import { AdminUsersPage } from './pages/admin/AdminUsersPage';
-import { AdminVenuesPage } from './pages/admin/AdminVenuesPage';
-import { AdminSchedulesPage } from './pages/admin/AdminSchedulesPage';
-import { AdminLessonsPage } from './pages/admin/AdminLessonsPage';
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage').then(module => ({ default: module.AdminUsersPage })));
+const AdminVenuesPage = lazy(() => import('./pages/admin/AdminVenuesPage').then(module => ({ default: module.AdminVenuesPage })));
+const AdminSchedulesPage = lazy(() => import('./pages/admin/AdminSchedulesPage').then(module => ({ default: module.AdminSchedulesPage })));
+const AdminLessonsPage = lazy(() => import('./pages/admin/AdminLessonsPage').then(module => ({ default: module.AdminLessonsPage })));
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AuthCompletePage } from './pages/public/AuthCompletePage';
 
+const portalDataProvider = dataProvider();
+
 export function App() {
   return (
     <BrowserRouter>
       <Refine 
-        dataProvider={dataProvider()}
+        dataProvider={portalDataProvider}
         authProvider={authProvider}
+        options={{ reactQuery: { clientConfig: portalQueryClient } }}
         resources={[
           {
             name: 'announcements',
@@ -58,7 +65,7 @@ export function App() {
           // resources lain bisa didefinisikan jika diperlukan
         ]}
       >
-        <Routes>
+        <RouteLoadingBoundary><Routes>
           {/* Public Portal Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
@@ -102,7 +109,7 @@ export function App() {
           {/* Admin Protected Routes */}
           <Route element={
             <Authenticated key="admin" fallback={<Navigate to="/login" />}>
-              <AdminLayout />
+              <AdminAccessGuard><AdminLayout /></AdminAccessGuard>
             </Authenticated>
           }>
             <Route path="/admin" element={<AdminDashboardPage />} />
@@ -123,7 +130,7 @@ export function App() {
 
           {/* 404 Route */}
           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+        </Routes></RouteLoadingBoundary>
         <GlobalNetworkIndicator />
       </Refine>
     </BrowserRouter>

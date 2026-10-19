@@ -37,6 +37,7 @@ export const getActiveRequestCount = () => activeRequestCount;
  */
 export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
   const headers = new Headers(options.headers);
+  const isRead = !options.method || ['GET', 'HEAD'].includes(options.method.toUpperCase());
 
   if (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
     try {
@@ -61,11 +62,15 @@ export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
     headers.set('Content-Type', 'application/json');
   }
 
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(), isRead ? 20_000 : 45_000);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout.signal]) : timeout.signal;
   beginNetworkRequest();
   try {
     const response = await fetch(url, {
       ...options,
       headers,
+      signal,
       credentials: 'include', // Kunci utama integrasi auth cookie HTTP-only
     });
 
@@ -81,8 +86,21 @@ export const fetchWrapper = async (url: string, options: RequestInit = {}) => {
     }
 
     assertJsonResponse(response, url);
-    return response;
+    // Keep both the timeout and indicator active until the entire body arrives.
+    const body = await response.arrayBuffer();
+    return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    if (timeout.signal.aborted) throw {
+      statusCode: 408,
+      message: isRead
+        ? 'Server terlalu lama merespons. Periksa koneksi dan pilih Coba Lagi.'
+        : 'Penyimpanan melewati batas waktu. Muat ulang data sebelum mencoba lagi; perubahan mungkin sudah tersimpan.',
+    } satisfies HttpError;
+    if (error instanceof TypeError) throw { statusCode: 0, message: 'Tidak dapat terhubung ke server. Periksa koneksi internet, lalu coba lagi.' } satisfies HttpError;
+    throw error;
   } finally {
+    clearTimeout(timer);
     endNetworkRequest();
   }
 };
@@ -104,7 +122,7 @@ const generateFilter = (filters?: CrudFilters) => {
 
   if (filters) {
     filters.forEach((filter) => {
-      if ('field' in filter && filter.operator === 'eq') {
+      if ('field' in filter && ['eq', 'contains'].includes(filter.operator)) {
         queryFilters[filter.field] = String(filter.value);
       }
     });
@@ -119,12 +137,15 @@ export const dataProvider = (): DataProvider => ({
     const url = new URL(`${window.location.origin}${API_URL}/${safeResource}`);
 
     // Pagination
-    const current = (pagination as Record<string, unknown> | undefined)?.current as number || 1;
+    const current = pagination?.currentPage || (pagination as Record<string, unknown> | undefined)?.current as number || 1;
     const pageSize = (pagination as Record<string, unknown> | undefined)?.pageSize as number || 10;
     
     if (pagination?.mode === 'server') {
       url.searchParams.set('_page', String(current));
       url.searchParams.set('_limit', String(pageSize));
+    } else {
+      url.searchParams.set('_page', '1');
+      url.searchParams.set('_limit', '100');
     }
 
     // Sort
@@ -142,12 +163,33 @@ export const dataProvider = (): DataProvider => ({
 
     const response = await fetchWrapper(url.toString(), {
       headers: meta?.headers,
+      signal: meta?.signal,
     });
     
     const body = await readJsonResponse(response, url.toString());
     const payload = body.data !== undefined ? body.data : body;
-    const items = Array.isArray(payload) ? payload : (payload.items || []);
-    const total = (typeof payload === 'object' && payload?.total) || body.meta?.total || items.length;
+    const items = Array.isArray(payload) ? [...payload] : [...(payload.items || [])];
+    const total = (typeof payload === 'object' && payload?.total) ?? body.meta?.total ?? items.length;
+    // Refine mode "off" means all records, not the API's default first page.
+    // Respect the server's actual page size and never silently truncate a curriculum.
+    if (pagination?.mode !== 'server' && !Array.isArray(payload)) {
+      const limit = Number(payload.limit) || 100;
+      for (let page = 2; items.length < total; page += 3) {
+        // Bounded concurrency avoids a serial waterfall on large curricula.
+        const pages = Array.from({ length: Math.min(3, Math.ceil((total - items.length) / limit)) }, (_, index) => page + index);
+        const batches = await Promise.all(pages.map(async number => {
+          const pageUrl = new URL(url);
+          pageUrl.searchParams.set('_page', String(number));
+          pageUrl.searchParams.set('_limit', String(limit));
+          const nextResponse = await fetchWrapper(pageUrl.toString(), { headers: meta?.headers, signal: meta?.signal });
+          const nextBody = await readJsonResponse(nextResponse, pageUrl.toString());
+          const next = nextBody.data ?? nextBody;
+          if (!next.items?.length) throw new Error('Daftar berubah saat dimuat. Muat ulang agar data lengkap.');
+          return next.items;
+        }));
+        batches.forEach(batch => items.push(...batch));
+      }
+    }
 
     return {
       data: items,
@@ -156,8 +198,8 @@ export const dataProvider = (): DataProvider => ({
   },
 
   getOne: async ({ resource, id, meta }) => {
-    const url = `${API_URL}/${resource}/${id}`;
-    const response = await fetchWrapper(url, { headers: meta?.headers });
+    const url = `${API_URL}/${resource}/${id}${meta?.audience === 'public' ? '?audience=public' : ''}`;
+    const response = await fetchWrapper(url, { headers: meta?.headers, signal: meta?.signal });
     const body = await readJsonResponse(response, url);
     const payload = body.data !== undefined ? body.data : body;
 

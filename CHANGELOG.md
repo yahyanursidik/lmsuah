@@ -2,6 +2,27 @@
 
 Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git memakai awalan `v` dan menunjuk commit rilis pada `main`. `package.json` dan `package-lock.json` harus memakai versi yang sama. Changelog di `lms-kajian-yts-docs` merupakan riwayat dokumen, bukan versi aplikasi.
 
+## [0.2.2] — 2026-10-19
+
+### Diperbaiki
+
+- Cache query portal selama 30 detik mengurangi pengambilan ulang saat kembali ke menu. Cache dibersihkan saat login/logout dan mutasi menginvalidasi data terkait.
+- Identitas dan izin berbagi request akun yang sedang berjalan. Gangguan pemeriksaan izin ditampilkan dengan pesan error dan tombol coba lagi, bukan dianggap sebagai akun peserta.
+- Pembacaan materi, kuis, dan detail soal yang independen dijalankan paralel setelah pemeriksaan akses. Pembaca umum/peserta hanya menerima metadata kuis, tanpa jawaban benar melalui detail pertemuan.
+- Daftar tanpa pagination memuat seluruh halaman dengan maksimal tiga request paralel, tetap menjaga urutan.
+- Jadwal menerima program kosong/null sebagai agenda umum, dapat melepas relasi program, dan tidak menggunakan ID demo untuk foreign key pembuat.
+- Form jadwal menampilkan hasil sukses/gagal, mempertahankan isian saat gagal, menunggu pilihan lokasi/program, dan mencegah submit ganda. Pesan validasi menyebut field yang perlu diperbaiki.
+- Loading lokal/global mencakup autentikasi, refresh, dan penerimaan body respons. Pembacaan dibatasi 20 detik dan mutasi 45 detik, tanpa pengulangan otomatis mutasi yang mungkin sudah tersimpan.
+- Pembatalan form pertemuan tidak memuat ulang kurikulum; kegagalan materi tidak lagi ditampilkan sebagai daftar kosong.
+- Route dipisahkan secara lazy; paket framework, data, dan autentikasi dipisahkan dari bundle aplikasi tanpa menonaktifkan peringatan ukuran.
+
+### Verifikasi dan batas rilis
+
+- Paket rilis diuji terpisah dari workspace pengembangan: 162 tes dalam 26 file lulus; lint bersih (0 error/0 warning); typecheck/build dan pemeriksaan diff lulus tanpa peringatan ukuran bundle.
+- Rilis tidak memerlukan migrasi, perubahan kredensial, atau aktivasi fitur baru di database produksi.
+- Wizard/referensi Program Kajian, sinkronisasi belajar server lanjutan, progres baru, revisi terpisah, PDF privat/transkrip, serta migrasi 0010–0012 tetap berada di workspace pengembangan dan tidak termasuk paket ini.
+- Kecepatan produksi dan alur login akun nyata tetap perlu diperiksa setelah deploy; tes lokal bukan bukti keberhasilan OAuth produksi.
+
 ## [0.2.1] — 2026-10-19
 
 ### Diperbaiki

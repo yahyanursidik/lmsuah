@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { MOCK_SPEAKER, MOCK_PROGRAMS } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
+import type { PublicLessonSummary, PublicProgramSummary } from '../../types';
 
 export function SpeakerProfilePage() {
-  const { query: programsQuery, result: programsResult } = useList<any>({ resource: 'programs', pagination: { mode: 'off' } });
-  const { result: lessonsResult } = useList<any>({ resource: 'lessons', pagination: { mode: 'off' } });
+  const { query: programsQuery, result: programsResult } = useList<PublicProgramSummary>({ resource: 'programs', pagination: { mode: 'off' } });
+  const { result: lessonsResult } = useList<PublicLessonSummary>({ resource: 'lessons', pagination: { mode: 'off' } });
 
   const apiPrograms = programsResult?.data || [];
   const apiLessons = lessonsResult?.data || [];
@@ -74,7 +75,7 @@ export function SpeakerProfilePage() {
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-slate-900">Program Kajian yang Diampu</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {programs.map((prog: any) => (
+            {programs.map((prog) => (
               <div key={prog.id} className="rounded-xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-3">
                 <div className="space-y-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded inline-block">

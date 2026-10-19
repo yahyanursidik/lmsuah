@@ -390,7 +390,7 @@ export function AdminSchedulesPage() {
                       <label className="text-xs font-semibold text-slate-700">Tipe Agenda <span className="text-rose-500">*</span></label>
                       <select
                         value={formData.type}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value as any }))}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value as ScheduleItem['type'] }))}
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-shadow"
                       >
                         <option value="Rutin">Kajian Rutin</option>

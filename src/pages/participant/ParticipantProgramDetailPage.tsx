@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { BookOpen, CheckCircle2, ChevronRight, Play } from 'lucide-react';
 import { getProgramProgress, getUserLessonProgress } from '@/lib/userStore';
+import type { PublicLessonSummary } from '../../types';
 
 export function ParticipantProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +16,7 @@ export function ParticipantProgramDetailPage() {
     queryOptions: { enabled: !!id },
   });
 
-  const { query: lessonsQuery, result: lessons } = useList({
+  const { query: lessonsQuery, result: lessons } = useList<PublicLessonSummary>({
     resource: 'lessons',
     pagination: { mode: 'off' },
     filters: [{ field: 'programId', operator: 'eq', value: id }],
@@ -23,7 +24,7 @@ export function ParticipantProgramDetailPage() {
     queryOptions: { enabled: !!id },
   });
 
-  const programLessons = (lessons?.data || []) as any[];
+  const programLessons = lessons?.data || [];
   const progress = getUserLessonProgress(userId);
   const info = getProgramProgress(userId, programLessons);
 

@@ -41,4 +41,10 @@ Jangan gunakan awalan `VITE_` untuk secret dan jangan commit nilai rahasia. Rede
 
 Jangan kirim cookie, token, password, atau client secret saat mengumpulkan informasi error.
 
+## Netlify: false positive pada origin publik
+
+Jika build dan bundling berhasil tetapi secret scanner mendeteksi nilai `BETTER_AUTH_URL` dalam contoh callback, yang terdeteksi adalah origin website publik, bukan kredensial. `netlify.toml` mengecualikan hanya key `BETTER_AUTH_URL` melalui `SECRETS_SCAN_OMIT_KEYS`. Jangan menambahkan `DATABASE_URL`, `BETTER_AUTH_SECRET`, atau `GOOGLE_CLIENT_SECRET` ke pengecualian dan jangan mematikan secret scanning secara global.
+
+Konfigurasi server Functions tetap disimpan melalui Netlify UI/CLI/API; `netlify.toml` tidak menyimpan nilai secret. Lihat [konfigurasi secret scanning Netlify](https://docs.netlify.com/build/environment-variables/secrets-controller/#configure-secret-scanning).
+
 Referensi: https://better-auth.com/docs/authentication/google

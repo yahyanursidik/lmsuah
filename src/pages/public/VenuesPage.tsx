@@ -21,12 +21,12 @@ export function VenuesPage() {
 
   const apiData = apiVenues?.data || [];
   const isFetched = venuesQuery.isFetched || apiData.length > 0;
-  const venuesList = (isFetched ? apiData : (venuesQuery.isError ? MOCK_VENUES : [])) as Venue[];
   const visibleVenues = useMemo(() => {
+    const venuesList = isFetched ? apiVenues.data : (venuesQuery.isError ? MOCK_VENUES : []);
     const needle = query.trim().toLowerCase();
     if (!needle) return venuesList;
     return venuesList.filter((venue) => [venue.name, venue.address, venue.city, venue.district].some((value) => value?.toLowerCase().includes(needle)));
-  }, [query, venuesList]);
+  }, [query, isFetched, apiVenues.data, venuesQuery.isError]);
 
   return (
     <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">

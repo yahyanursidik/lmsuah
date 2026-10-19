@@ -14,6 +14,35 @@ export interface Program {
   status: 'draft' | 'published' | 'archived';
 }
 
+export interface PublicProgramSummary {
+  id: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  bookTitle?: string | null;
+  coverImage?: string | null;
+}
+
+export interface PublicLessonSummary {
+  id: string;
+  title: string;
+  programId?: string | null;
+  sequence?: number;
+  date?: string | null;
+  duration?: string | null;
+  description?: string | null;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  status: 'draft' | 'published';
+  imageUrl?: string | null;
+  linkUrl?: string | null;
+}
+
 export interface EnrollmentItem {
   id: string;
   userId: string;

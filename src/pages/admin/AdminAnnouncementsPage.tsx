@@ -5,9 +5,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { AdminAnnouncementForm } from './AdminAnnouncementForm';
+import type { Announcement } from '../../types';
 
 export const AdminAnnouncementsPage: React.FC = () => {
-  const { query: listQuery, result } = useList({
+  const { query: listQuery, result } = useList<Announcement>({
     resource: 'announcements',
     pagination: { mode: 'off' },
     sorters: [{ field: 'createdAt', order: 'desc' }],
@@ -66,7 +67,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {announcements.map((item: any) => (
+          {announcements.map((item) => (
             <Card key={item.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
               {item.imageUrl && (
                 <div className="h-32 bg-slate-100 rounded-t-lg overflow-hidden border-b border-slate-100">

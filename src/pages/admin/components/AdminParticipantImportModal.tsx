@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { X, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-message';
 
 export type ImportedParticipant = {
   name: string;
@@ -77,8 +78,8 @@ export function AdminParticipantImportModal({ isOpen, onClose, onImport, isLoadi
         }
         
         setPreview(parsedData);
-      } catch (err: any) {
-        setError(err.message || 'Gagal memproses file CSV');
+      } catch (err) {
+        setError(getErrorMessage(err, 'Gagal memproses file CSV'));
         setFile(null);
         setPreview([]);
       }

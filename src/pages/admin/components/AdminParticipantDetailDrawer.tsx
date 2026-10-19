@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, User, Mail, Phone, BookOpen, Clock, Activity } from 'lucide-react';
 import { fetchWrapper } from '@/providers/dataProvider';
+import { getErrorMessage } from '@/lib/error-message';
 
 type ParticipantProfile = {
   id: string;
@@ -51,8 +52,8 @@ export function AdminParticipantDetailDrawer({ userId, onClose }: AdminParticipa
         } else {
           throw new Error(payload.error || 'Gagal memuat detail peserta');
         }
-      } catch (err: any) {
-        setError(err.message || 'Terjadi kesalahan saat memuat data');
+      } catch (err) {
+        setError(getErrorMessage(err, 'Terjadi kesalahan saat memuat data'));
       } finally {
         setIsLoading(false);
       }

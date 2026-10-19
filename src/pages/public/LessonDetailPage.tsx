@@ -447,7 +447,7 @@ export function LessonDetailPage() {
                   ].map((f) => (
                     <button
                       key={f.key}
-                      onClick={() => setMeetingFilter(f.key as any)}
+                      onClick={() => setMeetingFilter(f.key as typeof meetingFilter)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                         meetingFilter === f.key
                           ? 'bg-emerald-950 text-emerald-300 font-bold'

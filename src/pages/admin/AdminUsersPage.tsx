@@ -5,7 +5,8 @@ import { useList } from '@refinedev/core';
 import { BookOpen, CalendarDays, Clock, KeyRound, Mail, RefreshCw, Search, ShieldCheck, Upload, UserCheck, UserPlus, Users, Edit, Eye } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { fetchWrapper } from '@/providers/dataProvider';
-import { AdminParticipantAddModal } from './components/AdminParticipantAddModal';
+import { AdminParticipantAddModal, type ParticipantFormData } from './components/AdminParticipantAddModal';
+import { getErrorMessage } from '@/lib/error-message';
 import { AdminParticipantDetailDrawer } from './components/AdminParticipantDetailDrawer';
 import { AdminParticipantImportModal, type ImportedParticipant } from './components/AdminParticipantImportModal';
 import { AdminParticipantPasswordModal } from './components/AdminParticipantPasswordModal';
@@ -242,13 +243,13 @@ export function AdminUsersPage() {
       });
       await refreshRoles();
     } catch (error) {
-      setRolesError(error instanceof Error ? error.message : 'Role belum dapat diberikan.');
+      setRolesError(getErrorMessage(error, 'Role belum dapat diberikan.'));
     } finally {
       setAssigningKey('');
     }
   };
 
-  const handleAddParticipant = async (data: any) => {
+  const handleAddParticipant = async (data: ParticipantFormData) => {
     setIsAdding(true);
     try {
       const res = await fetchWrapper('/api/admin/participants', {
@@ -262,8 +263,8 @@ export function AdminUsersPage() {
       }
       await refreshRoles();
       setIsAddModalOpen(false);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(getErrorMessage(err, 'Gagal menambahkan peserta.'));
     } finally {
       setIsAdding(false);
     }
@@ -284,8 +285,8 @@ export function AdminUsersPage() {
       alert(payload.message);
       await refreshRoles();
       setIsImportModalOpen(false);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(getErrorMessage(err, 'Gagal mengimpor peserta.'));
     } finally {
       setIsImporting(false);
     }
@@ -305,8 +306,8 @@ export function AdminUsersPage() {
       }
       alert('Password berhasil diubah!');
       setPasswordModalData({ isOpen: false, userId: null, userName: '' });
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(getErrorMessage(err, 'Gagal mengubah password.'));
     } finally {
       setIsChangingPassword(false);
     }
@@ -326,8 +327,8 @@ export function AdminUsersPage() {
       }
       await refreshRoles();
       setEditModalData({ isOpen: false, userId: null, initialData: null });
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(getErrorMessage(err, 'Gagal memperbarui peserta.'));
     } finally {
       setIsEditing(false);
     }

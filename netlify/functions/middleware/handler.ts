@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { handleCors } from './cors.js';
 import { ValidationError } from './validation.js';
 import { AuthError, ForbiddenError } from './auth.js';
+import { HttpError } from '../utils/http-error.js';
 
 export type RouteHandler = (
   request: Request,
@@ -64,7 +65,11 @@ export function createHandler(handler: RouteHandler) {
       let errorCode = 'INTERNAL_ERROR';
       let errorMessage = 'Terjadi kesalahan pada server';
 
-      if (error instanceof ValidationError) {
+      if (error instanceof HttpError) {
+        statusCode = error.statusCode;
+        errorCode = error.code;
+        errorMessage = error.message;
+      } else if (error instanceof ValidationError) {
         statusCode = 400;
         errorCode = 'VALIDATION_ERROR';
         errorMessage = error.message;

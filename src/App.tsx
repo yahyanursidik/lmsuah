@@ -35,6 +35,10 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 const AdminProgramsPage = lazy(() => import('./pages/admin/AdminProgramsPage').then(module => ({ default: module.AdminProgramsPage })));
 import { AdminKajianLayout } from './pages/admin/AdminKajianLayout';
 import { AdminProgramDetailPage } from './pages/admin/AdminProgramDetailPage';
+const AdminProgramSetupPage = lazy(() => import('./pages/admin/AdminProgramSetupPage').then(module => ({ default: module.AdminProgramSetupPage })));
+const AdminProgramReferencesPage = lazy(() => import('./pages/admin/AdminProgramReferencesPage').then(module => ({ default: module.AdminProgramReferencesPage })));
+const AdminProgramRevisionsPage = lazy(() => import('./pages/admin/AdminProgramRevisionsPage').then(module => ({ default: module.AdminProgramRevisionsPage })));
+const ParticipantQuizPage = lazy(() => import('./pages/participant/ParticipantQuizPage').then(module => ({ default: module.ParticipantQuizPage })));
 const AdminCurriculumPage = lazy(() => import('./pages/admin/AdminCurriculumPage').then(module => ({ default: module.AdminCurriculumPage })));
 import { AdminParticipantsPage } from './pages/admin/AdminParticipantsPage';
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage').then(module => ({ default: module.AdminUsersPage })));
@@ -97,6 +101,7 @@ export function App() {
             <Route path="/belajar/katalog/:id" element={<ProgramDetailPage />} />
             <Route path="/belajar/program/:id" element={<ParticipantProgramDetailPage />} />
             <Route path="/belajar/progres" element={<ProgressPage />} />
+            <Route path="/belajar/kuis/:id" element={<ParticipantQuizPage />} />
             <Route path="/belajar/jadwal" element={<ParticipantSchedulePage />} />
             <Route path="/belajar/lokasi" element={<VenuesPage />} />
             <Route path="/belajar/lokasi/:id" element={<VenueDetailPage />} />
@@ -117,8 +122,10 @@ export function App() {
             <Route path="/admin/programs/:id" element={<AdminKajianLayout />}>
               <Route index element={<AdminProgramDetailPage />} />
               <Route path="curriculum" element={<AdminCurriculumPage />} />
+              <Route path="setup" element={<AdminProgramSetupPage />} />
+              <Route path="references" element={<AdminProgramReferencesPage />} />
+              <Route path="revisions" element={<AdminProgramRevisionsPage />} />
               <Route path="participants" element={<AdminParticipantsPage />} />
-              {/* Other nested routes will be implemented later */}
             </Route>
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/venues" element={<AdminVenuesPage />} />

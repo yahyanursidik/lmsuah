@@ -24,7 +24,7 @@ export const portalNavigation: Record<Portal, PortalNavGroup[]> = {
     { label: 'Belajar', items: [
       { label: 'Kajian Saya', href: '/belajar', icon: BookOpen, keywords: 'pertemuan materi kuis' },
       { label: 'Katalog Kajian', href: '/belajar/katalog', icon: BookOpen, keywords: 'program tersedia' },
-      { label: 'Progres Belajar', href: '/belajar/progres', icon: TrendingUp },
+      { label: 'Progres Belajar', href: '/belajar/progres', icon: TrendingUp, keywords: 'kuis evaluasi hasil nilai percobaan' },
       { label: 'Jadwal Kajian', href: '/belajar/jadwal', icon: CalendarDays },
       { label: 'Lokasi Majelis', href: '/belajar/lokasi', icon: MapPin, keywords: 'masjid alamat' },
     ] },
@@ -43,15 +43,19 @@ export function filterPortalNavigation(portal: Portal, search: string) {
 export function getPortalTrail(portal: Portal, pathname: string): PortalCrumb[] {
   const root = portalNavigation[portal][0]!.items[0]!;
   const trail: PortalCrumb[] = [{ label: root.label, href: root.href }];
-  const match = portalNavigation[portal].flatMap(group => group.items).filter(item => item.href !== root.href && (pathname === item.href || pathname.startsWith(`${item.href}/`))).sort((a, b) => b.href.length - a.href.length)[0];
+  const match = portalNavigation[portal].flatMap(group => group.items).filter(item => item.href !== root.href && !(portal === 'participant' && pathname.startsWith('/belajar/kuis/') && item.href === '/belajar') && (pathname === item.href || pathname.startsWith(`${item.href}/`))).sort((a, b) => b.href.length - a.href.length)[0];
   if (match) trail.push({ label: match.label, href: match.href });
   if (portal === 'admin' && /^\/admin\/programs\/[^/]+/.test(pathname)) {
     const parent = pathname.split('/').slice(0, 4).join('/');
     trail.push({ label: 'Detail program', href: parent });
-    if (pathname.endsWith('/curriculum')) trail.push({ label: 'Kurikulum', href: pathname });
+    if (pathname.endsWith('/setup')) trail.push({ label: 'Persiapan program', href: pathname });
+    else if (pathname.endsWith('/references')) trail.push({ label: 'Seri & Kitab', href: pathname });
+    else if (pathname.endsWith('/curriculum')) trail.push({ label: 'Pertemuan & Materi', href: pathname });
+    else if (pathname.endsWith('/revisions')) trail.push({ label: 'Review & Revisi', href: pathname });
     else if (pathname.endsWith('/participants')) trail.push({ label: 'Peserta program', href: pathname });
   } else if (portal === 'participant') {
-    if (/^\/belajar\/lessons?\//.test(pathname)) trail.push({ label: 'Pertemuan', href: pathname });
+    if (pathname.startsWith('/belajar/kuis/')) trail.push({ label: 'Progres Belajar', href: '/belajar/progres' }, { label: 'Evaluasi belajar', href: pathname });
+    else if (/^\/belajar\/lessons?\//.test(pathname)) trail.push({ label: 'Pertemuan', href: pathname });
     else if (pathname.startsWith('/belajar/program/')) trail.push({ label: 'Detail kajian', href: pathname });
     else if (pathname.startsWith('/belajar/katalog/')) trail.push({ label: 'Detail program', href: pathname });
     else if (pathname.startsWith('/belajar/lokasi/')) trail.push({ label: 'Detail lokasi', href: pathname });

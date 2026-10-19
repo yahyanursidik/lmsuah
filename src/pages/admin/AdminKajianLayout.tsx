@@ -3,7 +3,7 @@
  */
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useOne } from '@refinedev/core';
-import { ArrowLeft, BookOpenCheck, LayoutDashboard, Users } from 'lucide-react';
+import { ArrowLeft, BookOpenCheck, GitPullRequest, LayoutDashboard, Users } from 'lucide-react';
 import { ErrorAlert } from '../../components/public/UIStates';
 import { DataLoading } from '../../components/ui/DataLoading';
 import { getErrorMessage } from '../../lib/error-message';
@@ -15,9 +15,13 @@ export function AdminKajianLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { query, result: program } = useOne<ProgramHeader>({ resource: 'programs', id: id || '' });
+  const capabilities = useOne<{ programRevisions: boolean }>({ resource: 'program-capabilities', id: 'general' });
   const menuItems = [
     { label: 'Ringkasan', href: `/admin/programs/${id}`, icon: LayoutDashboard },
+    { label: 'Persiapan program', href: `/admin/programs/${id}/setup`, icon: BookOpenCheck },
+    { label: 'Seri & Kitab', href: `/admin/programs/${id}/references`, icon: BookOpenCheck },
     { label: 'Pertemuan & Materi', href: `/admin/programs/${id}/curriculum`, icon: BookOpenCheck },
+    { label: 'Review & Revisi', href: `/admin/programs/${id}/revisions`, icon: GitPullRequest },
     { label: 'Peserta', href: `/admin/programs/${id}/participants`, icon: Users },
   ];
 
@@ -25,7 +29,7 @@ export function AdminKajianLayout() {
   if (query.isError || !program) return <ErrorAlert message={getErrorMessage(query.error, 'Program tidak ditemukan atau tidak dapat dimuat.')} onRetry={() => query.refetch()} />;
 
   return (
-    <div className="mx-auto max-w-[90rem] space-y-6">
+    <div className="program-workspace mx-auto max-w-[90rem] space-y-6">
       <header className="flex min-w-0 items-start gap-3 border-b border-slate-200/80 pb-5">
         <button 
           type="button" 
@@ -79,7 +83,7 @@ export function AdminKajianLayout() {
             })}
           </nav>
         </aside>
-        <div className="min-w-0"><Outlet /></div>
+        <div className="min-w-0">{capabilities.query.isLoading ? <DataLoading label="Memeriksa alur penyuntingan…" /> : capabilities.query.isError ? <ErrorAlert message="Alur penyuntingan belum dapat diperiksa. Coba lagi sebelum mengubah program." onRetry={() => capabilities.query.refetch()} /> : <Outlet context={{ revisionMode: capabilities.result?.programRevisions === true }} />}</div>
       </div>
     </div>
   );

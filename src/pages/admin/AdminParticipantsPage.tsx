@@ -2,6 +2,8 @@ import { useParams } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Users } from 'lucide-react';
+import { useState } from 'react';
+import { ErrorAlert } from '../../components/public/UIStates';
 
 interface EnrollmentItem {
   id: string;
@@ -15,17 +17,27 @@ interface EnrollmentItem {
 
 export function AdminParticipantsPage() {
   const { id } = useParams<{ id: string }>();
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [page, setPage] = useState(1);
 
   const { query: enrollmentsQuery, result: enrollmentsResult } = useList<EnrollmentItem>({
     resource: 'enrollments',
-    filters: [{ field: 'programId', operator: 'eq', value: id }]
+    filters: [{ field: 'programId', operator: 'eq', value: id }],
+    pagination: { mode: 'off' },
   });
 
   const isLoadingEnrollments = enrollmentsQuery.isLoading;
   const enrollments = enrollmentsResult?.data || [];
+  const filtered = enrollments.filter(item => (status === 'all' || item.status === status) && `${item.userName} ${item.userEmail}`.toLowerCase().includes(search.toLowerCase()));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 25));
+  const currentPage = Math.min(page, pageCount);
+  const rows = filtered.slice((currentPage - 1) * 25, currentPage * 25);
+  if (enrollmentsQuery.isError) return <ErrorAlert message="Peserta gagal dimuat. Ini bukan berarti belum ada pendaftaran." onRetry={() => enrollmentsQuery.refetch()} />;
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row"><label className="flex-1 text-sm font-semibold">Cari peserta<input value={search} onChange={event => setSearch(event.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3" placeholder="Nama atau email…" /></label><label className="text-sm font-semibold">Status<select value={status} onChange={event => setStatus(event.target.value)} className="mt-2 block min-h-11 rounded-lg border border-slate-300 bg-white px-3"><option value="all">Semua</option><option value="active">Aktif</option><option value="completed">Selesai</option><option value="dropped">Berhenti</option></select></label></div>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Data Peserta Terdaftar</h2>
@@ -63,7 +75,7 @@ export function AdminParticipantsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200/50">
-                  {enrollments.map((enrollment: EnrollmentItem) => (
+                  {rows.map((enrollment: EnrollmentItem) => (
                     <tr key={enrollment.id} className="hover:bg-slate-200/20 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-800">
                         {enrollment.userName || 'Tanpa Nama'}
@@ -71,7 +83,6 @@ export function AdminParticipantsPage() {
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1 text-xs text-slate-500">
                           <span>{enrollment.userEmail || '-'}</span>
-                          <span>{enrollment.profilePhone || '-'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-500">
@@ -97,6 +108,8 @@ export function AdminParticipantsPage() {
           )}
         </CardContent>
       </Card>
+      {filtered.length === 0 && enrollments.length > 0 && <p role="status" className="text-sm text-slate-600">Tidak ada peserta yang cocok dengan filter.</p>}
+      {pageCount > 1 && <nav aria-label="Halaman peserta" className="flex flex-wrap items-center justify-between gap-3 text-sm"><button className="min-h-11 rounded-lg border px-4" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</button><span>Halaman {currentPage} dari {pageCount} · {filtered.length} peserta</span><button className="min-h-11 rounded-lg border px-4" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Berikutnya</button></nav>}
     </div>
   );
 }

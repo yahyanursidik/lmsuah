@@ -2,10 +2,15 @@ import type { Config } from '@netlify/functions';
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { chapters, books, programs } from './db/schema/index.js';
-import { eq, and, asc, desc, count, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, count, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { validateBody } from './utils/validation.js';
+import { validateBody, ValidationError } from './utils/validation.js';
 import { ForbiddenError } from './middleware/auth.js';
+import { canReadDrafts } from './utils/content-policy.js';
+import { featureRequested } from './utils/advanced-features.js';
+import { assertLegacyWorkspaceWritable, legacyWorkspaceGuardWrites } from './utils/program-snapshots.js';
+import { readPublishedCollection } from './utils/publication-readers.js';
+import { HttpError } from './utils/http-error.js';
 import {
   getOptionalAuth,
   parseQueryParams,
@@ -13,7 +18,6 @@ import {
   requireContentUpdateAccess,
   requireContentDeleteAccess,
   logMutationAudit,
-  isGuest,
   getDatabaseActorId,
 } from './utils/contentHelper.js';
 
@@ -38,7 +42,13 @@ const chaptersHandler = async (request: Request) => {
   const resourceId = pathParts.length > 2 ? pathParts[2] : null;
 
   if (method === 'GET') {
-    const isGuestUser = isGuest(session);
+    const isGuestUser = !canReadDrafts(session);
+    if (isGuestUser && featureRequested('programRevisions')) {
+      const query = parseQueryParams(url, ALLOWED_FILTERS, ALLOWED_SORTS);
+      const result = await readPublishedCollection('chapters', query, resourceId || undefined);
+      if (resourceId && !result.items[0]) throw new HttpError(404, 'Modul tidak ditemukan pada versi publik.');
+      return resourceId ? result.items[0] : result;
+    }
 
     if (resourceId) {
       const items = await db.select().from(chapters).where(eq(chapters.id, resourceId)).limit(1);
@@ -55,7 +65,8 @@ const chaptersHandler = async (request: Request) => {
           if (!parentBook[0] || parentBook[0].status !== 'published') {
             throw new ForbiddenError('Tamu hanya diizinkan melihat bab dari kitab yang sudah dipublikasikan');
           }
-        } else if (item.programId) {
+        }
+        if (item.programId) {
           const parentProgram = await db.select().from(programs).where(eq(programs.id, item.programId)).limit(1);
           if (!parentProgram[0] || parentProgram[0].status !== 'published') {
             throw new ForbiddenError('Tamu hanya diizinkan melihat bab dari kajian yang sudah dipublikasikan');
@@ -88,6 +99,7 @@ const chaptersHandler = async (request: Request) => {
 
     // Tamu hanya boleh membaca modul dari induk yang sudah dipublikasikan.
     if (isGuestUser) {
+      conditions.push(sql`(${chapters.programId} is null or exists(select 1 from ${programs} where ${programs.id} = ${chapters.programId} and ${programs.status} = 'published'))`);
       if (query.filters.programId) {
         const parentProgram = await db
           .select({ status: programs.status })
@@ -106,7 +118,7 @@ const chaptersHandler = async (request: Request) => {
         if (publishedBookIds.length === 0) {
           return { items: [], total: 0, page: query.page, limit: query.limit };
         }
-        conditions.push(sql`${chapters.bookId} IN ${publishedBookIds}`);
+        conditions.push(inArray(chapters.bookId, publishedBookIds));
       }
     }
 
@@ -149,10 +161,14 @@ const chaptersHandler = async (request: Request) => {
 
   if (method === 'POST') {
     const body = await validateBody(request, chapterSchema);
-    const authSession = requireContentCreateAccess(session);
+    if (!body.programId && !body.bookId) throw new ValidationError('Pilih program atau kitab untuk modul.');
+    const parent = body.programId ? (await db.select().from(programs).where(eq(programs.id, body.programId)).limit(1))[0] : body.bookId ? (await db.select().from(books).where(eq(books.id, body.bookId)).limit(1))[0] : undefined;
+    if (!parent) throw new ValidationError('Induk modul tidak ditemukan.');
+    await assertLegacyWorkspaceWritable(body.programId);
+    const authSession = requireContentCreateAccess(session, parent?.status);
     const databaseActorId = getDatabaseActorId(authSession);
 
-    const [newChapter] = await db
+    const insertQuery = db
       .insert(chapters)
       .values({
         bookId: body.bookId,
@@ -163,6 +179,10 @@ const chaptersHandler = async (request: Request) => {
         updatedBy: databaseActorId,
       })
       .returning();
+    const inserted = featureRequested('programRevisions') && body.programId
+      ? (await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${body.programId}`}, 0))`), ...legacyWorkspaceGuardWrites([body.programId]), insertQuery])).at(-1) as Array<typeof chapters.$inferSelect>
+      : await insertQuery;
+    const newChapter = inserted[0];
 
     logMutationAudit('CREATE', 'chapters', newChapter.id, authSession.userId, {
       title: newChapter.title,
@@ -185,11 +205,15 @@ const chaptersHandler = async (request: Request) => {
     if (!existing[0]) {
       throw new Error('Bab tidak ditemukan');
     }
+    if (featureRequested('programRevisions') && !existing[0].programId) throw new HttpError(409, 'Bab bersama hanya dibaca pada alur revisi terpisah. Gunakan modul milik program agar program lain tidak berubah.');
+    if (body.programId && body.programId !== existing[0].programId) throw new ValidationError('Modul tidak dapat dipindahkan antarprogram. Pindahkan pertemuannya, bukan identitas modul.');
 
-    const authSession = requireContentUpdateAccess(session);
+    const parent = existing[0].programId ? (await db.select().from(programs).where(eq(programs.id, existing[0].programId)).limit(1))[0] : existing[0].bookId ? (await db.select().from(books).where(eq(books.id, existing[0].bookId)).limit(1))[0] : undefined;
+    const authSession = requireContentUpdateAccess(session, parent?.status);
+    await assertLegacyWorkspaceWritable(existing[0].programId);
     const databaseActorId = getDatabaseActorId(authSession);
 
-    const [updatedChapter] = await db
+    const updateQuery = db
       .update(chapters)
       .set({
         ...(body.bookId && { bookId: body.bookId }),
@@ -201,6 +225,10 @@ const chaptersHandler = async (request: Request) => {
       })
       .where(eq(chapters.id, resourceId))
       .returning();
+    const updated = featureRequested('programRevisions') && existing[0].programId
+      ? (await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${existing[0].programId}`}, 0))`), ...legacyWorkspaceGuardWrites([existing[0].programId]), updateQuery])).at(-1) as Array<typeof chapters.$inferSelect>
+      : await updateQuery;
+    const updatedChapter = updated[0];
 
     logMutationAudit('UPDATE', 'chapters', resourceId, authSession.userId, {
       changes: body,
@@ -221,7 +249,11 @@ const chaptersHandler = async (request: Request) => {
       throw new Error('Bab tidak ditemukan');
     }
 
-    await db.delete(chapters).where(eq(chapters.id, resourceId));
+    await assertLegacyWorkspaceWritable(existing[0].programId);
+    if (featureRequested('programRevisions') && !existing[0].programId) throw new HttpError(409, 'Bab bersama tidak dihapus melalui alur revisi program.');
+    const deleteQuery = db.delete(chapters).where(eq(chapters.id, resourceId));
+    if (featureRequested('programRevisions') && existing[0].programId) await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${existing[0].programId}`}, 0))`), ...legacyWorkspaceGuardWrites([existing[0].programId]), deleteQuery]);
+    else await deleteQuery;
 
     logMutationAudit('DELETE', 'chapters', resourceId, authSession.userId, {
       deletedTitle: existing[0].title,

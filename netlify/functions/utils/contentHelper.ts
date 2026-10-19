@@ -43,7 +43,7 @@ export function requireContentCreateAccess(session: UserSession | null, targetSt
     throw new ForbiddenError('Hanya Contributor, Publisher, atau Admin yang dapat membuat konten');
   }
 
-  if (targetStatus === 'published' && !isPublisher(session)) {
+  if (['published', 'archived'].includes(targetStatus) && !isPublisher(session)) {
     throw new ForbiddenError('Hanya Publisher atau Admin yang dapat memublikasikan konten');
   }
 
@@ -52,14 +52,14 @@ export function requireContentCreateAccess(session: UserSession | null, targetSt
 
 export function requireContentUpdateAccess(
   session: UserSession | null,
-  _currentStatus?: string,
+  currentStatus?: string,
   targetStatus?: string
 ): UserSession {
   if (!session || !isContributor(session)) {
     throw new ForbiddenError('Hanya Contributor, Publisher, atau Admin yang dapat mengubah konten');
   }
 
-  if (targetStatus === 'published' && !isPublisher(session)) {
+  if ((currentStatus === 'published' || currentStatus === 'archived' || targetStatus === 'published' || targetStatus === 'archived') && !isPublisher(session)) {
     throw new ForbiddenError('Hanya Publisher atau Admin yang dapat memublikasikan konten');
   }
 

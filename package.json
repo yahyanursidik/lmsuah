@@ -1,22 +1,26 @@
 {
   "name": "lms-kajian-yts",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "db:generate": "drizzle-kit generate",
+    "db:preflight": "tsx netlify/functions/db/preflight.ts",
+    "db:baseline-copy": "tsx netlify/functions/db/baseline-copy.ts",
+    "db:smoke-copy": "tsx netlify/functions/db/copy-smoke.ts",
     "db:migrate": "tsx netlify/functions/db/migrate.ts",
     "db:seed": "tsx netlify/functions/db/seed.ts"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.5.4",
     "@neondatabase/serverless": "^1.1.0",
+    "@netlify/blobs": "^11.1.4",
     "@refinedev/core": "5.0.12",
     "@tanstack/react-query": "5.101.4",
     "bcryptjs": "^3.0.3",
@@ -33,6 +37,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@eslint/js": "^9.20.0",
     "@netlify/functions": "^5.3.0",
     "@tailwindcss/vite": "^4.0.7",

@@ -15,7 +15,7 @@ const mobileItems = [
   portalNavigation.admin[1]!.items[0]!,
   portalNavigation.admin[1]!.items[2]!,
 ];
-const shortLabels = ['Beranda', 'Program', 'Pengguna', 'Jadwal'];
+const shortLabels = ['Dashboard', 'Program', 'Pengguna', 'Jadwal'];
 
 export function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

@@ -39,6 +39,7 @@ export function createHandler(handler: RouteHandler) {
         logger.info('REQUEST_COMPLETED', { requestId, status: result.status });
         const headers = new Headers(result.headers);
         headers.set('x-request-id', requestId);
+        if (!headers.has('Cache-Control')) headers.set('Cache-Control', 'private, no-store');
         return new Response(result.body, {
           status: result.status,
           statusText: result.statusText,
@@ -55,6 +56,7 @@ export function createHandler(handler: RouteHandler) {
           status: 200,
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'private, no-store',
             'x-request-id': requestId,
           },
         }
@@ -64,6 +66,12 @@ export function createHandler(handler: RouteHandler) {
       let statusCode = 500;
       let errorCode = 'INTERNAL_ERROR';
       let errorMessage = 'Terjadi kesalahan pada server';
+      let databaseCode = '';
+      let cause: unknown = error;
+      for (let depth = 0; depth < 5 && cause && typeof cause === 'object'; depth += 1) {
+        if ('code' in cause) databaseCode = String(cause.code);
+        cause = 'cause' in cause ? cause.cause : null;
+      }
 
       if (error instanceof HttpError) {
         statusCode = error.statusCode;
@@ -89,6 +97,14 @@ export function createHandler(handler: RouteHandler) {
         statusCode = 409;
         errorCode = 'CONFLICT';
         errorMessage = 'Slug pertemuan sudah digunakan. Pilih alamat pertemuan lain.';
+      } else if (['23503', '22012', '23505'].includes(databaseCode)) {
+        statusCode = 409;
+        errorCode = 'DEPENDENCY_CONFLICT';
+        errorMessage = 'Data berubah, urutan sudah digunakan, atau masih memiliki riwayat terkait. Muat ulang; gunakan pengurutan, arsip, atau nonaktifkan konten untuk menjaga riwayat.';
+      } else if (['42P01', '42703'].includes(databaseCode)) {
+        statusCode = 503;
+        errorCode = 'MIGRATION_REQUIRED';
+        errorMessage = 'Struktur database untuk fitur ini belum tersedia. Terapkan migrasi yang telah disetujui; tidak ada perubahan struktur otomatis dari request ini.';
       }
 
       logger.error('REQUEST_FAILED', error, { requestId, statusCode, errorCode });
@@ -99,6 +115,7 @@ export function createHandler(handler: RouteHandler) {
           status: statusCode,
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'private, no-store',
             'x-request-id': requestId,
           },
         }

@@ -29,7 +29,9 @@ export function LoginPage() {
     login(credentials, {
       onSuccess: (data) => {
         if (!data?.success) { setLoginError(getLoginError(data?.error)); return; }
-        navigate(data.redirectTo || '/dashboard', { replace: true });
+        const requested = params.get('redirect') || '';
+        const safeReturn = /^\/(programs|belajar|lessons?|dashboard)(\/|\?|$)/.test(requested) && !/[\\\r\n]/.test(requested) ? requested : '';
+        navigate(safeReturn || data.redirectTo || '/dashboard', { replace: true });
       },
       onError: (error: unknown) => setLoginError(getLoginError(error)),
     });

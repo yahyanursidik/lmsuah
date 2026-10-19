@@ -32,7 +32,7 @@ describe('Portal navigation', () => {
   it('shows breadcrumb links without exposing opaque database IDs', () => {
     render(<MemoryRouter initialEntries={['/admin/programs/opaque-id/curriculum']}><PortalBreadcrumbs portal="admin" /></MemoryRouter>);
     expect(screen.getByRole('link', { name: 'Detail program' }).getAttribute('href')).toBe('/admin/programs/opaque-id');
-    expect(screen.getByText('Kurikulum').getAttribute('aria-current')).toBe('page');
+    expect(screen.getByText('Pertemuan & Materi').getAttribute('aria-current')).toBe('page');
     expect(screen.queryByText('opaque-id')).toBeNull();
   });
 });

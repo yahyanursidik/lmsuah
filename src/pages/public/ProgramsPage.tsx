@@ -15,6 +15,7 @@ export function ProgramsPage() {
   const { query: listQuery, result: listResult } = useList<Program>({
     resource: 'programs',
     pagination: { mode: 'off' },
+    filters: [{ field: 'status', operator: 'eq', value: 'published' }],
   });
 
   const apiPrograms = listResult?.data || [];

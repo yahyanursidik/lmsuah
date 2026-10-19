@@ -1,5 +1,6 @@
 @import "../tokens.css";
 @import "tailwindcss";
+@import "./components/ui/program-workspace.css";
 
 @layer base {
   :root {

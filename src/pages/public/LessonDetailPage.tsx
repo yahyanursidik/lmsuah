@@ -7,6 +7,8 @@ import { DataLoading } from '../../components/ui/DataLoading';
 import { getErrorMessage } from '../../lib/error-message';
 import { QuizComponent } from '../../components/public/QuizComponent';
 import { MaterialViewer } from '../../components/material/MaterialViewer';
+import { useLearningData } from '../../lib/useLearningData';
+import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
 import {
   ChevronLeft,
   ChevronRight,
@@ -33,8 +35,6 @@ import {
 import {
   getSingleLessonProgress,
   getUserLessonProgress,
-  saveLastPosition,
-  toggleLessonCompletion,
   getUserNotes,
   addNote,
   deleteNote,
@@ -44,6 +44,7 @@ import {
 
 interface LessonMarker {
   id: string;
+  videoId?: string;
   timestamp: number;
   title: string;
   description?: string;
@@ -58,7 +59,7 @@ interface LessonItem {
   description?: string;
   status: 'draft' | 'published';
   programId?: string;
-  materials?: { id: string; type: string; url: string; filename?: string; duration?: string }[];
+  materials?: { id: string; type: string; url: string; filename?: string; duration?: string; isDownloadable?: boolean; downloadUrl?: string; requiresAuth?: boolean }[];
   quiz?: { id: string; title: string; description: string; passingScore: number; maxAttempts: number };
   markers?: LessonMarker[];
 }
@@ -78,7 +79,9 @@ export function LessonDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: identity } = useGetIdentity<{ id: string; name: string }>();
-  const userId = identity?.id || 'demo-peserta-1';
+  const userId = identity?.id || '';
+  const learning = useLearningData(userId);
+  const saveProgress = learning.saveProgress;
 
   const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isTabActive, setIsTabActive] = useState(0); // 0=Ringkasan, 1=Daftar Isi, 2=Catatan Saya
@@ -96,6 +99,7 @@ export function LessonDetailPage() {
   const { query: lessonQuery, result: lesson } = useOne<LessonItem>({
     resource: 'lessons',
     id: id || '',
+    meta: { audience: 'public' },
     queryOptions: { enabled: !!id },
   });
   const { result: systemSettings } = useOne<{ id: string; allowPdfDownload?: boolean }>({ resource: 'settings', id: 'general' });
@@ -116,7 +120,7 @@ export function LessonDetailPage() {
       setBookmarked(isBookmarked(userId, 'lesson', lesson.id));
       setNotes(getUserNotes(userId, lesson.id));
     }
-  }, [lesson?.id, userId]);
+  }, [lesson?.id, userId, learning.loading]);
 
   useEffect(() => {
     const lessonMaterials = lesson?.materials || [];
@@ -129,34 +133,20 @@ export function LessonDetailPage() {
     setActiveMaterialId(preferred.id || preferred.url);
   }, [lesson?.id, lesson?.materials]);
 
-  // Track position to save on unmount or marker click
-  const mountTimeRef = useRef<number>(Date.now());
-  const savedOffsetRef = useRef<number>(startAt);
-  useEffect(() => {
-    savedOffsetRef.current = startAt;
-    mountTimeRef.current = Date.now();
-  }, [startAt]);
-
-  useEffect(() => {
-    return () => {
-      if (lesson?.id && userId) {
-        const elapsed = (Date.now() - mountTimeRef.current) / 1000;
-        const newPos = savedOffsetRef.current + elapsed;
-        saveLastPosition(userId, lesson.id, newPos);
-      }
-    };
-  }, [lesson?.id, userId]);
+  // Do not infer watched time from wall-clock time: an embedded player may be
+  // paused. Persist explicit seek positions and completion only.
 
   // Seek to marker
   const seekTo = useCallback((seconds: number, markerId: string) => {
     setStartAt(seconds);
     setActiveMarker(markerId);
-  }, []);
+    if (lesson?.id && userId) void saveProgress(lesson.id, { lastPositionSeconds: Math.floor(seconds) });
+  }, [lesson?.id, userId, saveProgress]);
 
-  const handleToggleCompletion = () => {
-    if (!lesson?.id || !userId) return;
-    const newState = toggleLessonCompletion(userId, lesson.id);
-    setIsCompleted(newState);
+  const handleToggleCompletion = async () => {
+    if (!userId) { navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`); return; }
+    if (!lesson?.id || learning.pending) return;
+    if (await saveProgress(lesson.id, { isCompleted: !isCompleted })) setIsCompleted(!isCompleted);
   };
 
   const handleToggleBookmark = () => {
@@ -190,7 +180,7 @@ export function LessonDetailPage() {
     queryOptions: { enabled: !!lesson?.programId },
   });
 
-  const siblings = siblingsResult?.data || [];
+  const siblings = (siblingsResult?.data || []).filter(item => item.status === 'published');
   const currentIndex = siblings.findIndex((s: LessonItem) => s.id === lesson?.id);
   const prevLesson = currentIndex > 0 ? siblings[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 && currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
@@ -218,7 +208,7 @@ export function LessonDetailPage() {
   if (!lesson) {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-12 text-center">
-        <SEOHead title="Materi Tidak Ditemukan" />
+      <SEOHead title="Materi Tidak Ditemukan" />
         <div className="py-16 space-y-4">
           <div className="text-5xl">📚</div>
           <h1 className="text-2xl font-bold text-slate-900">Materi Tidak Ditemukan</h1>
@@ -235,7 +225,7 @@ export function LessonDetailPage() {
   const youtubeVideo = materials.find(m => m.type === 'youtube');
   const activeMaterial = materials.find((material) => (material.id || material.url) === activeMaterialId) || youtubeVideo || materials[0];
   const activeMaterialIndex = materials.findIndex((m) => (m.id || m.url) === (activeMaterial?.id || activeMaterial?.url));
-  const markers = lesson.markers || [];
+  const markers = (lesson.markers || []).filter(marker => !marker.videoId || marker.videoId === activeMaterial?.id);
   const activeYoutube = activeMaterial?.type === 'youtube' ? activeMaterial : youtubeVideo;
   const video = activeYoutube ? { youtubeId: activeYoutube.url.split('v=')[1] || activeYoutube.url.split('/').pop() || '', duration: activeYoutube.duration } : null;
 
@@ -257,6 +247,7 @@ export function LessonDetailPage() {
       <SEOHead title={lesson.title} description={lesson.description} />
 
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <LearningSyncNotice {...learning} />
 
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs text-stone-500 flex-wrap">
@@ -312,6 +303,8 @@ export function LessonDetailPage() {
             <button
               type="button"
               onClick={handleToggleCompletion}
+              disabled={learning.loading || learning.pending}
+              aria-busy={learning.pending}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${
                 isCompleted
                   ? 'bg-emerald-800 text-white border-emerald-700 shadow-xs'
@@ -319,7 +312,7 @@ export function LessonDetailPage() {
               }`}
             >
               <CheckCircle2 size={16} className={isCompleted ? 'text-emerald-300' : 'text-stone-400'} />
-              <span>{isCompleted ? 'Selesai Disimak' : 'Tandai Selesai'}</span>
+              <span>{learning.pending ? 'Menyimpan progres…' : isCompleted ? 'Selesai Disimak' : 'Tandai Selesai'}</span>
             </button>
           </div>
         </div>
@@ -450,7 +443,7 @@ export function LessonDetailPage() {
                   ].map((f) => (
                     <button
                       key={f.key}
-                      onClick={() => setMeetingFilter(f.key as typeof meetingFilter)}
+                      onClick={() => setMeetingFilter(f.key as 'all' | 'completed' | 'uncompleted')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                         meetingFilter === f.key
                           ? 'bg-emerald-950 text-emerald-300 font-bold'

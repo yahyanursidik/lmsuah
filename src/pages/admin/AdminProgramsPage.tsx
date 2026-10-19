@@ -3,7 +3,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreate, useDelete, useList, useUpdate } from '@refinedev/core';
+import { useCreate, useDelete, useList, useOne, useUpdate } from '@refinedev/core';
 import {
   Archive,
   ArrowRight,
@@ -30,6 +30,7 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorAlert } from '@/components/public/UIStates';
+import { useDialog } from '@/components/ui/useDialog';
 
 type ProgramStatus = 'draft' | 'published' | 'archived';
 type StatusFilter = 'all' | ProgramStatus;
@@ -102,6 +103,8 @@ function StatusBadge({ status }: { status: ProgramStatus }) {
 
 export function AdminProgramsPage() {
   const navigate = useNavigate();
+  const capabilities = useOne<{ programRevisions: boolean }>({ resource: 'program-capabilities', id: 'general' });
+  const revisionMode = capabilities.result?.programRevisions === true;
   const titleInputRef = useRef<HTMLInputElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -115,9 +118,12 @@ export function AdminProgramsPage() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [pendingProgramId, setPendingProgramId] = useState<string | null>(null);
   const [copiedProgramId, setCopiedProgramId] = useState<string | null>(null);
+  const [manualSlug, setManualSlug] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { query: listQuery, result: listResult } = useList<ProgramItem>({
     resource: 'programs',
+    pagination: { mode: 'off' },
   });
 
   const programsList = useMemo(() => listResult?.data || [], [listResult?.data]);
@@ -131,6 +137,9 @@ export function AdminProgramsPage() {
 
   const isSaving = Boolean(createMutation?.isPending || updateMutation?.isPending);
   const isDeleting = Boolean(deleteMutation?.isPending);
+  const initialForm = editingProgram ? { title: editingProgram.title, slug: editingProgram.slug, description: editingProgram.description || '', status: editingProgram.status } : EMPTY_FORM;
+  const formDialog = useDialog({ open: isModalOpen, pending: isSaving, dirty: JSON.stringify(formData) !== JSON.stringify(initialForm), onClose: () => setIsModalOpen(false) });
+  const deleteDialog = useDialog({ open: !!programToDelete, pending: isDeleting, onClose: () => setProgramToDelete(null) });
 
   const statusCounts = useMemo(
     () => ({
@@ -161,22 +170,10 @@ export function AdminProgramsPage() {
       return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
     });
   }, [programsList, searchQuery, sortBy, statusFilter]);
-
-  useEffect(() => {
-    if (!isModalOpen && !programToDelete) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (programToDelete && !isDeleting) setProgramToDelete(null);
-      if (isModalOpen && !isSaving) setIsModalOpen(false);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isDeleting, isModalOpen, isSaving, programToDelete]);
+  const pageCount = Math.max(1, Math.ceil(filteredPrograms.length / 12));
+  const currentPage = Math.min(page, pageCount);
+  const visiblePrograms = filteredPrograms.slice((currentPage - 1) * 12, currentPage * 12);
+  useEffect(() => setPage(1), [searchQuery, statusFilter, sortBy]);
 
   useEffect(() => {
     if (isModalOpen) requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -191,11 +188,13 @@ export function AdminProgramsPage() {
   const handleOpenCreateModal = () => {
     resetFeedback();
     setEditingProgram(null);
+    setManualSlug(false);
     setFormData(EMPTY_FORM);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (program: ProgramItem) => {
+    if (revisionMode) { navigate(`/admin/programs/${program.id}/revisions`); return; }
     resetFeedback();
     setEditingProgram(program);
     setFormData({
@@ -207,16 +206,14 @@ export function AdminProgramsPage() {
     setIsModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    if (isSaving) return;
-    setIsModalOpen(false);
-  };
+  const handleCloseModal = formDialog.close;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     resetFeedback();
     const values = {
       ...formData,
+      ...(editingProgram?.updatedAt ? { expectedUpdatedAt: editingProgram.updatedAt } : {}),
       title: formData.title.trim(),
       slug: normalizeSlug(formData.slug),
       description: formData.description.trim(),
@@ -240,10 +237,11 @@ export function AdminProgramsPage() {
     createProgram(
       { resource: 'programs', values },
       {
-        onSuccess: () => {
+        onSuccess: ({ data }) => {
           setIsModalOpen(false);
           setFeedback({ type: 'success', message: `Program “${values.title}” berhasil dibuat.` });
           refetch();
+          if (data.id) navigate(`/admin/programs/${data.id}/setup`);
         },
         onError: (error) => setFeedback({ type: 'error', message: getErrorMessage(error, 'Program gagal dibuat.') }),
       }
@@ -270,11 +268,12 @@ export function AdminProgramsPage() {
   };
 
   const handleChangeStatus = (program: ProgramItem) => {
+    if (revisionMode && program.status !== 'published') { navigate(`/admin/programs/${program.id}/revisions`); return; }
     const nextStatus: ProgramStatus = program.status === 'published' ? 'draft' : 'published';
     resetFeedback();
     setPendingProgramId(program.id);
     updateProgram(
-      { resource: 'programs', id: program.id, values: { status: nextStatus } },
+      { resource: 'programs', id: program.id, values: { status: nextStatus, expectedUpdatedAt: program.updatedAt } },
       {
         onSuccess: () => {
           setFeedback({
@@ -309,7 +308,7 @@ export function AdminProgramsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-6">
+    <div className="program-workspace mx-auto w-full max-w-[1500px] space-y-6">
       <section className="border-b border-slate-200 pb-6" aria-labelledby="programs-title">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0 max-w-3xl">
@@ -459,7 +458,7 @@ export function AdminProgramsPage() {
           </div>
         ) : (
           <div className={`grid gap-4 ${viewMode === 'grid' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
-            {filteredPrograms.map((program) => (
+            {visiblePrograms.map((program) => (
               <article key={program.id} className={`group min-w-0 rounded-xl border border-slate-200 bg-white transition-colors hover:border-slate-200 ${viewMode === 'list' ? 'lg:flex lg:items-center' : 'flex flex-col'}`}>
                 <div className={`min-w-0 flex-1 ${viewMode === 'list' ? 'p-4 lg:p-5' : 'p-5'}`}>
                   <div className="flex items-start justify-between gap-3">
@@ -494,7 +493,7 @@ export function AdminProgramsPage() {
                 <div className={`flex flex-col gap-2 border-t border-slate-200 bg-slate-50 hover:bg-slate-100 p-4 sm:flex-row ${viewMode === 'list' ? 'lg:w-[23rem] lg:shrink-0 lg:border-l lg:border-t-0' : ''}`}>
                   <Button type="button" variant="ghost" size="sm" onClick={() => handleChangeStatus(program)} disabled={pendingProgramId === program.id} className="flex-1 text-slate-700 hover:bg-slate-200 hover:text-slate-900">
                     {pendingProgramId === program.id ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" /> : program.status === 'published' ? <Archive className="mr-2 h-4 w-4" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    {program.status === 'published' ? 'Jadikan draft' : 'Publikasikan'}
+                    {program.status === 'published' ? 'Jadikan draft' : revisionMode ? 'Review & terbitkan' : 'Publikasikan'}
                   </Button>
                   <Button type="button" size="sm" onClick={() => navigate(`/admin/programs/${program.id}`)} className="flex-1 bg-emerald-600 text-slate-900 hover:bg-emerald-500">
                     Kelola program <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -506,9 +505,10 @@ export function AdminProgramsPage() {
         )}
       </section>
 
+      {pageCount > 1 && <nav aria-label="Halaman daftar program" className="flex flex-wrap items-center justify-between gap-3"><Button type="button" variant="outline" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button><span role="status" className="text-sm text-slate-600">Halaman {currentPage} dari {pageCount} · {filteredPrograms.length} program</span><Button type="button" variant="outline" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button></nav>}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-white/85 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) handleCloseModal(); }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="program-form-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-w-xl sm:rounded-2xl">
+          <div ref={formDialog.ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="program-form-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-w-xl sm:rounded-2xl">
             <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
               <div>
                 <h2 id="program-form-title" className="text-lg font-bold text-slate-900">{editingProgram ? 'Edit program' : 'Tambah program baru'}</h2>
@@ -520,16 +520,18 @@ export function AdminProgramsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
+              {feedback?.type === 'error' && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{feedback.message}</p>}
+              {!editingProgram && <p className="text-sm text-slate-600">Langkah 1: buat draft. Berikutnya Anda akan dipandu menambahkan pertemuan, materi, dan review publikasi.</p>}
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-slate-800">Judul program <span className="text-rose-400">*</span></span>
-                <input ref={titleInputRef} type="text" required maxLength={160} value={formData.title} onChange={(event) => { const title = event.target.value; setFormData((previous) => ({ ...previous, title, slug: editingProgram ? previous.slug : normalizeSlug(title) })); }} placeholder="Contoh: Syarah Kitab At-Tauhid" className="min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30" />
+                <input ref={titleInputRef} type="text" required maxLength={160} value={formData.title} onChange={(event) => { const title = event.target.value; setFormData((previous) => ({ ...previous, title, slug: editingProgram || manualSlug ? previous.slug : normalizeSlug(title) })); }} placeholder="Contoh: Syarah Kitab At-Tauhid" className="min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30" />
               </label>
 
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-slate-800">URL slug <span className="text-rose-400">*</span></span>
                 <div className="flex min-h-11 min-w-0 items-center rounded-lg border border-slate-200 bg-slate-50 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/30">
                   <span className="shrink-0 pl-3.5 text-xs text-slate-500">/programs/</span>
-                  <input type="text" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={formData.slug} onChange={(event) => setFormData((previous) => ({ ...previous, slug: normalizeSlug(event.target.value) }))} placeholder="syarah-kitab-at-tauhid" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 pr-3 font-mono text-xs text-slate-800 outline-none" />
+                  <input type="text" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={formData.slug} onChange={(event) => { setManualSlug(true); setFormData((previous) => ({ ...previous, slug: event.target.value })); }} placeholder="syarah-kitab-at-tauhid" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 pr-3 font-mono text-xs text-slate-800 outline-none" />
                 </div>
                 <span className="block text-xs text-slate-500">Gunakan huruf kecil, angka, dan tanda hubung. Slug menjadi alamat publik program.</span>
               </label>
@@ -542,9 +544,9 @@ export function AdminProgramsPage() {
               <fieldset className="space-y-2">
                 <legend className="text-sm font-semibold text-slate-800">Status publikasi</legend>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {(Object.keys(STATUS_META) as ProgramStatus[]).map((status) => (
+                  {(Object.keys(STATUS_META) as ProgramStatus[]).filter(status => editingProgram || status === 'draft').map((status) => (
                     <label key={status} className={`cursor-pointer rounded-lg border p-3 transition-colors ${formData.status === status ? 'border-emerald-400 bg-emerald-50/40' : 'border-slate-200 bg-slate-50 hover:border-slate-600'}`}>
-                      <input type="radio" name="status" value={status} checked={formData.status === status} onChange={() => setFormData((previous) => ({ ...previous, status }))} className="sr-only" />
+                      <input type="radio" name="status" value={status} disabled={revisionMode && status === 'published'} checked={formData.status === status} onChange={() => setFormData((previous) => ({ ...previous, status }))} className="sr-only" />
                       <span className="block text-sm font-semibold text-slate-900">{STATUS_META[status].label}</span>
                       <span className="mt-1 block text-xs leading-5 text-slate-500">{STATUS_META[status].description}</span>
                     </label>
@@ -566,7 +568,7 @@ export function AdminProgramsPage() {
 
       {programToDelete && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center bg-white/85 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !isDeleting) setProgramToDelete(null); }}>
-          <div role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description" className="w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl sm:p-6">
+          <div ref={deleteDialog.ref} tabIndex={-1} role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description" className="w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl sm:p-6">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-300"><Trash2 className="h-5 w-5" aria-hidden="true" /></div>
             <h2 id="delete-program-title" className="mt-4 text-lg font-bold text-slate-900">Hapus program?</h2>
             <p id="delete-program-description" className="mt-2 text-sm leading-6 text-slate-500">“{programToDelete.title}” akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>

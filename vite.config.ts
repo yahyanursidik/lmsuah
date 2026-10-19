@@ -128,6 +128,17 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            framework: ['react', 'react-dom', 'react-router-dom'],
+            data: ['@refinedev/core', '@tanstack/react-query'],
+            authentication: ['better-auth/react'],
+          },
+        },
+      },
+    },
     test: {
       globals: true,
       environment: 'jsdom',

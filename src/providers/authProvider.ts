@@ -2,6 +2,8 @@ import type { AuthProvider } from '@refinedev/core';
 import { authClient, signIn, signOut } from '../lib/auth-client';
 import { startGoogleLogin } from '../lib/google-auth';
 import { readJsonResponse } from '../lib/api-response';
+import { fetchWrapper } from './dataProvider';
+import { clearPortalQueryCache } from '../lib/query-client';
 
 const DEMO_STORAGE_KEY = 'lms_demo_user';
 
@@ -23,6 +25,21 @@ type AuthMePayload = {
 };
 
 type WrappedAuthMePayload = AuthMePayload | { data?: AuthMePayload };
+
+let accountRequest: Promise<AuthMePayload> | undefined;
+
+/** Identity and permissions share one in-flight request, not separate HTTP calls. */
+export function loadAuthMe(): Promise<AuthMePayload> {
+  if (!accountRequest) {
+    const request = (async () => {
+      const response = await fetchWrapper(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`);
+      return unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
+    })();
+    accountRequest = request;
+    void request.finally(() => { if (accountRequest === request) accountRequest = undefined; }).catch(() => {});
+  }
+  return accountRequest;
+}
 
 export function isAdminRole(role?: string | null): boolean {
   return role === 'admin' || role === 'administrator' || role === 'super_administrator';
@@ -76,6 +93,8 @@ function removeStoredDemo(): void {
 
 export const authProvider: AuthProvider = {
   login: async ({ email, password, providerName }: LoginParams) => {
+    accountRequest = undefined;
+    await clearPortalQueryCache();
     // 1. Social provider login (Google)
     if (providerName === 'google') {
       try {
@@ -150,9 +169,8 @@ export const authProvider: AuthProvider = {
 
         // We successfully logged in with real auth!
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
-          if (response.ok) {
-            const data = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
+          {
+            const data = await loadAuthMe();
             if (hasAdminRole(data.roles)) {
               return {
                 success: true,
@@ -189,6 +207,8 @@ export const authProvider: AuthProvider = {
   },
 
   logout: async () => {
+    accountRequest = undefined;
+    await clearPortalQueryCache();
     removeStoredDemo();
     try {
       await signOut();
@@ -210,7 +230,7 @@ export const authProvider: AuthProvider = {
 
     // 2. Check authClient session
     try {
-      const { data: session } = await authClient.getSession();
+      const { data: session } = await authClient.getSession({ fetchOptions: { timeout: 20_000 } });
       if (session) {
         return { authenticated: true };
       }
@@ -236,18 +256,12 @@ export const authProvider: AuthProvider = {
       }
     }
     
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
-      if (response.ok) {
-        const data = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
-        if (data.roles && data.roles.length > 0) {
-          if (data.roles.includes('super_administrator')) return 'super_administrator';
-          if (data.roles.includes('administrator')) return 'administrator';
-          return data.roles[0];
-        }
-      }
-    } catch {
-      // Ignore
+    // A network failure is not evidence that an administrator is a participant.
+    const data = await loadAuthMe();
+    if (data.roles && data.roles.length > 0) {
+      if (data.roles.includes('super_administrator')) return 'super_administrator';
+      if (data.roles.includes('administrator')) return 'administrator';
+      return data.roles[0];
     }
 
     return 'participant';
@@ -271,9 +285,8 @@ export const authProvider: AuthProvider = {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, { credentials: 'include' });
-      if (response.ok) {
-        const data = unwrapAuthMePayload(await readJsonResponse(response, '/api/auth/me'));
+      {
+        const data = await loadAuthMe();
         if (data.user) {
           let role = 'participant';
           if (data.roles && data.roles.length > 0) {

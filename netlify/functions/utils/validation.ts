@@ -10,7 +10,7 @@ export async function validateBody<T extends z.ZodTypeAny>(
     return schema.parse(body);
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      throw new ValidationError('Format data tidak valid', err.errors);
+      throw new ValidationError(err.errors.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '), err.errors);
     }
     throw new ValidationError('Gagal membaca body JSON');
   }

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
+import { useIsFetching, useIsMutating } from '@tanstack/react-query';
 import { getActiveRequestCount, NETWORK_STATUS_EVENT } from '@/providers/dataProvider';
 import './portal.css';
 
 export function GlobalNetworkIndicator() {
-  const [active, setActive] = useState(() => getActiveRequestCount() > 0);
+  const [networkActive, setActive] = useState(() => getActiveRequestCount() > 0);
+  const fetching = useIsFetching();
+  const mutating = useIsMutating();
+  const active = networkActive || fetching > 0 || mutating > 0;
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const update = (event: Event) => setActive(Boolean((event as CustomEvent<{ active: boolean }>).detail?.active));

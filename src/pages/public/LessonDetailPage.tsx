@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { SEOHead } from '../../components/public/SEOHead';
 import { LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
+import { DataLoading } from '../../components/ui/DataLoading';
+import { getErrorMessage } from '../../lib/error-message';
 import { QuizComponent } from '../../components/public/QuizComponent';
 import { MaterialViewer } from '../../components/material/MaterialViewer';
 import {
@@ -198,6 +200,7 @@ export function LessonDetailPage() {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-12 space-y-6">
         <SEOHead title="Memuat Materi..." />
+        <DataLoading compact label="Memuat pertemuan dan materi…" />
         <LoadingSkeleton count={3} />
       </div>
     );
@@ -207,7 +210,7 @@ export function LessonDetailPage() {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-12">
         <SEOHead title="Gagal Memuat Materi" />
-        <ErrorAlert message="Gagal memuat materi dari server." onRetry={() => refetch()} />
+        <ErrorAlert message={getErrorMessage(lessonQuery?.error, 'Gagal memuat materi dari server.')} onRetry={() => refetch()} />
       </div>
     );
   }

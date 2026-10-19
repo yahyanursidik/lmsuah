@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useList, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingSkeleton, EmptyState, ErrorAlert } from '@/components/public/UIStates';
 import { Plus, Edit3, Trash2, Calendar, RefreshCw, X, AlertTriangle, Search, ExternalLink } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { DataLoading } from '@/components/ui/DataLoading';
+import { getErrorMessage } from '@/lib/error-message';
 
 interface ScheduleItem {
   id: string;
   venueId: string;
-  programId?: string;
+  programId?: string | null;
   title: string;
   speaker: string;
   category?: string;
@@ -34,14 +36,19 @@ interface ProgramItem { id: string; title: string; status?: string }
 const today = new Date().toISOString().slice(0, 10);
 
 export function AdminSchedulesPage() {
+  const [params] = useSearchParams();
+  const programFilter = params.get('programId') || '';
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const submitting = useRef(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleItem['status']>('all');
 
   const [formData, setFormData] = useState({
     venueId: '',
-    programId: '',
+    programId: programFilter,
     title: '',
     speaker: 'Ustadz Abu Haidar As-Sundawy',
     category: 'Fiqih',
@@ -59,17 +66,20 @@ export function AdminSchedulesPage() {
 
   const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({
     resource: 'schedules',
+    pagination: { mode: 'off' },
   });
 
-  const { result: venuesResult } = useList<VenueItem>({
+  const { query: venuesQuery, result: venuesResult } = useList<VenueItem>({
     resource: 'venues',
+    pagination: { mode: 'off' },
   });
-  const { result: programsResult } = useList<ProgramItem>({ resource: 'programs', pagination: { mode: 'off' } });
+  const { query: programsQuery, result: programsResult } = useList<ProgramItem>({ resource: 'programs', pagination: { mode: 'off' } });
 
   const schedulesList = schedulesResult?.data || [];
   const venuesList = venuesResult?.data || [];
   const programsList = programsResult.data || [];
   const filteredSchedules = schedulesList.filter((schedule) => {
+    if (programFilter && schedule.programId !== programFilter) return false;
     const venueName = venuesList.find((venue) => venue.id === schedule.venueId)?.name || '';
     const matchesQuery = [schedule.title, schedule.speaker, schedule.category, venueName].some((value) => value?.toLowerCase().includes(query.trim().toLowerCase()));
     return matchesQuery && (statusFilter === 'all' || schedule.status === statusFilter);
@@ -83,12 +93,15 @@ export function AdminSchedulesPage() {
   const { mutate: deleteSchedule, mutation: deleteMutation } = useDelete();
 
   const isSaving = createMutation?.isPending || updateMutation?.isPending || deleteMutation?.isPending || false;
+  const referencesLoading = venuesQuery.isLoading || programsQuery.isLoading;
+  const referencesError = venuesQuery.isError || programsQuery.isError;
 
   const handleOpenCreateModal = () => {
+    setFormError('');
     setEditingSchedule(null);
     setFormData({
       venueId: venuesList[0]?.id || '',
-      programId: '',
+      programId: programFilter,
       title: '',
       speaker: 'Ustadz Abu Haidar As-Sundawy',
       category: 'Fiqih',
@@ -107,6 +120,7 @@ export function AdminSchedulesPage() {
   };
 
   const handleOpenEditModal = (sch: ScheduleItem) => {
+    setFormError('');
     setEditingSchedule(sch);
     setFormData({
       venueId: sch.venueId,
@@ -130,33 +144,39 @@ export function AdminSchedulesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current || isSaving) return;
+    setFormError('');
+    if (referencesLoading || referencesError) return setFormError('Data lokasi dan program belum siap. Muat ulang pilihan sebelum menyimpan.');
+    const venueId = formData.venueId || venuesList[0]?.id;
+    if (!venueId) return setFormError('Tambahkan lokasi majelis terlebih dahulu sebelum membuat jadwal.');
+    if (!formData.title.trim()) return setFormError('Judul kajian wajib diisi.');
+    submitting.current = true;
+    const values = { ...formData, title: formData.title.trim(), venueId, programId: formData.programId || null };
+    const options = {
+      onSuccess: () => {
+        setIsModalOpen(false);
+        setFeedback({ type: 'success' as const, message: editingSchedule ? 'Perubahan jadwal berhasil disimpan.' : 'Jadwal kajian berhasil dibuat.' });
+      },
+      onError: (error: unknown) => setFormError(getErrorMessage(error, 'Jadwal belum dapat disimpan. Periksa isian dan coba lagi.')),
+      onSettled: () => { submitting.current = false; },
+    };
 
     if (editingSchedule) {
       updateSchedule(
         {
           resource: 'schedules',
           id: editingSchedule.id,
-          values: formData,
+          values,
         },
-        {
-          onSuccess: () => {
-            setIsModalOpen(false);
-            refetch();
-          },
-        }
+        options
       );
     } else {
       createSchedule(
         {
           resource: 'schedules',
-          values: formData,
+          values,
         },
-        {
-          onSuccess: () => {
-            setIsModalOpen(false);
-            refetch();
-          },
-        }
+        options
       );
     }
   };
@@ -169,7 +189,8 @@ export function AdminSchedulesPage() {
           id,
         },
         {
-          onSuccess: () => refetch(),
+          onSuccess: () => setFeedback({ type: 'success', message: 'Jadwal berhasil dihapus.' }),
+          onError: error => setFeedback({ type: 'error', message: getErrorMessage(error, 'Jadwal belum dapat dihapus.') }),
         }
       );
     }
@@ -190,6 +211,8 @@ export function AdminSchedulesPage() {
 
   return (
     <div className="space-y-8">
+      {feedback && <div role={feedback.type === 'error' ? 'alert' : 'status'} className={`rounded-xl border p-4 text-sm ${feedback.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>{feedback.message}</div>}
+      {programFilter && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">Jadwal program: {programsList.find(program => program.id === programFilter)?.title || 'program terpilih'}. <Link className="ml-2 min-h-11 underline" to="/admin/schedules">Lihat semua jadwal</Link></div>}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -225,6 +248,7 @@ export function AdminSchedulesPage() {
               size="sm"
               variant="ghost"
               onClick={() => refetch()}
+              disabled={schedulesQuery.isFetching}
               className="text-slate-500 hover:text-slate-900"
             >
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> Segarkan
@@ -233,12 +257,13 @@ export function AdminSchedulesPage() {
         </CardHeader>
 
         <CardContent className="p-4 sm:p-6">
+          {schedulesQuery.isFetching && !isLoading && <DataLoading compact label="Memperbarui jadwal… Data sebelumnya tetap ditampilkan." />}
           <div className="mb-5 flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><span className="sr-only">Cari jadwal</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari agenda, pemateri, atau lokasi…" className="min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20" /></label><select aria-label="Filter status jadwal" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className="min-h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-emerald-400"><option value="all">Semua status</option><option value="Rutin">Sesuai jadwal</option><option value="Diundur">Diundur</option><option value="Pindah Lokasi">Pindah lokasi</option><option value="Dibatalkan">Dibatalkan</option></select><Link to="/schedules" target="_blank" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-800 hover:bg-slate-200"><ExternalLink className="h-4 w-4" /> Lihat publik</Link></div>
           {isLoading ? (
             <LoadingSkeleton count={3} />
           ) : isError ? (
             <ErrorAlert
-              message="Gagal mengambil data jadwal dari server."
+              message={getErrorMessage(schedulesQuery.error, 'Gagal mengambil data jadwal dari server.')}
               onRetry={() => refetch()}
             />
           ) : filteredSchedules.length === 0 ? (
@@ -359,13 +384,17 @@ export function AdminSchedulesPage() {
               <h3 className="text-lg font-bold text-slate-900">
                 {editingSchedule ? 'Edit Jadwal Kajian' : 'Tambah Jadwal Baru'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+              <button aria-label="Tutup formulir jadwal" disabled={isSaving} onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="overflow-y-auto px-6 py-6 custom-scrollbar">
-              <form id="schedule-form" onSubmit={handleSubmit} className="space-y-8">
+              <form id="schedule-form" aria-label="Formulir jadwal kajian" onSubmit={handleSubmit} aria-busy={isSaving} className="space-y-8">
+                {formError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{formError}</p>}
+                {referencesLoading && <DataLoading compact label="Memuat pilihan lokasi dan program…" />}
+                {referencesError && <ErrorAlert message="Pilihan lokasi atau program gagal dimuat. Isian Anda tetap tersimpan di formulir." onRetry={() => { void venuesQuery.refetch(); void programsQuery.refetch(); }} />}
+                {!venuesQuery.isLoading && !venuesQuery.isError && venuesList.length === 0 && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Belum ada lokasi majelis. <Link to="/admin/venues" className="underline">Tambahkan lokasi terlebih dahulu</Link>.</p>}
                 
                 {/* Informasi Kajian */}
                 <section>
@@ -378,6 +407,7 @@ export function AdminSchedulesPage() {
                       <label className="text-xs font-semibold text-slate-700">Judul Kajian <span className="text-rose-500">*</span></label>
                       <input
                         type="text"
+                        aria-label="Judul kajian"
                         required
                         value={formData.title}
                         onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
@@ -413,6 +443,7 @@ export function AdminSchedulesPage() {
                     <div className="sm:col-span-2 space-y-1.5">
                       <label className="text-xs font-semibold text-slate-700">Program Terkait <span className="text-slate-400 font-normal">(opsional)</span></label>
                       <select
+                        aria-label="Program terkait"
                         value={formData.programId}
                         onChange={(event) => setFormData((previous) => ({ ...previous, programId: event.target.value }))}
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-shadow"
@@ -489,6 +520,7 @@ export function AdminSchedulesPage() {
                       <label className="text-xs font-semibold text-slate-700">Lokasi Majelis <span className="text-rose-500">*</span></label>
                       <select
                         required
+                        aria-label="Lokasi majelis"
                         value={formData.venueId}
                         onChange={(e) => setFormData((prev) => ({ ...prev, venueId: e.target.value }))}
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-shadow"
@@ -589,6 +621,7 @@ export function AdminSchedulesPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsModalOpen(false)}
+                disabled={isSaving}
                 className="text-slate-700 bg-white hover:bg-slate-50 min-h-[44px]"
               >
                 Batal
@@ -596,7 +629,7 @@ export function AdminSchedulesPage() {
               <Button
                 type="submit"
                 form="schedule-form"
-                disabled={isSaving}
+                disabled={isSaving || referencesLoading || referencesError || venuesList.length === 0}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white min-h-[44px] px-6 font-semibold shadow-sm"
               >
                 {isSaving ? 'Menyimpan...' : (editingSchedule ? 'Simpan Perubahan' : 'Buat Jadwal')}

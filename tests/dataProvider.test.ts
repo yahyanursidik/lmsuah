@@ -153,6 +153,23 @@ describe('Custom Refine REST Data Provider', () => {
       );
       expect(result.data).toEqual({ id: 1, title: 'Baru' });
     });
+    it('uses Refine v5 currentPage and forwards contains search', async () => {
+      fetchMock.mockResolvedValueOnce(Response.json({ data: { items: [], total: 0, limit: 20 } }));
+      await provider.getList({ resource: 'lessons', pagination: { currentPage: 3, pageSize: 20, mode: 'server' }, filters: [{ field: 'title', operator: 'contains', value: 'Tauhid' }] });
+      const url = new URL(fetchMock.mock.calls[0][0]);
+      expect(url.searchParams.get('_page')).toBe('3');
+      expect(url.searchParams.get('title')).toBe('Tauhid');
+    });
+    it('mode off fetches every page, including beyond 100 records', async () => {
+      const page = (start: number, length: number) => Array.from({ length }, (_, index) => ({ id: start + index }));
+      fetchMock.mockResolvedValueOnce(Response.json({ data: { items: page(1, 100), total: 205, limit: 100 } }));
+      fetchMock.mockResolvedValueOnce(Response.json({ data: { items: page(101, 100), total: 205, limit: 100 } }));
+      fetchMock.mockResolvedValueOnce(Response.json({ data: { items: page(201, 5), total: 205, limit: 100 } }));
+      const result = await provider.getList({ resource: 'lessons', pagination: { mode: 'off' } });
+      expect(result.data).toHaveLength(205);
+      expect(result.total).toBe(205);
+      expect(new URL(fetchMock.mock.calls[2][0]).searchParams.get('_page')).toBe('3');
+    });
     
     // Pastikan database logic tidak terekspos dalam body melainkan menggunakan format RESTful
   });

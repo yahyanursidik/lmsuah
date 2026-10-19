@@ -1,11 +1,13 @@
 import type { Config } from '@netlify/functions';
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
-import { lessons, lessonVideos, lessonAttachments, quizzes, questions, questionOptions } from './db/schema/index.js';
+import { lessons, lessonVideos, lessonAttachments, quizzes, quizAttempts, questions, questionOptions } from './db/schema/index.js';
 import { eq, and, asc, count, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
 import { ForbiddenError } from './middleware/auth.js';
+import { canReadDrafts, publicQuizMetadata } from './utils/content-policy.js';
+import { HttpError } from './utils/http-error.js';
 import {
   getOptionalAuth,
   parseQueryParams,
@@ -13,7 +15,6 @@ import {
   requireContentUpdateAccess,
   requireContentDeleteAccess,
   logMutationAudit,
-  isGuest,
   getDatabaseActorId,
 } from './utils/contentHelper.js';
 
@@ -90,7 +91,8 @@ const lessonsHandler = async (request: Request) => {
   const resourceId = pathParts.length > 2 ? pathParts[2] : null;
 
   if (method === 'GET') {
-    const isGuestUser = isGuest(session);
+    const isGuestUser = !canReadDrafts(session);
+    const readerAudience = isGuestUser || url.searchParams.get('audience') === 'public';
 
     if (resourceId) {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resourceId);
@@ -99,12 +101,15 @@ const lessonsHandler = async (request: Request) => {
       const items = await db.select().from(lessons).where(condition).limit(1);
       const item = items[0];
 
-      if (!item) throw new Error('Lesson tidak ditemukan');
+      if (!item) throw new HttpError(404, 'Pertemuan tidak ditemukan');
       if (isGuestUser && item.status !== 'published') throw new ForbiddenError('Tamu tidak diizinkan');
 
       // Fetch materials
-      const vids = await db.select().from(lessonVideos).where(eq(lessonVideos.lessonId, item.id));
-      const atts = await db.select().from(lessonAttachments).where(eq(lessonAttachments.lessonId, item.id));
+      const [vids, atts, quizRes] = await Promise.all([
+        db.select().from(lessonVideos).where(eq(lessonVideos.lessonId, item.id)),
+        db.select().from(lessonAttachments).where(eq(lessonAttachments.lessonId, item.id)),
+        db.select().from(quizzes).where(eq(quizzes.lessonId, item.id)).limit(1),
+      ]);
       
       const materials = [
         ...vids.map(v => ({ id: v.id, type: 'youtube', url: `https://youtube.com/watch?v=${v.youtubeId}`, duration: v.duration })),
@@ -112,15 +117,17 @@ const lessonsHandler = async (request: Request) => {
       ];
 
       // Fetch Quiz
-      const quizRes = await db.select().from(quizzes).where(eq(quizzes.lessonId, item.id)).limit(1);
       let quiz = null;
       
-      if (quizRes.length > 0) {
+      if (quizRes.length > 0 && !readerAudience) {
         const qz = quizRes[0];
-        const qs = await db.select().from(questions).where(eq(questions.quizId, qz.id));
-        const opts = await db.select().from(questionOptions)
-          .innerJoin(questions, eq(questionOptions.questionId, questions.id))
-          .where(eq(questions.quizId, qz.id));
+        const [qs, opts, attempts] = await Promise.all([
+          db.select().from(questions).where(eq(questions.quizId, qz.id)),
+          db.select().from(questionOptions)
+            .innerJoin(questions, eq(questionOptions.questionId, questions.id))
+            .where(eq(questions.quizId, qz.id)),
+          db.select({ id: quizAttempts.id }).from(quizAttempts).where(eq(quizAttempts.quizId, qz.id)).limit(1),
+        ]);
 
         const formattedQuestions = qs.map(q => ({
           ...q,
@@ -129,11 +136,12 @@ const lessonsHandler = async (request: Request) => {
 
         quiz = {
           ...qz,
-          questions: formattedQuestions
+          questions: formattedQuestions,
+          hasAttempts: attempts.length > 0,
         };
       }
 
-      return { ...item, materials, quiz };
+      return { ...item, materials, quiz: readerAudience ? publicQuizMetadata(quizRes[0]) : quiz };
     }
 
     const query = parseQueryParams(url, ALLOWED_FILTERS, ALLOWED_SORTS);

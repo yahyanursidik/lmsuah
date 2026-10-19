@@ -1,6 +1,7 @@
 export function LoadingSkeleton({ count = 3 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div role="status" aria-label="Memuat data…" className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <span className="sr-only">Memuat data…</span>
       {Array.from({ length: count }).map((_, idx) => (
         <div
           key={idx}
@@ -61,7 +62,7 @@ export function ErrorAlert({
   onRetry?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-red-200 bg-red-50/80 p-6 text-red-900 shadow-xs">
+    <div role="alert" className="rounded-2xl border border-red-200 bg-red-50/80 p-6 text-red-900 shadow-xs">
       <div className="flex items-start gap-4">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

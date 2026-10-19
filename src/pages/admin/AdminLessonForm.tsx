@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useCreate, useOne, useUpdate } from '@refinedev/core';
 import { AlertCircle, CalendarDays, LoaderCircle, Save, X } from 'lucide-react';
+import { DataLoading } from '../../components/ui/DataLoading';
+import { ErrorAlert } from '../../components/public/UIStates';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 
 interface MeetingFormData {
@@ -17,6 +19,7 @@ interface MeetingRecord extends MeetingFormData { id: string }
 interface AdminLessonFormProps {
   lessonId: string | null;
   onClose: () => void;
+  onSuccess?: () => void;
   programId?: string;
   chapterId?: string;
 }
@@ -26,7 +29,7 @@ const errorMessage = (error: unknown) => error && typeof error === 'object' && '
   ? String(error.message)
   : 'Pertemuan belum dapat disimpan. Periksa kembali data yang diisi.';
 
-export function AdminLessonForm({ lessonId, onClose, programId, chapterId }: AdminLessonFormProps) {
+export function AdminLessonForm({ lessonId, onClose, onSuccess, programId, chapterId }: AdminLessonFormProps) {
   const isEditing = Boolean(lessonId);
   const [feedback, setFeedback] = useState<string | null>(null);
   const lessonQuery = useOne<MeetingRecord>({ resource: 'lessons', id: lessonId || '', queryOptions: { enabled: isEditing } });
@@ -58,7 +61,8 @@ export function AdminLessonForm({ lessonId, onClose, programId, chapterId }: Adm
 
   const onSubmit: SubmitHandler<MeetingFormData> = (values) => {
     setFeedback(null);
-    const options = { onSuccess: onClose, onError: (error: unknown) => setFeedback(errorMessage(error)) };
+    if (isEditing && (lessonQuery.query.isLoading || lessonQuery.query.isError || !lessonQuery.result)) return;
+    const options = { onSuccess: () => { onSuccess?.(); onClose(); }, onError: (error: unknown) => setFeedback(errorMessage(error)) };
     if (lessonId) updateLesson({ resource: 'lessons', id: lessonId, values }, options);
     else createLesson({ resource: 'lessons', values: { ...values, programId, chapterId } }, options);
   };
@@ -71,8 +75,9 @@ export function AdminLessonForm({ lessonId, onClose, programId, chapterId }: Adm
           <button type="button" onClick={onClose} disabled={isSaving} aria-label="Tutup" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50"><X className="h-4 w-4" /></button>
         </header>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 p-5 sm:p-6">
+          {lessonQuery.query.isError && <ErrorAlert message="Data pertemuan gagal dimuat. Coba lagi sebelum menyimpan." onRetry={() => lessonQuery.query.refetch()} />}
           {feedback && <div role="alert" className="flex items-start gap-2 rounded-lg border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-200"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{feedback}</div>}
-          {lessonQuery.query.isLoading ? <div className="h-48 animate-pulse rounded-xl bg-slate-50 motion-reduce:animate-none" /> : <>
+          {lessonQuery.query.isLoading ? <DataLoading label="Memuat data pertemuan…" /> : <>
             <label className="block space-y-2"><span className="text-sm font-semibold text-slate-700">Judul pertemuan *</span><input autoFocus required {...register('title')} placeholder="Contoh: Adab menuntut ilmu" className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-50 px-3.5 text-sm text-slate-900 outline-none placeholder:text-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30" /></label>
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
               <label className="block space-y-2"><span className="text-sm font-semibold text-slate-700">Slug *</span><input required {...register('slug')} className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-50 px-3.5 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30" /></label>
@@ -84,7 +89,7 @@ export function AdminLessonForm({ lessonId, onClose, programId, chapterId }: Adm
             </div>
             <label className="block space-y-2"><span className="text-sm font-semibold text-slate-700">Deskripsi</span><textarea rows={4} {...register('description')} placeholder="Ringkasan bahasan pertemuan" className="w-full resize-y rounded-lg border border-slate-700 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30" /></label>
           </>}
-          <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={isSaving} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50">Batal</button><button type="submit" disabled={isSaving || lessonQuery.query.isLoading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-slate-900 hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-50">{isSaving ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Save className="h-4 w-4" />} Simpan pertemuan</button></footer>
+          <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={isSaving} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50">Batal</button><button type="submit" disabled={isSaving || lessonQuery.query.isLoading || (isEditing && (lessonQuery.query.isError || !lessonQuery.result))} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-slate-900 hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-50">{isSaving ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Save className="h-4 w-4" />} Simpan pertemuan</button></footer>
         </form>
       </div>
     </div>

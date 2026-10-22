@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
+import { programReadColumns } from "./program-columns.js";
 import { lessons, programs, quizAttempts, quizzes } from '../db/schema/index.js';
 import { db } from './db.js';
 import { ForbiddenError, type UserSession } from '../middleware/auth.js';
@@ -35,7 +36,7 @@ export async function assertQuizReadable(quiz: typeof quizzes.$inferSelect, sess
     await assertLessonReadable(quiz.lessonId, session, false);
     return { snapshot: null, allowNewAttempt: true };
   }
-  const [program] = lesson?.programId ? await db.select().from(programs).where(eq(programs.id, lesson.programId)).limit(1) : [];
+  const [program] = lesson?.programId ? await db.select(programReadColumns()).from(programs).where(eq(programs.id, lesson.programId)).limit(1) : [];
   const [active] = session ? await db.select({ id: quizAttempts.id }).from(quizAttempts).where(and(eq(quizAttempts.quizId, quiz.id), eq(quizAttempts.userId, session.userId), eq(quizAttempts.status, 'in_progress'))).limit(1) : [];
   if (program?.status === 'published' && active) return { snapshot: null, allowNewAttempt: false };
   throw new ForbiddenError('Kuis tidak termasuk versi publik saat ini. Percobaan lama hanya dapat dilanjutkan oleh pemiliknya.');

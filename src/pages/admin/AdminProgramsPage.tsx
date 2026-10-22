@@ -2,6 +2,8 @@
  * Hallmark · genre: modern-minimal · macrostructure: Workbench · designed-as-app
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ImageUrlField } from '@/components/ui/ImageUrlField';
+import { useUploadsPending } from '@/lib/media-upload-state';
 import { useNavigate } from 'react-router-dom';
 import { useCreate, useDelete, useList, useOne, useUpdate } from '@refinedev/core';
 import {
@@ -42,6 +44,7 @@ interface ProgramItem {
   slug: string;
   title: string;
   description?: string;
+  coverImage?: string | null;
   status: ProgramStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -51,6 +54,7 @@ interface ProgramFormData {
   title: string;
   slug: string;
   description: string;
+  coverImage: string;
   status: ProgramStatus;
 }
 
@@ -58,6 +62,7 @@ const EMPTY_FORM: ProgramFormData = {
   title: '',
   slug: '',
   description: '',
+  coverImage: '',
   status: 'draft',
 };
 
@@ -102,6 +107,7 @@ function StatusBadge({ status }: { status: ProgramStatus }) {
 }
 
 export function AdminProgramsPage() {
+  const uploading = useUploadsPending();
   const navigate = useNavigate();
   const capabilities = useOne<{ programRevisions: boolean }>({ resource: 'program-capabilities', id: 'general' });
   const revisionMode = capabilities.result?.programRevisions === true;
@@ -135,9 +141,9 @@ export function AdminProgramsPage() {
   const { mutate: updateProgram, mutation: updateMutation } = useUpdate();
   const { mutate: deleteProgram, mutation: deleteMutation } = useDelete();
 
-  const isSaving = Boolean(createMutation?.isPending || updateMutation?.isPending);
+  const isSaving = Boolean(createMutation?.isPending || updateMutation?.isPending) || uploading;
   const isDeleting = Boolean(deleteMutation?.isPending);
-  const initialForm = editingProgram ? { title: editingProgram.title, slug: editingProgram.slug, description: editingProgram.description || '', status: editingProgram.status } : EMPTY_FORM;
+  const initialForm = editingProgram ? { title: editingProgram.title, slug: editingProgram.slug, description: editingProgram.description || '', coverImage: editingProgram.coverImage || '', status: editingProgram.status } : EMPTY_FORM;
   const formDialog = useDialog({ open: isModalOpen, pending: isSaving, dirty: JSON.stringify(formData) !== JSON.stringify(initialForm), onClose: () => setIsModalOpen(false) });
   const deleteDialog = useDialog({ open: !!programToDelete, pending: isDeleting, onClose: () => setProgramToDelete(null) });
 
@@ -201,6 +207,7 @@ export function AdminProgramsPage() {
       title: program.title,
       slug: program.slug,
       description: program.description || '',
+      coverImage: program.coverImage || '',
       status: program.status,
     });
     setIsModalOpen(true);
@@ -520,6 +527,7 @@ export function AdminProgramsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
+              <ImageUrlField value={formData.coverImage} onChange={coverImage => setFormData(previous => ({ ...previous, coverImage }))} label="Sampul Program Kajian (opsional)" />
               {feedback?.type === 'error' && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{feedback.message}</p>}
               {!editingProgram && <p className="text-sm text-slate-600">Langkah 1: buat draft. Berikutnya Anda akan dipandu menambahkan pertemuan, materi, dan review publikasi.</p>}
               <label className="block space-y-2">

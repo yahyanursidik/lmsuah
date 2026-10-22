@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useUploadsPending } from '../../lib/media-upload-state';
 import { useCreate, useUpdate, useOne } from '@refinedev/core';
 import { Button } from '../../components/ui/Button';
 import { ImageUrlField } from '../../components/ui/ImageUrlField';
@@ -13,6 +14,7 @@ interface AdminAnnouncementFormProps {
 
 export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id, onSuccess, onCancel }) => {
   const createMutation = useCreate();
+  const uploading = useUploadsPending();
   const updateMutation = useUpdate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -51,7 +53,7 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || uploading) return;
     setFormError('');
     if (formData.imageUrl.trim() && !normalizeImageSource(formData.imageUrl)) {
       setFormError('URL gambar tidak valid. Gunakan HTTP/HTTPS atau jalur lokal.');
@@ -144,7 +146,7 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
         <Button type="button" variant="outline" onClick={onCancel}>
           Batal
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || uploading}>
           {isSubmitting ? 'Menyimpan…' : id ? 'Simpan Perubahan' : 'Buat Pengumuman'}
         </Button>
       </div>

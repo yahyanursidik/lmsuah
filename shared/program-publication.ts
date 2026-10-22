@@ -3,6 +3,7 @@ export interface PublicationProgram {
   slug: string;
   title: string;
   description: string | null;
+  coverImage?: string | null;
   category?: string;
   instructor?: string;
   bookTitle?: string;

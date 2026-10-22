@@ -99,7 +99,7 @@ export async function revisionSourceWrites(snapshot: ProgramPublicationSnapshot,
   const programId = snapshot.program.id;
   const ids = snapshot.lessons.map(item => item.id);
   const writes: BatchItem<'pg'>[] = [];
-  writes.push(db.update(programs).set({ title: snapshot.program.title, slug: snapshot.program.slug, description: snapshot.program.description, status: 'published', updatedAt: new Date(), updatedBy: actorId }).where(eq(programs.id, programId)));
+  writes.push(db.update(programs).set({ title: snapshot.program.title, slug: snapshot.program.slug, description: snapshot.program.description, coverImage: snapshot.program.coverImage || null, status: 'published', updatedAt: new Date(), updatedBy: actorId }).where(eq(programs.id, programId)));
   writes.push(db.update(series).set({ status: 'archived', updatedAt: new Date(), updatedBy: actorId }).where(eq(series.programId, programId)));
   for (const group of snapshot.series) {
     const values = { programId, title: group.title, slug: group.slug, description: group.description, sequence: group.sequence, status: group.status, updatedAt: new Date(), updatedBy: actorId };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { AppImage } from '../../components/ui/AppImage';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useLearningData } from '../../lib/useLearningData';
 import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
@@ -147,6 +148,7 @@ export function ProgramDetailPage() {
                 )}
               </div>
 
+              {displayProgram.coverImage && <div className="h-48 overflow-hidden rounded-xl sm:h-64"><AppImage src={displayProgram.coverImage} alt={`Sampul ${displayProgram.title}`} kind="program" loading="eager" className="h-full w-full object-cover" /></div>}
               <div className="flex items-start justify-between gap-4">
                 <h1 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl text-stone-100 leading-tight">
                   {displayProgram.title}

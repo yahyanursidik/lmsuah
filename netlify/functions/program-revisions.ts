@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { createHandler } from './middleware/handler.js';
@@ -52,7 +53,7 @@ export default createHandler(async request => {
   if (request.method === 'POST' && !id) {
     await requirePermission(session, 'program.update');
     const body = await validateBody(request, createSchema);
-    const [program] = await db.select().from(programs).where(eq(programs.id, body.programId)).limit(1);
+    const [program] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, body.programId)).limit(1);
     if (!program) throw new HttpError(404, 'Program tidak ditemukan.');
     const [previous] = body.fromRevisionId ? await db.select().from(programRevisions).where(and(eq(programRevisions.id, body.fromRevisionId), eq(programRevisions.programId, body.programId))).limit(1) : [];
     if (body.fromRevisionId && !previous) throw new HttpError(404, 'Versi sumber tidak ditemukan dalam program ini.');

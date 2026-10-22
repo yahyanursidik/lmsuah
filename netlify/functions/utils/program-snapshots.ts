@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { programReadColumns } from "./program-columns.js";
 import { books, chapters, lessons, lessonVideos, lessonAttachments, lessonMarkers, lessonQuizDrafts, programs, programPublications, programRevisions, quizzes, questions, questionOptions, schedules, venues, series, seriesBooks } from '../db/schema/index.js';
 import { db } from './db.js';
 import { featureRequested, requireFeature } from './advanced-features.js';
@@ -17,7 +18,7 @@ export async function getProgramPublication(programId: string, includeWithdrawn 
 export async function assertLegacyWorkspaceWritable(programId: string | null | undefined) {
   if (!programId || !featureRequested('programRevisions')) return;
   await requireFeature('programRevisions');
-  const [program] = await db.select().from(programs).where(eq(programs.id, programId)).limit(1);
+  const [program] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, programId)).limit(1);
   const [revision] = await db.select({ id: programRevisions.id }).from(programRevisions).where(and(eq(programRevisions.programId, programId), ne(programRevisions.status, 'cancelled'))).limit(1);
   if (program?.status === 'published' || revision || await getProgramPublication(programId, true)) throw new HttpError(409, 'Program ini menggunakan revisi terpisah. Buka Review & Revisi untuk menyunting; versi publik tidak diubah melalui editor langsung.', 'SEPARATE_REVISION_REQUIRED');
 }
@@ -41,7 +42,7 @@ export async function publishedSnapshotQuiz(quizId: string) {
 }
 
 export async function buildSourceSnapshot(programId: string, includeDrafts = false): Promise<ProgramPublicationSnapshot> {
-  const [program] = await db.select().from(programs).where(eq(programs.id, programId)).limit(1);
+  const [program] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, programId)).limit(1);
   if (!program) throw new HttpError(404, 'Program tidak ditemukan.');
   const items = await db.select().from(lessons).where(and(eq(lessons.programId, programId), includeDrafts ? undefined : eq(lessons.status, 'published'))).orderBy(asc(lessons.sequence), asc(lessons.id));
   const ids = items.map(item => item.id);
@@ -68,7 +69,7 @@ export async function buildSourceSnapshot(programId: string, includeDrafts = fal
   const localModules = new Map(modules.map(module => [module.id, module.programId === programId ? module.id : crypto.randomUUID()]));
   const snapshot: ProgramPublicationSnapshot = {
     schemaVersion: 1,
-    program: { id: program.id, title: program.title, slug: program.slug, description: program.description,
+    program: { id: program.id, title: program.title, slug: program.slug, description: program.description, coverImage: program.coverImage,
       category: agenda[0]?.category || undefined, instructor: agenda[0]?.instructor, routineSchedule: agenda[0] ? [agenda[0].day, agenda[0].startTime].filter(Boolean).join(' · ') : undefined, venueName: agenda[0]?.venueName },
     chapters: modules.map(module => ({ id: localModules.get(module.id)!, programId, bookId: module.bookId, title: module.title, sequence: module.sequence })),
     series: groups.map(group => ({ id: group.id, programId, slug: group.slug, title: group.title, description: group.description, sequence: group.sequence, status: group.status, books: references.filter(book => book.seriesId === group.id).map(book => ({ id: book.id, title: book.title, slug: book.slug, author: book.author, status: book.status })) })),

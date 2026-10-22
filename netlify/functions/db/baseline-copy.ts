@@ -40,7 +40,7 @@ async function main() {
     ], { fullResults: true });
   }
   const migration = await runAtomicMigrations(client, migrationsFolder);
-  const expected = await buildMigrationReference(13);
+  const expected = await buildMigrationReference(migrationFiles(migrationsFolder).length - 1);
   const after = await client.transaction([client.query(schemaCatalogSql, []), client.query(countsSql, [])], { readOnly: true, fullResults: true });
   const upgraded = after[0]!.rows[0]!.catalog as SchemaCatalog;
   const remaining = compareCatalogs(expected.catalog, upgraded);

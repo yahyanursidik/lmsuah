@@ -1,5 +1,6 @@
 
 import { useParams, Link } from 'react-router-dom';
+import { AppImage } from '@/components/ui/AppImage';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { BookOpen, CheckCircle2, ChevronRight, Play } from 'lucide-react';
 import { getProgramProgress, getUserLessonProgress } from '@/lib/userStore';
@@ -49,6 +50,7 @@ export function ParticipantProgramDetailPage() {
       </div>
 
       <header className="rounded-2xl bg-white p-6 border border-stone-200 shadow-sm">
+        {program.coverImage && <div className="mb-5 h-48 overflow-hidden rounded-xl sm:h-64"><AppImage src={String(program.coverImage)} alt={`Sampul ${program.title}`} kind="program" loading="eager" className="h-full w-full object-cover" /></div>}
         <h1 className="text-2xl font-bold tracking-tight text-slate-950">{program.title}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">{program.description || 'Deskripsi program belum tersedia.'}</p>
         

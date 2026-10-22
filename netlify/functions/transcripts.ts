@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { and, asc, desc, eq, ne, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { createHandler } from './middleware/handler.js';
@@ -60,8 +61,8 @@ export default createHandler(async request => {
     if (existingDocumentId && existing?.lessonId !== lesson.id) throw new ForbiddenError('Dokumen harus berada dalam pertemuan yang sama.');
     const documentId = existing?.id || crypto.randomUUID();
     const versionId = crypto.randomUUID();
-    const blobKey = `transcripts/${lesson.programId}/${lesson.id}/${documentId}/${versionId}.pdf`;
-    const store = privateTranscriptStore();
+    const blobKey = `${process.env.LMS_PRIVATE_PDF_STORAGE === 'contabo' ? 'contabo/private/' : ''}transcripts/${lesson.programId}/${lesson.id}/${documentId}/${versionId}.pdf`;
+    const store = privateTranscriptStore(blobKey);
     const result = await store.set(blobKey, bytes.buffer, { onlyIfNew: true, metadata: { mime: 'application/pdf', sha256 } });
     if (!result.modified) throw new HttpError(409, 'Kunci versi PDF sudah ada. Unggah kembali sebagai versi baru.');
     try {
@@ -100,7 +101,7 @@ export default createHandler(async request => {
     if (body.action === 'publish' && featureRequested('programRevisions')) {
       const [lesson] = await db.select().from(lessons).where(eq(lessons.id, document.lessonId)).limit(1);
       if (lesson?.programId && !await getProgramPublication(lesson.programId, true)) {
-        const [program] = await db.select().from(programs).where(eq(programs.id, lesson.programId)).limit(1);
+        const [program] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, lesson.programId)).limit(1);
         const [revision] = await db.select({ id: programRevisions.id }).from(programRevisions).where(and(eq(programRevisions.programId, lesson.programId), sql`${programRevisions.status} <> 'cancelled'`)).limit(1);
         if (program?.status === 'published' || revision) throw new HttpError(409, 'Terbitkan snapshot awal program terlebih dahulu. PDF baru tidak boleh mengubah versi publik lama selama snapshot awal disiapkan.');
       }

@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { programs, lessons, lessonVideos, lessonAttachments, schedules, venues, series, seriesBooks, books, transcriptDocuments, transcriptVersions, programPublications, programRevisions } from './db/schema/index.js';
@@ -11,6 +12,7 @@ import { programReadiness } from '../../shared/program-readiness.js';
 import { eq, and, asc, desc, count, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
+import { imageSourceSchema } from './utils/image-validation.js';
 import { ForbiddenError } from './middleware/auth.js';
 import {
   getOptionalAuth,
@@ -29,6 +31,7 @@ const programSchema = z.object({
   slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug hanya huruf kecil, angka, dan tanda hubung'),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(500).optional(),
+  coverImage: imageSourceSchema.nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional().default('draft'),
 });
 
@@ -50,7 +53,7 @@ async function withProgramMetadata(items: Array<typeof programs.$inferSelect>, e
     const agenda = agendas.find(schedule => schedule.programId === item.id);
     const reference = references.filter(book => book.programId === item.id);
     const publication = publications.find(candidate => candidate.programId === item.id);
-    return { ...item, ...(publication?.header || {}), status: item.status, category: agenda?.category || undefined, instructor: agenda?.instructor || undefined, venueName: agenda?.venueName || undefined,
+    return { ...item, ...(publication?.header || {}), status: item.status, coverImage: publication ? publication.header.coverImage || null : item.coverImage, category: agenda?.category || undefined, instructor: agenda?.instructor || undefined, venueName: agenda?.venueName || undefined,
       routineSchedule: agenda ? [agenda.day, agenda.startTime].filter(Boolean).join(' · ') : undefined,
       bookTitle: publication ? publication.header.bookTitle : [...new Set(reference.map(book => book.title))].join(', ') || undefined,
       author: publication ? publication.header.author : [...new Set(reference.map(book => book.author).filter(Boolean))].join(', ') || undefined,
@@ -75,7 +78,7 @@ const programsHandler = async (request: Request) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resourceId);
       const condition = isUuid ? eq(programs.id, resourceId) : eq(programs.slug, resourceId);
 
-      const items = await db.select().from(programs).where(condition).limit(1);
+      const items = await db.select(programReadColumns()).from(programs).where(condition).limit(1);
       const item = items[0];
 
       if (!item) {
@@ -120,7 +123,7 @@ const programsHandler = async (request: Request) => {
 
     const [data, totalCount] = await Promise.all([
       db
-        .select()
+        .select(programReadColumns())
         .from(programs)
         .where(whereClause)
         .orderBy(orderByClause)
@@ -156,11 +159,12 @@ const programsHandler = async (request: Request) => {
         slug: body.slug,
         title: body.title,
         description: body.description,
+        ...(body.coverImage ? { coverImage: body.coverImage } : {}),
         status: body.status,
         createdBy: databaseActorId,
         updatedBy: databaseActorId,
       })
-      .returning();
+      .returning(programReadColumns());
 
     logMutationAudit('CREATE', 'programs', newProgram.id, authSession.userId, {
       title: newProgram.title,
@@ -176,7 +180,7 @@ const programsHandler = async (request: Request) => {
     }
 
     const body = await validateBody(request, programUpdateSchema);
-    const existing = await db.select().from(programs).where(eq(programs.id, resourceId)).limit(1);
+    const existing = await db.select(programReadColumns()).from(programs).where(eq(programs.id, resourceId)).limit(1);
 
     if (!existing[0]) {
       throw new HttpError(404, 'Program tidak ditemukan');
@@ -185,7 +189,7 @@ const programsHandler = async (request: Request) => {
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
     if (featureRequested('programRevisions')) {
       if (body.status === 'published') throw new HttpError(409, 'Terbitkan atau tampilkan kembali versi melalui Review & Revisi agar snapshot yang disetujui tetap terlindungi.');
-      if (body.title !== undefined || body.slug !== undefined || body.description !== undefined) await assertLegacyWorkspaceWritable(resourceId);
+      if (body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined) await assertLegacyWorkspaceWritable(resourceId);
     }
     if (body.status === 'published') {
       const items = await db.select({ status: lessons.status, materialCount: sql<number>`(
@@ -208,16 +212,17 @@ const programsHandler = async (request: Request) => {
         ...(body.slug && { slug: body.slug }),
         ...(body.title && { title: body.title }),
         ...(body.description !== undefined && { description: body.description }),
+        ...(body.coverImage !== undefined && (body.coverImage || null) !== (existing[0].coverImage || null) && { coverImage: body.coverImage || null }),
         ...(body.status && { status: body.status }),
         updatedBy: databaseActorId,
         updatedAt: new Date(),
       })
       .where(and(eq(programs.id, resourceId), body.expectedUpdatedAt ? sql`floor(extract(epoch from ${programs.updatedAt}) * 1000) = ${Date.parse(body.expectedUpdatedAt)}` : undefined))
-      .returning();
+      .returning(programReadColumns());
     let updatedRows: Array<typeof programs.$inferSelect>;
     if (featureRequested('programRevisions')) {
       const results = await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${resourceId}`}, 0))`),
-        ...(body.title !== undefined || body.slug !== undefined || body.description !== undefined ? legacyWorkspaceGuardWrites([resourceId]) : []), updateQuery]);
+        ...(body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined ? legacyWorkspaceGuardWrites([resourceId]) : []), updateQuery]);
       updatedRows = results[results.length - 1] as Array<typeof programs.$inferSelect>;
     } else updatedRows = await updateQuery;
     const updatedProgram = updatedRows[0];
@@ -239,7 +244,7 @@ const programsHandler = async (request: Request) => {
     }
 
     const authSession = requireContentDeleteAccess(session);
-    const existing = await db.select().from(programs).where(eq(programs.id, resourceId)).limit(1);
+    const existing = await db.select(programReadColumns()).from(programs).where(eq(programs.id, resourceId)).limit(1);
 
     if (!existing[0]) {
       throw new Error('Program tidak ditemukan');

@@ -4,6 +4,9 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
+- Kandidat v0.4.0: unggah foto/PDF publik ke Contabo dan sampul Program Kajian dengan pratinjau, status proses, validasi server dan kompatibilitas S3_*. Belum dirilis; menunggu uji bucket nyata.
+- Migrasi produksi 0010–0014 telah diterapkan dengan izin setelah uji salinan lulus, tanpa penulisan baris aplikasi/perubahan flags. Bukti: docs/contabo-uploads.md. Gate rilis: docs/releases/v0.4.0-draft.md.
+
 ## [0.3.3] — 2026-10-22
 
 - Memperbaiki deploy Netlify yang terhenti karena nama bucket publik S3_BUCKET terdeteksi sebagai secret. Hanya key konfigurasi S3 publik yang dikecualikan; access key, secret key, database dan OAuth secret tetap dipindai.

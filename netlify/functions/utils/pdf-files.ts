@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
 import { HttpError } from './http-error.js';
+import { contaboPrivateStore } from './contabo-storage.js';
 
 // Synchronous Netlify Functions have a request-size limit. Keep binary uploads
 // below that limit; larger files need a separately reviewed multipart flow.
@@ -35,7 +36,8 @@ export async function readLimitedPdfBody(request: Request) {
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return bytes;
 }
-export function privateTranscriptStore() {
+export function privateTranscriptStore(key?: string) {
+  if (key?.startsWith('contabo/')) return contaboPrivateStore();
   try {
     const siteID = process.env.NETLIFY_SITE_ID;
     const token = process.env.NETLIFY_BLOBS_TOKEN;

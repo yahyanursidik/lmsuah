@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useUploadsPending } from '../../lib/media-upload-state';
 import { ImageUrlField } from '@/components/ui/ImageUrlField';
 import { getVenueFallbackImage, normalizeImageSource } from '@/lib/image-source';
 import { getErrorMessage } from '@/lib/error-message';
@@ -25,6 +26,7 @@ interface VenueItem {
 }
 
 export function AdminVenuesPage() {
+  const uploading = useUploadsPending();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVenue, setEditingVenue] = useState<VenueItem | null>(null);
   const [query, setQuery] = useState('');
@@ -61,7 +63,7 @@ export function AdminVenuesPage() {
   const { mutate: updateVenue, mutation: updateMutation } = useUpdate();
   const { mutate: deleteVenue, mutation: deleteMutation } = useDelete();
 
-  const isSaving = createMutation?.isPending || updateMutation?.isPending || deleteMutation?.isPending || false;
+  const isSaving = createMutation?.isPending || updateMutation?.isPending || deleteMutation?.isPending || uploading;
 
   const handleOpenCreateModal = () => {
     setFormError('');

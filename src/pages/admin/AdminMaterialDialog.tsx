@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { MediaUploadButton } from '../../components/ui/MediaUploadButton';
+import { useUploadsPending } from '../../lib/media-upload-state';
 import { useOne, useUpdate } from "@refinedev/core";
 import {
   AlertCircle,
@@ -56,6 +58,7 @@ export function AdminMaterialDialog({
   onSuccess: () => void;
 }) {
   const [feedback, setFeedback] = useState<string | null>(null);
+  const uploading = useUploadsPending();
   const lessonQuery = useOne<LessonContentRecord>({
     resource: "lessons",
     id: lessonId,
@@ -63,6 +66,7 @@ export function AdminMaterialDialog({
   const { mutate: updateLesson, mutation } = useUpdate();
   const {
     register,
+    setValue,
     control,
     handleSubmit,
     reset,
@@ -71,7 +75,7 @@ export function AdminMaterialDialog({
   } = useForm<MaterialFormData>({ defaultValues: { materials: [] } });
   const dialog = useDialog({
     onClose: closeParent,
-    pending: mutation.isPending,
+    pending: (mutation.isPending || uploading),
     dirty: isDirty,
   });
   const onClose = dialog.close;
@@ -136,7 +140,7 @@ export function AdminMaterialDialog({
           <button
             type="button"
             onClick={onClose}
-            disabled={mutation.isPending}
+            disabled={(mutation.isPending || uploading)}
             aria-label="Tutup"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50"
           >
@@ -155,7 +159,7 @@ export function AdminMaterialDialog({
           )}
           <fieldset
             disabled={
-              mutation.isPending ||
+              (mutation.isPending || uploading) ||
               lessonQuery.query.isLoading ||
               lessonQuery.query.isError ||
               !lessonQuery.result
@@ -223,6 +227,7 @@ export function AdminMaterialDialog({
                         />
                       </label>
                     </div>
+                    {materials?.[index]?.type === "PDF" && <MediaUploadButton kind="document" onUploaded={url => setValue(`materials.${index}.url`, url, { shouldDirty: true, shouldValidate: true })} />}
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <label className="space-y-2">
                         <span className="text-xs font-semibold text-slate-500">
@@ -275,17 +280,17 @@ export function AdminMaterialDialog({
               <button
                 type="button"
                 onClick={onClose}
-                disabled={mutation.isPending}
+                disabled={(mutation.isPending || uploading)}
                 className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                disabled={mutation.isPending || lessonQuery.query.isLoading}
+                disabled={(mutation.isPending || uploading) || lessonQuery.query.isLoading}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-slate-900 hover:bg-emerald-500 disabled:opacity-50"
               >
-                {mutation.isPending ? (
+                {(mutation.isPending || uploading) ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />

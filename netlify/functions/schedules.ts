@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { isSafeStreamUrl, resolveStreamUrl } from '../../shared/schedule-stream.js';
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { schedules } from './db/schema/index.js';
@@ -34,7 +35,7 @@ const scheduleSchema = z.object({
   status: z.enum(['Rutin', 'Dibatalkan', 'Diundur', 'Pindah Lokasi']).optional().default('Rutin'),
   statusReason: z.string().optional(),
   isLiveStream: z.boolean().optional().default(false),
-  streamUrl: z.string().optional(),
+  streamUrl: z.string().trim().refine(value => !value || isSafeStreamUrl(value), 'Gunakan tautan siaran HTTP atau HTTPS yang valid').optional(),
 });
 
 const scheduleUpdateSchema = scheduleSchema.partial();
@@ -142,7 +143,7 @@ const schedulesHandler = async (request: Request) => {
         status: body.status,
         statusReason: body.statusReason,
         isLiveStream: body.isLiveStream,
-        streamUrl: body.streamUrl,
+        streamUrl: body.streamUrl || body.isLiveStream ? resolveStreamUrl(body.streamUrl) || '' : '',
         createdBy: getDatabaseActorId(authSession),
         updatedBy: getDatabaseActorId(authSession),
       })
@@ -187,7 +188,7 @@ const schedulesHandler = async (request: Request) => {
         ...(body.status && { status: body.status }),
         ...(body.statusReason !== undefined && { statusReason: body.statusReason }),
         ...(body.isLiveStream !== undefined && { isLiveStream: body.isLiveStream }),
-        ...(body.streamUrl !== undefined && { streamUrl: body.streamUrl }),
+        ...((body.streamUrl !== undefined || body.isLiveStream === true) && { streamUrl: resolveStreamUrl(body.streamUrl ?? existing[0].streamUrl) || '' }),
         updatedBy: getDatabaseActorId(authSession),
         updatedAt: new Date(),
       })

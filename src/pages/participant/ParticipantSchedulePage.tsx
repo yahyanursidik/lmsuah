@@ -12,6 +12,7 @@ import { useLearningData } from "@/lib/useLearningData";
 import { LearningSyncNotice } from '@/components/ui/LearningSyncNotice';
 import { useParticipantPortalData } from "./useParticipantPortalData";
 import { useState } from "react";
+import { scheduleStreamUrl, TARBIYAH_CHANNEL_NAME } from '../../../shared/schedule-stream';
 
 export function ParticipantSchedulePage() {
   const { data: identity } = useGetIdentity<{ id: string }>();
@@ -81,6 +82,7 @@ export function ParticipantSchedulePage() {
       ) : visible.length > 0 ? (
         <div className="space-y-4">
           {visible.map((schedule) => {
+            const streamUrl = scheduleStreamUrl(schedule);
             const changed = schedule.status && schedule.status !== "Rutin";
             const cancelled = schedule.status === "Dibatalkan";
             const program = programs.find(
@@ -122,7 +124,7 @@ export function ParticipantSchedulePage() {
                       </span>
                       {schedule.isLiveStream && (
                         <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700">
-                          <Radio className="h-3 w-3" /> Live
+                          <Radio className="h-3 w-3" /> Live {TARBIYAH_CHANNEL_NAME}
                         </span>
                       )}
                     </div>
@@ -162,9 +164,9 @@ export function ParticipantSchedulePage() {
                         <MapPin className="h-3.5 w-3.5" /> Detail lokasi
                       </Link>
                     )}
-                    {schedule.streamUrl && !cancelled && (
+                    {streamUrl && !cancelled && (
                       <a
-                        href={schedule.streamUrl}
+                        href={streamUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-red-700 px-3 text-xs font-bold text-white hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"

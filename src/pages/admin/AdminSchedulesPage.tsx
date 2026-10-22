@@ -8,6 +8,7 @@ import { Plus, Edit3, Trash2, Calendar, RefreshCw, X, AlertTriangle, Search, Ext
 import { Link, useSearchParams } from 'react-router-dom';
 import { DataLoading } from '@/components/ui/DataLoading';
 import { getErrorMessage } from '@/lib/error-message';
+import { getStreamLinkMode, isSafeStreamUrl, streamUrlForMode, TARBIYAH_STREAMS_URL, type StreamLinkMode } from '../../../shared/schedule-stream';
 
 interface ScheduleItem {
   id: string;
@@ -44,6 +45,7 @@ export function AdminSchedulesPage() {
   const submitting = useRef(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [query, setQuery] = useState('');
+  const [streamLinkMode, setStreamLinkMode] = useState<StreamLinkMode>('auto-streams');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleItem['status']>('all');
 
   const [formData, setFormData] = useState({
@@ -61,7 +63,7 @@ export function AdminSchedulesPage() {
     status: 'Rutin' as 'Rutin' | 'Dibatalkan' | 'Diundur' | 'Pindah Lokasi',
     statusReason: '',
     isLiveStream: true,
-    streamUrl: 'https://youtube.com/@TarbiyahSunnah',
+    streamUrl: TARBIYAH_STREAMS_URL,
   });
 
   const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({
@@ -98,6 +100,7 @@ export function AdminSchedulesPage() {
 
   const handleOpenCreateModal = () => {
     setFormError('');
+    setStreamLinkMode('auto-streams');
     setEditingSchedule(null);
     setFormData({
       venueId: venuesList[0]?.id || '',
@@ -114,13 +117,14 @@ export function AdminSchedulesPage() {
       status: 'Rutin',
       statusReason: '',
       isLiveStream: true,
-      streamUrl: 'https://youtube.com/@TarbiyahSunnah',
+      streamUrl: TARBIYAH_STREAMS_URL,
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (sch: ScheduleItem) => {
     setFormError('');
+    setStreamLinkMode(getStreamLinkMode(sch.streamUrl));
     setEditingSchedule(sch);
     setFormData({
       venueId: sch.venueId,
@@ -150,8 +154,10 @@ export function AdminSchedulesPage() {
     const venueId = formData.venueId || venuesList[0]?.id;
     if (!venueId) return setFormError('Tambahkan lokasi majelis terlebih dahulu sebelum membuat jadwal.');
     if (!formData.title.trim()) return setFormError('Judul kajian wajib diisi.');
+    const streamUrl = streamUrlForMode(streamLinkMode, formData.streamUrl);
+    if (formData.isLiveStream && !isSafeStreamUrl(streamUrl)) return setFormError('Masukkan tautan siaran HTTP atau HTTPS yang valid.');
     submitting.current = true;
-    const values = { ...formData, title: formData.title.trim(), venueId, programId: formData.programId || null };
+    const values = { ...formData, streamUrl: isSafeStreamUrl(streamUrl) ? streamUrl : '', title: formData.title.trim(), venueId, programId: formData.programId || null };
     const options = {
       onSuccess: () => {
         setIsModalOpen(false);
@@ -549,12 +555,26 @@ export function AdminSchedulesPage() {
                       </label>
                       
                       {formData.isLiveStream && (
-                        <div className="mt-3 pl-7">
+                        <div className="mt-3 space-y-3 sm:pl-7">
+                          <div className="space-y-1.5">
+                            <label htmlFor="schedule-stream-mode" className="text-xs font-semibold text-slate-700">Mode tautan siaran</label>
+                            <select id="schedule-stream-mode" value={streamLinkMode} onChange={event => setStreamLinkMode(event.target.value as StreamLinkMode)} className="min-h-11 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900">
+                              <option value="auto-streams">Otomatis — Daftar siaran channel</option>
+                              <option value="auto-live">Otomatis — Siaran langsung channel</option>
+                              <option value="manual">Manual — Tautan khusus</option>
+                            </select>
+                          </div>
+                          <p className="text-xs leading-5 text-slate-600">{streamLinkMode === 'manual' ? 'Isi tautan video atau siaran khusus. Tautan manual tidak akan diganti otomatis.' : 'Tautan otomatis menggunakan Tarbiyah Sunnah Channel (@TarbiyahSunnahChannel).'}</p>
+                          {isSafeStreamUrl(streamUrlForMode(streamLinkMode, formData.streamUrl)) && <a href={streamUrlForMode(streamLinkMode, formData.streamUrl)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-emerald-800 underline underline-offset-4">Pratinjau tautan <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>}
+                          <label htmlFor="schedule-stream-url" className="block text-xs font-semibold text-slate-700">Tautan siaran</label>
                           <input
+                            id="schedule-stream-url"
                             type="url"
-                            value={formData.streamUrl}
+                            required={streamLinkMode === 'manual'}
+                            readOnly={streamLinkMode !== 'manual'}
+                            value={streamUrlForMode(streamLinkMode, formData.streamUrl)}
                             onChange={(e) => setFormData((prev) => ({ ...prev, streamUrl: e.target.value }))}
-                            placeholder="https://youtube.com/live/..."
+                            placeholder="https://www.youtube.com/watch?v=..."
                             className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-shadow"
                           />
                         </div>

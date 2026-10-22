@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react';
 import { MOCK_SCHEDULES, MOCK_VENUES, ScheduleItem, Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
+import { scheduleStreamUrl, TARBIYAH_CHANNEL_NAME } from '../../../shared/schedule-stream';
 
 export function SchedulesPage() {
   const [filterType, setFilterType] = useState<'Semua' | 'Rutin' | 'Tematik' | 'Perubahan' | 'Live'>('Semua');
@@ -91,6 +92,7 @@ export function SchedulesPage() {
       ) : (
         <div className="space-y-6">
           {filteredSchedules.map((sch) => {
+            const streamUrl = scheduleStreamUrl(sch);
             const isCancelled = sch.status === 'Dibatalkan';
             const isRescheduled = sch.status === 'Diundur';
             const isRelocated = sch.status === 'Pindah Lokasi';
@@ -138,7 +140,7 @@ export function SchedulesPage() {
                     {sch.isLiveStream && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
                         <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse" />
-                        Live Radio Rodja / YouTube
+                        Live {TARBIYAH_CHANNEL_NAME} / YouTube
                       </span>
                     )}
                   </div>
@@ -198,9 +200,9 @@ export function SchedulesPage() {
                       Detail Lokasi 📍
                     </Link>
                   )}
-                  {sch.streamUrl && !isCancelled && (
+                  {streamUrl && !isCancelled && (
                     <a
-                      href={sch.streamUrl}
+                      href={streamUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded-xl bg-red-700 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-red-800 transition-colors min-h-[44px] flex items-center justify-center"

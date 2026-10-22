@@ -4,6 +4,15 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-22
+
+- Footer menyediakan kontak bantuan `ahlan@yahyanursidik.my.id` untuk kendala/error/kegagalan sistem, dengan profil Yahya Nursidik dan keterangan Special Advisor for Digital Transformation, Innovation & Business YTS.
+- Label live pada jadwal publik dan portal peserta memakai Tarbiyah Sunnah Channel, bukan Radio Rodja.
+- Form Jadwal & Agenda menyediakan mode otomatis daftar siaran (`https://www.youtube.com/@TarbiyahSunnahChannel/streams`), otomatis live (`https://www.youtube.com/tarbiyahsunnahchannel/live`), atau tautan manual, lengkap dengan pratinjau dan validasi.
+- Default handle lama dikoreksi saat dibaca/diedit tanpa mengganti tautan video/channel khusus. URL manual dipertahankan ketika siaran dinonaktifkan; tombol tonton disembunyikan pada siaran nonaktif, agenda dibatalkan dan URL tidak aman.
+- Menggunakan kolom URL yang sudah ada; tidak ada migrasi, pembaruan massal data, perubahan secret, atau aktivasi fitur produksi. Catatan rilis: `docs/releases/v0.3.1.md`.
+- Paket rilis terisolasi lulus 323 tes / 46 file dengan satu worker; lint 0 error/0 warning, build/TypeScript dan bundling handler jadwal tanpa warning lulus. Tes diulang sendiri setelah percobaan bersamaan dengan build mencapai batas memori Windows.
+
 ## [0.3.0] — 2026-10-20
 
 - Menyelesaikan workspace Program Kajian lanjutan, persiapan/referensi program, revisi snapshot dengan review independen, multi-materi/kuis, serta progres dan riwayat evaluasi peserta di server.

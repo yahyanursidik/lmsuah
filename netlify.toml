@@ -6,4 +6,5 @@
 [build.environment]
   # This is the public application origin, not an authentication credential.
   # Keep scanning all other keys, including database credentials and OAuth secrets.
-  SECRETS_SCAN_OMIT_KEYS = "BETTER_AUTH_URL"
+  # Bucket names, endpoints and regions are public; credentials remain scanned.
+  SECRETS_SCAN_OMIT_KEYS = "BETTER_AUTH_URL,S3_ENDPOINT,S3_BUCKET,S3_REGION,S3_PUBLIC_URL"

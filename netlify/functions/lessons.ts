@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { lessons, lessonVideos, lessonAttachments, lessonMarkers, quizzes, quizAttempts, questions, questionOptions, programs, chapters, lessonQuizDrafts } from './db/schema/index.js';
@@ -125,7 +126,7 @@ const lessonsHandler = async (request: Request) => {
       if (isGuestUser && item.programId && await getProgramPublication(item.programId, true)) throw new HttpError(404, 'Pertemuan tidak tersedia pada versi publik saat ini.');
       if (isGuestUser && item.status !== 'published') throw new ForbiddenError('Tamu tidak diizinkan');
       if (isGuestUser) {
-        const parent = item.programId ? await db.select().from(programs).where(eq(programs.id, item.programId)).limit(1) : [];
+        const parent = item.programId ? await db.select(programReadColumns()).from(programs).where(eq(programs.id, item.programId)).limit(1) : [];
         if (parent[0]?.status !== 'published') throw new ForbiddenError('Program belum dipublikasikan');
       }
 

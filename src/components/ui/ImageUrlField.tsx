@@ -1,4 +1,6 @@
 import { useId } from "react";
+import { MediaUploadButton } from './MediaUploadButton';
+import { useUploadsPending } from '@/lib/media-upload-state';
 import { AppImage } from "./AppImage";
 import { normalizeImageSource } from "@/lib/image-source";
 
@@ -14,9 +16,12 @@ export function ImageUrlField({
   fallbackSrc?: string;
 }) {
   const id = useId();
+  const uploading = useUploadsPending();
   const invalid = !!value.trim() && !normalizeImageSource(value);
   return (
     <div className="space-y-2">
+      <MediaUploadButton onUploaded={onChange} />
+      {value && <button type="button" disabled={uploading} onClick={() => onChange('')} className="min-h-11 rounded-lg border border-stone-300 px-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Hapus foto / gunakan tanpa gambar</button>}
       <label htmlFor={id} className="block text-sm font-medium text-slate-700">
         {label}
       </label>

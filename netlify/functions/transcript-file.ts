@@ -39,7 +39,7 @@ export default createHandler(async request => {
   const download = url.searchParams.get('download') === '1';
   const [settings] = await db.select().from(systemSettings).where(eq(systemSettings.id, 'general')).limit(1);
   if (download && (!version.isDownloadable || settings?.allowPdfDownload === false)) throw new ForbiddenError('Pengunduhan PDF ini tidak diizinkan.');
-  const data = await privateTranscriptStore().get(version.blobKey, { type: 'arrayBuffer', consistency: 'strong' });
+  const data = await privateTranscriptStore(version.blobKey).get(version.blobKey, { type: 'arrayBuffer', consistency: 'strong' });
   if (!data) throw new HttpError(404, 'Berkas PDF tidak tersedia di penyimpanan.');
   const bytes = new Uint8Array(data);
   if (bytes.length !== version.sizeBytes || validatePdf(bytes, version.mime) !== version.sha256) throw new HttpError(502, 'Integritas PDF tidak cocok. Hubungi pengelola.', 'FILE_INTEGRITY_ERROR');

@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { series, seriesBooks, books, programs } from './db/schema/index.js';
@@ -83,7 +84,7 @@ const seriesHandler = async (request: Request) => {
         throw new ForbiddenError('Tamu hanya diizinkan melihat seri yang sudah dipublikasikan');
       }
       if (isGuestUser) {
-        const [parent] = await db.select().from(programs).where(eq(programs.id, item.programId)).limit(1);
+        const [parent] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, item.programId)).limit(1);
         if (parent?.status !== 'published') throw new ForbiddenError('Program seri belum diterbitkan.');
       }
       return (await withBooks([item], !isGuestUser))[0];
@@ -150,7 +151,7 @@ const seriesHandler = async (request: Request) => {
   if (method === 'POST') {
     const body = await validateBody(request, seriesSchema);
     const authSession = requireContentCreateAccess(session, body.status);
-    const [parent] = await db.select().from(programs).where(eq(programs.id, body.programId)).limit(1);
+    const [parent] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, body.programId)).limit(1);
     if (!parent) throw new ValidationError('Program seri tidak ditemukan.');
     requireContentUpdateAccess(session, parent.status);
     await assertLegacyWorkspaceWritable(body.programId);
@@ -200,7 +201,7 @@ const seriesHandler = async (request: Request) => {
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
     await assertLegacyWorkspaceWritable(existing[0].programId);
     if (body.programId && body.programId !== existing[0].programId) throw new ValidationError('Seri tidak dapat dipindahkan antarprogram melalui editor ini.');
-    const [parent] = await db.select().from(programs).where(eq(programs.id, existing[0].programId)).limit(1);
+    const [parent] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, existing[0].programId)).limit(1);
     requireContentUpdateAccess(session, parent?.status);
     await validateBooks(body.bookIds);
     if (body.slug && body.slug !== existing[0].slug) {

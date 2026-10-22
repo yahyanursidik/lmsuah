@@ -94,8 +94,8 @@ begin
 end $$`;
 
 export async function runCopySmoke(client: NeonQueryFunction<false, false>) {
-  const reference = await buildMigrationReference(13);
   const files = migrationFiles(migrationsFolder);
+  const reference = await buildMigrationReference(files.length - 1);
   const history = await readMigrationHistory(client); verifyMigrationHistory(history, files);
   if (history.length !== files.length) throw new Error('COPY_MIGRATIONS_INCOMPLETE');
   const tables = [...new Set(reference.catalog.columns.map(column => column.table))].sort();

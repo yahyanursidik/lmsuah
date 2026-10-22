@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { enrollments, programs, user } from './db/schema/index.js';
@@ -22,7 +23,7 @@ const enrollmentsHandler = async (request: Request) => {
   if (method === 'POST') {
     const body = await validateBody(request, z.object({ programId: z.string().uuid(), status: z.enum(['active', 'dropped']) }));
     if (session.isDevelopmentDemo) throw new HttpError(409, 'Gunakan akun peserta nyata untuk menyimpan pendaftaran ke server.');
-    const [program] = await db.select().from(programs).where(eq(programs.id, body.programId)).limit(1);
+    const [program] = await db.select(programReadColumns()).from(programs).where(eq(programs.id, body.programId)).limit(1);
     if (!program || body.status === 'active' && program.status !== 'published') throw new HttpError(404, 'Program tidak tersedia untuk pendaftaran.');
     const [, result] = await db.batch([
       db.execute(sql`with parent_lock as materialized (select pg_advisory_xact_lock(hashtextextended(${`program:${body.programId}`}, 0)))

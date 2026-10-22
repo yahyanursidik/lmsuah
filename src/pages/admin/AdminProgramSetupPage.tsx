@@ -1,5 +1,7 @@
 /* Hallmark · genre: modern-minimal · macrostructure: Guided Workbench · design-system: design.md · designed-as-app */
 import { useEffect, useRef, useState } from "react";
+import { ImageUrlField } from '../../components/ui/ImageUrlField';
+import { useUploadsPending } from '../../lib/media-upload-state';
 import { useList, useOne, usePermissions, useUpdate } from "@refinedev/core";
 import { Link, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
@@ -15,6 +17,7 @@ interface Program {
   title: string;
   slug: string;
   description?: string;
+  coverImage?: string | null;
   status: string;
 }
 interface Meeting {
@@ -36,6 +39,7 @@ const action =
   "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:opacity-50";
 
 export function AdminProgramSetupPage() {
+  const uploading = useUploadsPending();
   const { id = "" } = useParams();
   const revisionMode = useOutletContext<{ revisionMode: boolean } | undefined>()?.revisionMode;
   const [params, setParams] = useSearchParams();
@@ -58,7 +62,7 @@ export function AdminProgramSetupPage() {
     "publisher",
   ].includes(permissions || "");
   const { mutate: update, mutation } = useUpdate();
-  const [form, setForm] = useState({ title: "", slug: "", description: "" });
+  const [form, setForm] = useState({ title: "", slug: "", description: "", coverImage: "" });
   const [dirty, setDirty] = useState(false);
   const [quizLesson, setQuizLesson] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -74,6 +78,7 @@ export function AdminProgramSetupPage() {
         title: program.title,
         slug: program.slug,
         description: program.description || "",
+        coverImage: program.coverImage || "",
       });
     }
   }, [program, dirty]);
@@ -93,7 +98,7 @@ export function AdminProgramSetupPage() {
   };
   const go = (index: number) => {
     if (
-      mutation.isPending ||
+      mutation.isPending || uploading ||
       (dirty &&
         !window.confirm(
           "Perubahan informasi belum disimpan. Pindah langkah dan abaikan perubahan?",
@@ -179,6 +184,7 @@ export function AdminProgramSetupPage() {
           onSubmit={saveInformation}
           className="space-y-5 rounded-xl border border-slate-200 bg-white p-5"
         >
+          <ImageUrlField value={form.coverImage} onChange={coverImage => { setDirty(true); setForm(previous => ({ ...previous, coverImage })); }} label="Sampul Program Kajian (opsional)" />
           <label className="block space-y-2 text-sm font-semibold">
             Judul *
             <input
@@ -225,7 +231,7 @@ export function AdminProgramSetupPage() {
             />
           </label>
           <button
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || uploading}
             className={`${action} bg-emerald-50`}
           >
             {mutation.isPending ? "Menyimpan…" : "Simpan & lanjutkan"}
@@ -319,7 +325,7 @@ export function AdminProgramSetupPage() {
                 !ready ||
                 meetings.query.isLoading ||
                 meetings.query.isError ||
-                mutation.isPending ||
+                mutation.isPending || uploading ||
                 program.status === "published"
               }
               onClick={() => {

@@ -1,5 +1,11 @@
 # Program Kajian lanjutan: kesiapan rilis dan migrasi
 
+Status terkini 22 Oktober 2026: setelah uji salinan baru lulus dan pengguna memberi izin, baseline produksi telah direkonsiliasi dan migrasi 0010–0014 diterapkan atomik. Journal 15 entri, tidak ada schema drift/migrasi tertunda/duplikasi enrollment-progres; tidak ada penulisan baris aplikasi atau perubahan feature flags. Cadangan, bukti dan batas aktivasi terbaru ada di [laporan Contabo/sampul](contabo-uploads.md).
+
+Hotfix deploy v0.3.3 sudah di-merge melalui PR #14. Paket unggahan/sampul v0.4.0 disiapkan melalui PR #15. Uji nyata publik lmsuah dan privat lmsuahprivate lulus; akses anonim privat 401/403, hash signed GET identik, conditional create-only teruji dan seluruh fixture dibersihkan. Seluruh 419 tes/57 file, lint/typecheck/build lulus. Verifikasi browser end-to-end pada salinan sudah lulus: sampul, pesan error, review PDF independen, akses peserta berizin, range dan mode layar penuh. Rincian ada di docs/releases/v0.4.0.md. Feature flags tetap tidak diaktifkan; adapter tidak memerlukan migrasi tambahan.
+
+## Riwayat pemeriksaan 20 Oktober (bukan status produksi terkini)
+
 Status 20 Oktober 2026: baseline dan migrasi 0010–0013 sudah diterapkan serta diuji **hanya di salinan Neon terisolasi**. Database sumber belum dimigrasi; flag fitur dan Blobs produksi belum diaktifkan. Kode masih lokal, belum push/merge; rilis produksi tetap v0.2.2. Catatan audit 18 Oktober adalah temuan historis, bukan daftar status terbaru. Bukti dan target salinan tersedia di [laporan rekonsiliasi](database-baseline-copy-2026-10-20.md).
 
 ## Cakupan yang diselesaikan

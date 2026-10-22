@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
+import { programReadColumns } from "./program-columns.js";
 import { db } from './db.js';
 import { lessons, programs } from '../db/schema/index.js';
 import { ForbiddenError, type UserSession } from '../middleware/auth.js';
@@ -23,7 +24,7 @@ export async function assertLessonReadable(lessonId: string, session: UserSessio
   if (!lesson) throw new HttpError(404, 'Pertemuan tidak ditemukan');
   if (allowEditor && canReadDrafts(session)) return lesson;
   if (lesson.programId && await getProgramPublication(lesson.programId, true)) throw new ForbiddenError('Pertemuan tidak tersedia pada versi publik saat ini.');
-  const [program] = lesson.programId ? await db.select().from(programs).where(eq(programs.id, lesson.programId)).limit(1) : [];
+  const [program] = lesson.programId ? await db.select(programReadColumns()).from(programs).where(eq(programs.id, lesson.programId)).limit(1) : [];
   if (lesson.status !== 'published' || program?.status !== 'published') throw new ForbiddenError('Program atau pertemuan belum dipublikasikan.');
   return lesson;
 }

@@ -142,6 +142,7 @@ export const programs = pgTable('programs', {
   slug: text('slug').notNull().unique(),
   title: text('title').notNull(),
   description: text('description'),
+  coverImage: text('cover_image'),
   status: text('status').default('draft').notNull(), // 'draft', 'published', 'archived' dll
   createdBy: text('created_by').references(() => user.id),
   updatedBy: text('updated_by').references(() => user.id),

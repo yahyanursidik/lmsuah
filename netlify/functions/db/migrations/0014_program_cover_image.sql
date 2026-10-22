@@ -1,0 +1,1 @@
+ALTER TABLE "programs" ADD COLUMN "cover_image" text;

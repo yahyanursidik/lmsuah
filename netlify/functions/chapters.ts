@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions';
+import { programReadColumns } from "./utils/program-columns.js";
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { chapters, books, programs } from './db/schema/index.js';
@@ -67,7 +68,7 @@ const chaptersHandler = async (request: Request) => {
           }
         }
         if (item.programId) {
-          const parentProgram = await db.select().from(programs).where(eq(programs.id, item.programId)).limit(1);
+          const parentProgram = await db.select(programReadColumns()).from(programs).where(eq(programs.id, item.programId)).limit(1);
           if (!parentProgram[0] || parentProgram[0].status !== 'published') {
             throw new ForbiddenError('Tamu hanya diizinkan melihat bab dari kajian yang sudah dipublikasikan');
           }
@@ -162,7 +163,7 @@ const chaptersHandler = async (request: Request) => {
   if (method === 'POST') {
     const body = await validateBody(request, chapterSchema);
     if (!body.programId && !body.bookId) throw new ValidationError('Pilih program atau kitab untuk modul.');
-    const parent = body.programId ? (await db.select().from(programs).where(eq(programs.id, body.programId)).limit(1))[0] : body.bookId ? (await db.select().from(books).where(eq(books.id, body.bookId)).limit(1))[0] : undefined;
+    const parent = body.programId ? (await db.select(programReadColumns()).from(programs).where(eq(programs.id, body.programId)).limit(1))[0] : body.bookId ? (await db.select().from(books).where(eq(books.id, body.bookId)).limit(1))[0] : undefined;
     if (!parent) throw new ValidationError('Induk modul tidak ditemukan.');
     await assertLegacyWorkspaceWritable(body.programId);
     const authSession = requireContentCreateAccess(session, parent?.status);
@@ -208,7 +209,7 @@ const chaptersHandler = async (request: Request) => {
     if (featureRequested('programRevisions') && !existing[0].programId) throw new HttpError(409, 'Bab bersama hanya dibaca pada alur revisi terpisah. Gunakan modul milik program agar program lain tidak berubah.');
     if (body.programId && body.programId !== existing[0].programId) throw new ValidationError('Modul tidak dapat dipindahkan antarprogram. Pindahkan pertemuannya, bukan identitas modul.');
 
-    const parent = existing[0].programId ? (await db.select().from(programs).where(eq(programs.id, existing[0].programId)).limit(1))[0] : existing[0].bookId ? (await db.select().from(books).where(eq(books.id, existing[0].bookId)).limit(1))[0] : undefined;
+    const parent = existing[0].programId ? (await db.select(programReadColumns()).from(programs).where(eq(programs.id, existing[0].programId)).limit(1))[0] : existing[0].bookId ? (await db.select().from(books).where(eq(books.id, existing[0].bookId)).limit(1))[0] : undefined;
     const authSession = requireContentUpdateAccess(session, parent?.status);
     await assertLegacyWorkspaceWritable(existing[0].programId);
     const databaseActorId = getDatabaseActorId(authSession);

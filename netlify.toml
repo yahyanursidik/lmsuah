@@ -6,5 +6,9 @@
 [build.environment]
   # This is the public application origin, not an authentication credential.
   # Keep scanning all other keys, including database credentials and OAuth secrets.
-  # Bucket names, endpoints and regions are public; credentials remain scanned.
-  SECRETS_SCAN_OMIT_KEYS = "BETTER_AUTH_URL,S3_ENDPOINT,S3_BUCKET,S3_REGION,S3_PUBLIC_URL"
+  # Bucket names/endpoints are non-secret metadata, even for private objects.
+  SECRETS_SCAN_OMIT_KEYS = "BETTER_AUTH_URL,CONTABO_ENDPOINT,CONTABO_BUCKET,CONTABO_PUBLIC_URL,CONTABO_SIGNING_REGION,S3_ENDPOINT,S3_BUCKET,S3_REGION,S3_PUBLIC_URL,CONTABO_PRIVATE_BUCKET,CONTABO_PRIVATE_ENDPOINT,LMS_PRIVATE_PDF_STORAGE,LMS_PRIVATE_PDF_ENABLED,LMS_PROGRAM_REVISIONS_ENABLED"
+
+[functions."media-upload"]
+  node_bundler = "esbuild"
+  external_node_modules = ["sharp"]

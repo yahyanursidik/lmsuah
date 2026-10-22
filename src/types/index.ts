@@ -11,6 +11,7 @@ export interface Program {
   title: string;
   slug: string;
   description: string;
+  coverImage?: string | null;
   status: 'draft' | 'published' | 'archived';
 }
 

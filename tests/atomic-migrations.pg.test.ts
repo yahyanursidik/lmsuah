@@ -12,9 +12,10 @@ describe('Atomic Neon HTTP migrations (real PostgreSQL semantics)', () => {
       await expect(runAtomicMigrations(database.httpClient, folder)).rejects.toThrow('Simulated');
       expect((await database.client.query("select count(*)::int as n from pg_tables where schemaname='public'")).rows).toEqual([{ n: 0 }]);
       expect(await readMigrationHistory(database.httpClient)).toEqual([]);
-      expect(await runAtomicMigrations(database.httpClient, folder)).toEqual({ applied: 14, total: 14 });
-      expect(await readMigrationHistory(database.httpClient)).toHaveLength(14);
-      expect(await runAtomicMigrations(database.httpClient, folder)).toEqual({ applied: 0, total: 14 });
+      const total = migrationFiles(folder).length;
+      expect(await runAtomicMigrations(database.httpClient, folder)).toEqual({ applied: total, total });
+      expect(await readMigrationHistory(database.httpClient)).toHaveLength(total);
+      expect(await runAtomicMigrations(database.httpClient, folder)).toEqual({ applied: 0, total });
       await database.client.exec("update drizzle.__drizzle_migrations set hash='tampered' where id=1");
       await expect(runAtomicMigrations(database.httpClient, folder)).rejects.toThrow('MIGRATION_HISTORY_MISMATCH');
     } finally { await database.client.close(); }

@@ -1,5 +1,6 @@
 /* Hallmark · genre: modern-minimal · macrostructure: Version review workbench · design-system: design.md */
 import { useEffect, useRef, useState } from 'react';
+import { useUploadsPending } from '../../lib/media-upload-state';
 import { useGetIdentity, useInvalidate, useList, useOne } from '@refinedev/core';
 import { useParams, useSearchParams } from 'react-router-dom';
 import type { ProgramPublicationSnapshot } from '../../../shared/program-publication';
@@ -17,6 +18,7 @@ const field = 'mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white 
 const message = (cause: unknown) => cause && typeof cause === 'object' && 'message' in cause ? String(cause.message) : 'Operasi revisi belum berhasil. Coba lagi.';
 
 export function AdminProgramRevisionsPage() {
+  const uploading = useUploadsPending();
   const { id: programId = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('revision') || '';
@@ -34,7 +36,8 @@ export function AdminProgramRevisionsPage() {
   const [createNote, setCreateNote] = useState('');
   const [includeDrafts, setIncludeDrafts] = useState(true);
   const [dirty, setDirty] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [saving, setPending] = useState(false);
+  const pending = saving || uploading;
   const [feedback, setFeedback] = useState<{ error: boolean; message: string } | null>(null);
   const [pdfLesson, setPdfLesson] = useState<string | null>(null);
   const [assetRevision, setAssetRevision] = useState(0);

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { ProgramPublicationSnapshot, PublicationQuiz } from '../../../shared/program-publication.js';
 import { HttpError } from './http-error.js';
+import { imageSourceSchema } from './image-validation.js';
 
 const id = z.string().uuid();
 const text = (max: number) => z.string().max(max);
@@ -9,7 +10,7 @@ const option = z.object({ id, questionId: id, text: text(500), isCorrect: z.bool
 const question = z.object({ id, text: text(1000), type: z.enum(['single_choice', 'true_false']), points: z.number().int().min(1).max(100), explanation: text(2000).nullable(), options: z.array(option).min(2).max(10) });
 export const revisionSnapshotSchema = z.object({
   schemaVersion: z.literal(1),
-  program: z.object({ id, slug: text(160), title: text(160), description: text(500).nullable(), category: text(100).optional(), instructor: text(180).optional(), bookTitle: text(2000).optional(), author: text(1000).optional(), routineSchedule: text(500).optional(), venueName: text(180).optional() }),
+  program: z.object({ id, slug: text(160), title: text(160), description: text(500).nullable(), coverImage: imageSourceSchema.nullable().optional(), category: text(100).optional(), instructor: text(180).optional(), bookTitle: text(2000).optional(), author: text(1000).optional(), routineSchedule: text(500).optional(), venueName: text(180).optional() }),
   chapters: z.array(z.object({ id, programId: id.nullable(), bookId: id.nullable(), title: text(180), sequence: z.number().int().min(1) })).max(1000),
   series: z.array(z.object({ id, programId: id, slug: text(180), title: text(180), description: text(2000).nullable(), sequence: z.number().int().min(1), status: z.enum(['draft', 'published', 'archived']), books: z.array(z.object({ id, title: text(180), slug: text(160), author: text(180).nullable(), status: z.string().max(30) })).max(100) })).max(200),
   lessons: z.array(z.object({ id, programId: id, chapterId: id.nullable(), slug: text(180), title: text(180), sequence: z.number().int().min(1), date: text(10).nullable(), description: text(5000).nullable(), status: z.literal('published'),

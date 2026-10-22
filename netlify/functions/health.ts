@@ -2,6 +2,7 @@ import type { Config } from '@netlify/functions';
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { sql } from 'drizzle-orm';
+import packageInfo from '../../package.json' with { type: 'json' };
 
 const healthHandler = async () => {
   let dbStatus = 'disconnected';
@@ -17,7 +18,7 @@ const healthHandler = async () => {
     status: 'ok',
     db: dbStatus,
     timestamp: new Date().toISOString(),
-    version: '0.1.0',
+    version: packageInfo.version,
     message: 'LMS Kajian YTS API is running',
   };
 };

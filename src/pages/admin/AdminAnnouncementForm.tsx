@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useCreate, useUpdate, useOne } from '@refinedev/core';
 import { Button } from '../../components/ui/Button';
+import { ImageUrlField } from '../../components/ui/ImageUrlField';
+import { normalizeImageSource } from '../../lib/image-source';
+import { getErrorMessage } from '../../lib/error-message';
 
 interface AdminAnnouncementFormProps {
   id?: string | null;
@@ -12,6 +15,7 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
   const createMutation = useCreate();
   const updateMutation = useUpdate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const { result } = useOne({
     resource: 'announcements',
@@ -47,6 +51,12 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setFormError('');
+    if (formData.imageUrl.trim() && !normalizeImageSource(formData.imageUrl)) {
+      setFormError('URL gambar tidak valid. Gunakan HTTP/HTTPS atau jalur lokal.');
+      return;
+    }
     setIsSubmitting(true);
     if (id) {
       updateMutation.mutate({
@@ -58,7 +68,7 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
           setIsSubmitting(false);
           if (onSuccess) onSuccess();
         },
-        onError: () => setIsSubmitting(false)
+        onError: error => { setIsSubmitting(false); setFormError(getErrorMessage(error, 'Pengumuman gagal disimpan. Silakan coba lagi.')); }
       });
     } else {
       createMutation.mutate({
@@ -69,13 +79,14 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
           setIsSubmitting(false);
           if (onSuccess) onSuccess();
         },
-        onError: () => setIsSubmitting(false)
+        onError: error => { setIsSubmitting(false); setFormError(getErrorMessage(error, 'Pengumuman gagal disimpan. Silakan coba lagi.')); }
       });
     }
   };
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 p-4">
+      {formError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Judul Pengumuman</label>
         <input
@@ -114,17 +125,7 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">URL Foto (Opsional)</label>
-        <input
-          type="url"
-          name="imageUrl"
-          value={formData.imageUrl}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          placeholder="https://contoh.com/gambar.jpg"
-        />
-      </div>
+      <ImageUrlField value={formData.imageUrl} onChange={imageUrl => setFormData(previous => ({ ...previous, imageUrl }))} />
 
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
@@ -144,7 +145,7 @@ export const AdminAnnouncementForm: React.FC<AdminAnnouncementFormProps> = ({ id
           Batal
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {id ? 'Simpan Perubahan' : 'Buat Pengumuman'}
+          {isSubmitting ? 'Menyimpan…' : id ? 'Simpan Perubahan' : 'Buat Pengumuman'}
         </Button>
       </div>
     </form>

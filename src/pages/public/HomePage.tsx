@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { AppImage } from '../../components/ui/AppImage';
+import { getVenueFallbackImage } from '../../lib/image-source';
 import { useList } from '@refinedev/core';
 import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES, type ScheduleItem, type Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
@@ -33,7 +35,7 @@ export function HomePage() {
       category: prog.category || 'Fiqih',
       bookTitle: prog.bookTitle || prog.title,
       totalLessons: progLessons.length,
-      coverImage: prog.coverImage || '/masjid-al-ukhuwah.jpg',
+      coverImage: prog.coverImage,
     };
   });
 
@@ -41,7 +43,7 @@ export function HomePage() {
     const activeKajians = apiSchedules.filter((s) => s.venueId === v.id).length;
     return {
       ...v,
-      image: v.image || '/masjid-umar-bin-khattab.jpg',
+      image: v.image,
       activeKajiansCount: activeKajians || v.activeKajiansCount || 1,
     };
   });
@@ -148,9 +150,10 @@ export function HomePage() {
               className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs hover:border-emerald-900/30"
             >
               <div className="relative h-48 overflow-hidden bg-stone-100">
-                <img
+                <AppImage
                   src={prog.coverImage}
                   alt={prog.title}
+                  kind="program"
                   className="h-full w-full object-cover"
                 />
                 <span className="absolute top-3 left-3 rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
@@ -194,9 +197,10 @@ export function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-4">
               <div className="relative aspect-square overflow-hidden rounded-2xl border border-amber-500/30 bg-black p-4 shadow-2xl flex items-center justify-center">
-                <img
+                <AppImage
                   src={speaker.image}
                   alt={speaker.name}
+                  kind="avatar"
                   className="h-full w-full object-contain rounded-xl"
                 />
               </div>
@@ -250,7 +254,7 @@ export function HomePage() {
           {venues.slice(0, 4).map((v) => (
             <div key={v.id} className="space-y-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30">
               <div className="h-44 w-full bg-stone-100 overflow-hidden">
-                <img src={v.image} alt={v.name} className="h-full w-full object-cover" />
+                <AppImage src={v.image} fallbackSrc={getVenueFallbackImage(v)} kind="venue" alt={v.name} className="h-full w-full object-cover" />
               </div>
               <div className="p-6 pt-0 space-y-3">
                 <h3 className="text-lg font-bold text-slate-900">{v.name}</h3>

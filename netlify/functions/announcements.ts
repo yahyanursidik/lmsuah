@@ -8,6 +8,7 @@ import { validateBody } from './utils/validation.js';
 import { requireAuth, requireRole } from './middleware/auth.js';
 import { getDatabaseActorId, getOptionalAuth } from './utils/contentHelper.js';
 import { HttpError } from './utils/http-error.js';
+import { imageSourceSchema } from './utils/image-validation.js';
 
 const ADMIN_ROLES = ['admin', 'administrator', 'super_administrator'];
 
@@ -15,7 +16,7 @@ const announcementSchema = z.object({
   title: z.string().min(1, 'Judul wajib diisi'),
   content: z.string().min(1, 'Konten wajib diisi'),
   linkUrl: z.string().url().optional().or(z.literal('')),
-  imageUrl: z.string().url().optional().or(z.literal('')),
+  imageUrl: imageSourceSchema.optional(),
   status: z.enum(['draft', 'published']).default('published'),
 });
 

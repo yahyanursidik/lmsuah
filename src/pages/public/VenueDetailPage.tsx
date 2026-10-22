@@ -1,16 +1,12 @@
 import { useState } from 'react';
+import { AppImage } from '../../components/ui/AppImage';
+import { getVenueFallbackImage } from '../../lib/image-source';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { useOne, useList } from '@refinedev/core';
 import { MOCK_VENUES, MOCK_PROGRAMS, MOCK_SCHEDULES, Venue, Program, ScheduleItem } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import { Copy, Check, Share2, MapPin, ExternalLink, Calendar, Phone, Users, Home } from 'lucide-react';
-
-const getVenueImage = (venue: Pick<Venue, 'id' | 'name' | 'image'>) => {
-  if (venue.image?.startsWith('/masjid')) return venue.image;
-  if (venue.id.includes('ukhuwah') || venue.name.toLowerCase().includes('ukhuwah')) return '/masjid-ukhuwah.jpg';
-  return '/masjid-umar.jpg';
-};
 
 export function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +27,7 @@ export function VenueDetailPage() {
 
   const mockVenue = MOCK_VENUES.find((v) => v.id === id);
   const rawVenue = refineVenue || mockVenue;
-  const venue: Venue | undefined = rawVenue ? { ...rawVenue, image: getVenueImage(rawVenue) } : undefined;
+  const venue: Venue | undefined = rawVenue;
   const isLoading = venueQuery.isLoading;
   const isError = venueQuery.isError;
   const refetch = venueQuery.refetch;
@@ -200,7 +196,7 @@ export function VenueDetailPage() {
 
             <div className="lg:col-span-4 space-y-4">
               <div className="rounded-2xl overflow-hidden border border-stone-700 bg-stone-800 h-52 shadow-xl">
-                <img src={venue.image} alt={venue.name} className="h-full w-full object-cover" />
+                <AppImage src={venue.image} fallbackSrc={getVenueFallbackImage(venue)} kind="venue" alt={venue.name} loading="eager" className="h-full w-full object-cover" />
               </div>
               <div className="rounded-2xl border border-stone-700 bg-stone-800/90 p-6 space-y-3.5 text-xs text-stone-300 shadow-xl">
                 <h3 className="font-bold text-stone-100 text-sm border-b border-stone-700 pb-2 flex items-center gap-2">

@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { ImageUrlField } from '@/components/ui/ImageUrlField';
+import { getVenueFallbackImage, normalizeImageSource } from '@/lib/image-source';
+import { getErrorMessage } from '@/lib/error-message';
 import { useList, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -17,6 +20,7 @@ interface VenueItem {
   googleMapsUrl?: string;
   capacity?: string;
   phone?: string;
+  image?: string | null;
   status: 'active' | 'inactive';
 }
 
@@ -24,6 +28,7 @@ export function AdminVenuesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVenue, setEditingVenue] = useState<VenueItem | null>(null);
   const [query, setQuery] = useState('');
+  const [formError, setFormError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | VenueItem['status']>('all');
 
   const [formData, setFormData] = useState({
@@ -35,6 +40,7 @@ export function AdminVenuesPage() {
     googleMapsUrl: '',
     capacity: '',
     phone: '',
+    image: '',
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -58,6 +64,7 @@ export function AdminVenuesPage() {
   const isSaving = createMutation?.isPending || updateMutation?.isPending || deleteMutation?.isPending || false;
 
   const handleOpenCreateModal = () => {
+    setFormError('');
     setEditingVenue(null);
     setFormData({
       name: '',
@@ -68,12 +75,14 @@ export function AdminVenuesPage() {
       googleMapsUrl: '',
       capacity: '',
       phone: '',
+      image: '',
       status: 'active',
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (v: VenueItem) => {
+    setFormError('');
     setEditingVenue(v);
     setFormData({
       name: v.name,
@@ -84,6 +93,7 @@ export function AdminVenuesPage() {
       googleMapsUrl: v.googleMapsUrl || '',
       capacity: v.capacity || '',
       phone: v.phone || '',
+      image: v.image || '',
       status: v.status,
     });
     setIsModalOpen(true);
@@ -91,6 +101,12 @@ export function AdminVenuesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setFormError('');
+    if (formData.image.trim() && !normalizeImageSource(formData.image)) {
+      setFormError('URL gambar tidak valid. Gunakan HTTP/HTTPS atau jalur lokal.');
+      return;
+    }
 
     if (editingVenue) {
       updateVenue(
@@ -104,6 +120,7 @@ export function AdminVenuesPage() {
             setIsModalOpen(false);
             refetch();
           },
+          onError: error => setFormError(getErrorMessage(error, 'Lokasi gagal disimpan. Silakan coba lagi.')),
         }
       );
     } else {
@@ -117,6 +134,7 @@ export function AdminVenuesPage() {
             setIsModalOpen(false);
             refetch();
           },
+          onError: error => setFormError(getErrorMessage(error, 'Lokasi gagal disimpan. Silakan coba lagi.')),
         }
       );
     }
@@ -318,6 +336,7 @@ export function AdminVenuesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">Nama Masjid / Majelis *</label>
                 <input
@@ -361,6 +380,8 @@ export function AdminVenuesPage() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-400 focus:outline-none"
                 />
               </div>
+
+              <ImageUrlField value={formData.image} onChange={image => setFormData(previous => ({ ...previous, image }))} fallbackSrc={getVenueFallbackImage({ name: formData.name, slug: formData.slug })} label="URL foto lokasi (opsional)" />
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -434,7 +455,7 @@ export function AdminVenuesPage() {
                   disabled={isSaving}
                   className="bg-emerald-600 hover:bg-emerald-700 text-slate-900 min-h-[44px] px-5"
                 >
-                  {editingVenue ? 'Simpan Perubahan' : 'Buat Lokasi'}
+                  {isSaving ? 'Menyimpan…' : editingVenue ? 'Simpan Perubahan' : 'Buat Lokasi'}
                 </Button>
               </div>
             </form>

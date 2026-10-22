@@ -4,6 +4,14 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-10-22
+
+- Memperbaiki jalur aset beranda yang salah dan pemetaan foto lokasi, termasuk ejaan Ukhuwwah. URL foto khusus lokasi kini diprioritaskan, bukan diabaikan.
+- Menggunakan penampil gambar bersama di seluruh gambar publik, peserta, admin, navigasi dan profil: lazy loading, fallback lokal terbatas tanpa loop, ukuran tetap, serta placeholder yang jelas saat gambar gagal/belum tersedia.
+- Menambahkan field dan pratinjau foto lokasi serta pratinjau foto pengumuman; validasi URL frontend/API menerima HTTP/HTTPS dan jalur lokal, menolak protokol berbahaya dan kredensial URL, tanpa proxy server yang mengambil URL arbitrer.
+- Foto yang belum tersedia tidak diganti dengan foto lokasi lain. Tidak ada migrasi, pembaruan massal database, perubahan secret, atau aktivasi flag produksi. Sampul program khusus bukan perluasan schema dalam rilis ini.
+- Workspace pengembangan dan paket rilis terisolasi sama-sama lulus 376 tes / 50 file; lint 0 error/0 warning, typecheck/build produksi serta bundling dua fungsi Netlify terkait lulus. Rincian: `docs/releases/v0.3.2.md` dan `docs/image-loading-audit-2026-10-22.md`.
+
 ## [0.3.1] — 2026-10-22
 
 - Footer menyediakan kontak bantuan `ahlan@yahyanursidik.my.id` untuk kendala/error/kegagalan sistem, dengan profil Yahya Nursidik dan keterangan Special Advisor for Digital Transformation, Innovation & Business YTS.

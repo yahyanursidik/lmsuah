@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { AppImage } from '../../components/ui/AppImage';
 import { useList } from '@refinedev/core';
 import { MOCK_SPEAKER, MOCK_PROGRAMS } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
@@ -32,8 +33,10 @@ export function SpeakerProfilePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-4">
               <div className="relative aspect-square overflow-hidden rounded-2xl border border-amber-500/30 bg-black p-4 shadow-2xl flex items-center justify-center">
-                <img
+                <AppImage
                   src={speaker.image}
+                  kind="avatar"
+                  loading="eager"
                   alt={speaker.name}
                   className="h-full w-full object-contain rounded-xl"
                 />

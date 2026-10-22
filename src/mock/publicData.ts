@@ -1,3 +1,5 @@
+import { TARBIYAH_STREAMS_URL } from '../../shared/schedule-stream';
+
 export interface Program {
   id: string;
   title: string;
@@ -241,7 +243,7 @@ export const MOCK_SCHEDULES: ScheduleItem[] = [
     status: 'Diundur',
     statusReason: 'Ustadz berhalangan hadir pada jam 09:00, diundur ke jam 13:00 WIB',
     isLiveStream: true,
-    streamUrl: 'https://youtube.com/@TarbiyahSunnah'
+    streamUrl: TARBIYAH_STREAMS_URL
   },
   {
     id: 'sch-2',
@@ -257,7 +259,7 @@ export const MOCK_SCHEDULES: ScheduleItem[] = [
     venueName: 'Masjid Umar bin Khattab Bandung',
     status: 'Rutin',
     isLiveStream: true,
-    streamUrl: 'https://youtube.com/@TarbiyahSunnah'
+    streamUrl: TARBIYAH_STREAMS_URL
   },
   {
     id: 'sch-3',
@@ -272,7 +274,7 @@ export const MOCK_SCHEDULES: ScheduleItem[] = [
     venueName: 'Masjid Al-Ukhuwah Bandung',
     status: 'Rutin',
     isLiveStream: true,
-    streamUrl: 'https://youtube.com/@TarbiyahSunnah'
+    streamUrl: TARBIYAH_STREAMS_URL
   }
 ];
 

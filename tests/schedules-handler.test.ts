@@ -17,6 +17,7 @@ vi.mock('../netlify/functions/utils/contentHelper.js', async importOriginal => (
   getOptionalAuth: async () => state.session,
 }));
 import handler from '../netlify/functions/schedules';
+import { TARBIYAH_LIVE_URL, TARBIYAH_STREAMS_URL } from '../shared/schedule-stream';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const valid = { venueId: id, title: 'Kajian', speaker: 'Pengajar', day: 'Senin', date: '2026-10-19' };
@@ -25,6 +26,32 @@ const call = (method: string, body: unknown, path = '') => handler(new Request(`
 beforeEach(() => { state.session = { userId: 'admin', roles: ['administrator'] }; state.rows = [{ id, status: 'Rutin' }]; state.insert.mockClear(); state.update.mockClear(); });
 
 describe('Schedule handler regressions without production database writes', () => {
+  it.each([undefined, '', 'https://youtube.com/@tarbiyahSUnnah'])('uses the correct default for a live agenda with %s', async streamUrl => {
+    expect((await call('POST', { ...valid, isLiveStream: true, streamUrl })).status).toBe(200);
+    expect(state.insert).toHaveBeenCalledWith(expect.objectContaining({ streamUrl: TARBIYAH_STREAMS_URL }));
+  });
+  it.each([TARBIYAH_LIVE_URL, 'https://youtu.be/fixture'])('saves an explicit live destination %s', async streamUrl => {
+    expect((await call('POST', { ...valid, isLiveStream: true, streamUrl })).status).toBe(200);
+    expect(state.insert).toHaveBeenCalledWith(expect.objectContaining({ streamUrl }));
+  });
+  it.each(['javascript:alert(1)', 'data:text/html,fixture', 'not-a-url'])('rejects unsafe/invalid URL %s before inserting', async streamUrl => {
+    const response = await call('POST', { ...valid, isLiveStream: true, streamUrl });
+    expect(response.status).toBe(400);
+    expect(state.insert).not.toHaveBeenCalled();
+  });
+  it('keeps a manual setting while switching broadcasting off', async () => {
+    const streamUrl = 'https://youtu.be/fixture';
+    expect((await call('POST', { ...valid, isLiveStream: false, streamUrl })).status).toBe(200);
+    expect(state.insert).toHaveBeenCalledWith(expect.objectContaining({ isLiveStream: false, streamUrl }));
+    expect((await call('PATCH', { isLiveStream: false }, `/${id}`)).status).toBe(200);
+    expect(state.update.mock.calls[0][0]).not.toHaveProperty('streamUrl');
+  });
+  it('corrects a stored legacy default when live is explicitly enabled', async () => {
+    state.rows = [{ id, isLiveStream: false, streamUrl: 'https://youtube.com/@tarbiyahSUnnah' }];
+    expect((await call('PATCH', { isLiveStream: true }, `/${id}`)).status).toBe(200);
+    expect(state.update).toHaveBeenCalledWith(expect.objectContaining({ streamUrl: TARBIYAH_STREAMS_URL }));
+  });
+
   it.each(['', null])('creates an agenda without a program using %s', async programId => {
     const response = await call('POST', { ...valid, programId });
     expect(response.status).toBe(200);

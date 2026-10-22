@@ -1,10 +1,10 @@
 # Unggah media Contabo dan sampul Program Kajian
 
-Status pengembangan: 2026-10-22. Unggah/baca foto WebP dan PDF publik pada lmsuah serta PDF privat pada bucket terpisah lmsuahprivate sudah lulus uji nyata. Bucket publik tetap dilarang untuk PDF privat. Fitur masih draft; verifikasi visual browser belum terkonfirmasi.
+Status pengembangan: 2026-10-22. Unggah/baca foto WebP dan PDF publik pada lmsuah serta PDF privat pada bucket terpisah lmsuahprivate sudah lulus uji nyata. Bucket publik tetap dilarang untuk PDF privat. Pengujian browser nyata pada salinan sudah lulus, termasuk visual PDF mobile dan sampul publik/peserta. Aktivasi fitur privat/revisi serta pemberian izin produksi tetap terpisah.
 
-Kandidat terbaru: seluruh 418 tes/56 file lulus, lint 0 error/0 warning, typecheck/build produksi lulus. Tiga fixture privat baru (probe awal, uji adapter, skrip smoke) dibersihkan dan HEAD 404 dikonfirmasi. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14; unggahan tetap kandidat draft v0.4.0 sampai gate visual E2E selesai.
+Kandidat terbaru: seluruh 418 tes/56 file lulus, lint 0 error/0 warning, typecheck/build produksi lulus. Tiga fixture privat baru (probe awal, uji adapter, skrip smoke) dibersihkan dan HEAD 404 dikonfirmasi. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14; catatan paket v0.4.0 tersedia di docs/releases/v0.4.0.md; gate visual E2E kini selesai pada salinan.
 
-Kandidat dipush sebagai [draft PR #15](https://github.com/yahyanursidik/lmsuah/pull/15). Preview commit 0648b20 berstatus Ready: halaman 200, GET media-upload 405 JSON, POST tanpa autentikasi 401 JSON, metadata program 200 JSON. Fungsi native berhasil dimuat pada Linux; pemeriksaan ini bukan bukti izin PUT bucket atau uji gambar end-to-end.
+Paket rilis disiapkan melalui [PR #15](https://github.com/yahyanursidik/lmsuah/pull/15). Preview commit 0648b20 berstatus Ready: halaman 200, GET media-upload 405 JSON, POST tanpa autentikasi 401 JSON, metadata program 200 JSON. Fungsi native berhasil dimuat pada Linux; pemeriksaan ini bukan bukti izin PUT bucket atau uji gambar end-to-end.
 
 ## Media publik
 
@@ -56,7 +56,7 @@ Pengguna mengizinkan produksi hanya setelah uji salinan lulus. Salinan Neon terb
 - Smoke GET produksi /api/health, /api/programs, /api/lessons dan /api/schedules: HTTP 200, JSON valid.
 - Preflight SELECT-only setelah migrasi: tidak ada migrasi tertunda, konflik enrollment/progres 0, seluruh definisi izin tersedia dan schema revisi/PDF siap. Kesiapan schema tidak berarti feature flags atau penyimpanan privat sudah diaktifkan.
 
-Verifikasi kode: 398 tes dalam 55 file lulus; tambahan alias S3/allowlist scanner lulus 7 tes dalam 2 file. Lint 0 error/0 warning, typecheck dan build produksi lulus. Localhost aktif kembali pada port 5180; POST unggah tanpa login menghasilkan 401 JSON, GET menghasilkan 405 JSON, dan metadata program 200 JSON. Catatan historis ini telah dilengkapi oleh uji bucket nyata di bagian terbaru; verifikasi visual browser tetap belum terkonfirmasi.
+Verifikasi kode: 398 tes dalam 55 file lulus; tambahan alias S3/allowlist scanner lulus 7 tes dalam 2 file. Lint 0 error/0 warning, typecheck dan build produksi lulus. Localhost aktif kembali pada port 5180; POST unggah tanpa login menghasilkan 401 JSON, GET menghasilkan 405 JSON, dan metadata program 200 JSON. Catatan historis ini telah dilengkapi oleh uji bucket nyata dan E2E browser pada salinan; rincian terbaru ada di catatan rilis v0.4.0.
 
 Migrasi 0014 hanya menambah kolom nullable programs.cover_image. Pembaca program tetap kompatibel sebelum migrasi; snapshot lama tanpa coverImage tetap valid tanpa mengubah format/hash historis.
 
@@ -72,4 +72,4 @@ Uji storage nyata: HeadBucket berhasil; PNG diolah menjadi WebP, PUT/GET publik 
 
 Bucket privat yang disetujui: lmsuahprivate; CONTABO_PRIVATE_ENDPOINT=https://sin1.contabostorage.com (alamat berakhiran /lmsuahprivate juga dinormalisasi), CONTABO_PRIVATE_BUCKET=lmsuahprivate. Kedua nilai memiliki default aman tersebut. Kredensial memakai pasangan server S3_* atau CONTABO_* yang sama dan sudah diuji; jangan mengganti S3_BUCKET publik menjadi nama bucket privat. Tidak ada public URL/presigned URL privat yang dikirim ke klien: pembacaan tetap melalui /api/transcript-file/:id setelah izin/versi diperiksa.
 
-Uji ulang yang dapat direproduksi: node --import tsx scripts/contabo-private-smoke.ts --approved-test-objects. Gunakan CONTABO_SMOKE_ENV_FILE untuk menunjuk .env lokal dari worktree; jangan salin secret ke repository. Script hanya membuat PDF sintetis ber-UUID, memeriksa hash signed GET, penolakan penimpaan, dan status/hash dua URL anonim, lalu menghapus fixture dan memverifikasi HEAD 404. Aktifkan provider/feature flags produksi hanya dalam langkah aktivasi terpisah setelah E2E; rilis kode tidak mengubahnya. Tidak ada migrasi database baru untuk adapter ini.
+Uji ulang yang dapat direproduksi: node --import tsx scripts/contabo-private-smoke.ts --approved-test-objects. Gunakan CONTABO_SMOKE_ENV_FILE untuk menunjuk .env lokal dari worktree; jangan salin secret ke repository. Script hanya membuat PDF sintetis ber-UUID, memeriksa hash signed GET, penolakan penimpaan, dan status/hash dua URL anonim, lalu menghapus fixture dan memverifikasi HEAD 404. Aktifkan provider/feature flags produksi hanya dalam langkah aktivasi terpisah setelah pemetaan izin ditinjau dan aktivasi disetujui; rilis kode tidak mengubahnya. Tidak ada migrasi database baru untuk adapter ini.

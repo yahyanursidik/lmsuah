@@ -24,6 +24,7 @@ dist
 dist-ssr
 *.local
 *.tsbuildinfo
+test-results/
 
 # Editor / OS
 .vscode/*

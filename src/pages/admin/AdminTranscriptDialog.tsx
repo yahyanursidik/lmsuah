@@ -199,11 +199,12 @@ export function AdminTranscriptDialog({
           <section className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
             <h3 className="font-bold">Belum diaktifkan pada database ini</h3>
             <p>
-              Migrasi PDF privat sudah disiapkan, tetapi belum dijalankan sesuai
-              keputusan Anda. Administrator perlu menerapkan migrasi yang
-              disetujui, mengonfigurasi Netlify Blobs privat dan izin pengguna,
-              lalu mengaktifkan LMS_PRIVATE_PDF_ENABLED di server. Tombol ini
-              tidak menjalankan migrasi.
+              PDF privat belum aktif pada lingkungan ini. Pastikan migrasi yang
+              disetujui sudah diterapkan, penyimpanan Netlify Blobs privat atau
+              bucket Contabo privat sudah dikonfigurasi, dan izin pengguna sudah
+              ditinjau sebelum mengaktifkan LMS_PRIVATE_PDF_ENABLED di server.
+              Pembaca memerlukan izin transcript.read. Tombol ini tidak
+              menjalankan migrasi atau mengubah izin pengguna.
             </p>
             <p className="mt-2">
               Sumber PDF eksternal tetap dapat dikelola melalui Tambah materi.

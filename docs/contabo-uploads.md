@@ -1,6 +1,6 @@
 # Unggah media Contabo dan sampul Program Kajian
 
-Status pengembangan: 2026-10-22. Belum dirilis; unggah nyata ke bucket menunggu kredensial lokal dan konfigurasi Functions Netlify.
+Status pengembangan: 2026-10-22. Unggah/baca foto WebP dan PDF publik nyata sudah lulus. Konten privat Contabo diblokir karena Public URL bucket membacanya meski ACL private; semua objek uji dibersihkan. Fitur masih draft, visual browser belum terkonfirmasi.
 
 Kandidat rilis terisolasi: 399 tes/55 file lulus, tambahan pengaman URL lulus 8 tes Contabo; lint/typecheck/build lulus. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14, sedangkan unggahan tetap kandidat draft v0.4.0.
 
@@ -36,9 +36,9 @@ Rujukan: [Netlify native modules](https://docs.netlify.com/build/functions/confi
 
 ## PDF privat tetap opt-in
 
-LMS_PRIVATE_PDF_STORAGE tetap netlify secara default. Pembacaan blob key lama tetap memakai Netlify; hanya objek baru dengan key contabo/private/transcripts/ menggunakan Contabo bila provider dipilih.
+PDF privat tetap memakai Netlify Blobs. Key Netlify lama tetap terbaca. Key contabo/ ditolak dengan PRIVATE_STORAGE_PUBLIC_BUCKET sebelum ada PUT atau penyimpanan versi; tidak ada pemindahan dokumen lama.
 
-Jangan aktifkan CONTABO_PRIVATE_PREFIX_VERIFIED atau LMS_PRIVATE_PDF_ENABLED sebelum memverifikasi policy bucket/prefix private/ dan akses anonim benar-benar ditolak melalui semua endpoint/public base. ACL private saja tidak boleh dianggap membatalkan bucket policy publik. Jangan memindah objek privat ke prefix publik, menampilkan public URL-nya, atau mengubah policy bucket otomatis.
+Uji nyata berkas sintetis ber-ACL private menghasilkan Public URL HTTP 200 dengan hash byte PDF yang sama, sedangkan URL bucket S3 tanpa tanda tangan 401. Jadi ACL private tidak melindungi berkas dari Public URL bucket ini. Adapter privat Contabo dihapus; mengatur flag verifikasi lama menjadi true tidak dapat membukanya. Gunakan Netlify Blobs atau bucket privat terpisah dengan persetujuan/tes baru. Policy bucket dan feature flags tidak diubah.
 
 LMS_PROGRAM_REVISIONS_ENABLED dan LMS_PRIVATE_PDF_ENABLED tidak diaktifkan oleh perubahan ini.
 
@@ -67,3 +67,7 @@ node --liftoff-only --no-wasm-tier-up --wasm-lazy-compilation --import tsx netli
 ```
 
 --approved hanya digunakan dengan persetujuan eksplisit setelah memvalidasi salinan dan cadangan. Jangan menjalankan migrasi awal pada tabel produksi yang sudah ada tanpa rekonsiliasi katalog.
+
+Uji storage nyata: HeadBucket berhasil; PNG diolah menjadi WebP, PUT/GET publik WebP dan PDF menghasilkan HTTP 200/MIME sesuai/hash identik. Probe privasi dua kali mengonfirmasi akses anonim PDF private pada Public URL. Delapan fixture total dihapus dan HEAD 404 terverifikasi; tidak ada objek lama yang disentuh. Smoke script scripts/contabo-smoke.ts secara default hanya menguji publik; --check-private-acl adalah probe negatif yang saat ini diharapkan gagal dan selalu membersihkan fixture.
+
+Pengguna memilih menyiapkan bucket Contabo privat terpisah. Adapter privat baru belum diaktifkan atau dibuat sebelum nama/endpoint bucket diterima dan uji anonim lulus. Regresi pengaman terbaru: 39 tes pada 4 file lulus; pembaca Netlify lama tetap berfungsi. Tidak ada perubahan policy bucket atau data pengguna.

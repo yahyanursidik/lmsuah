@@ -1,9 +1,4 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { HttpError } from "./http-error.js";
 
 export function contaboConfig() {
@@ -121,69 +116,4 @@ export async function putPublicMedia(
     );
   }
   return `${config.publicUrl}/${key}`;
-}
-
-/** Existing Netlify keys remain readable; Contabo private documents NEVER use the public URL. */
-export function contaboPrivateStore() {
-  if (process.env.CONTABO_PRIVATE_PREFIX_VERIFIED !== "true")
-    throw new HttpError(
-      503,
-      "Privasi prefix private/ Contabo belum diverifikasi. Jangan gunakan Public URL untuk PDF privat.",
-      "PRIVATE_STORAGE_NOT_VERIFIED",
-    );
-  const config = contaboConfig();
-  const client = contaboClient();
-  const keyFor = (key: string) => {
-    if (!key.startsWith("contabo/private/transcripts/") || key.includes(".."))
-      throw new HttpError(400, "Kunci dokumen privat tidak valid.");
-    return key.slice("contabo/".length);
-  };
-  return {
-    async set(
-      key: string,
-      body: ArrayBuffer,
-      options: { onlyIfNew: boolean; metadata: Record<string, string> },
-    ) {
-      await client.send(
-        new PutObjectCommand({
-          Bucket: config.bucket,
-          Key: keyFor(key),
-          Body: new Uint8Array(body),
-          ContentType: "application/pdf",
-          ACL: "private",
-          CacheControl: "private, no-store",
-          IfNoneMatch: options.onlyIfNew ? "*" : undefined,
-          Metadata: options.metadata,
-        }),
-      );
-      return { modified: true };
-    },
-    async get(
-      key: string,
-      _options: { type: "arrayBuffer"; consistency: "strong" },
-    ) {
-      void _options;
-      try {
-        const result = await client.send(
-          new GetObjectCommand({ Bucket: config.bucket, Key: keyFor(key) }),
-        );
-        const bytes = await result.Body?.transformToByteArray();
-        return bytes ? new Uint8Array(bytes).buffer : null;
-      } catch (error) {
-        if (
-          error &&
-          typeof error === "object" &&
-          "name" in error &&
-          ["NoSuchKey", "NotFound"].includes(String(error.name))
-        )
-          return null;
-        throw error;
-      }
-    },
-    async delete(key: string) {
-      await client.send(
-        new DeleteObjectCommand({ Bucket: config.bucket, Key: keyFor(key) }),
-      );
-    },
-  };
 }

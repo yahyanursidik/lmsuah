@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
 import { HttpError } from './http-error.js';
-import { contaboPrivateStore } from './contabo-storage.js';
 
 // Synchronous Netlify Functions have a request-size limit. Keep binary uploads
 // below that limit; larger files need a separately reviewed multipart flow.
@@ -37,7 +36,7 @@ export async function readLimitedPdfBody(request: Request) {
   return bytes;
 }
 export function privateTranscriptStore(key?: string) {
-  if (key?.startsWith('contabo/')) return contaboPrivateStore();
+  if (key?.startsWith('contabo/')) throw new HttpError(503, 'Bucket Contabo lmsuah bersifat publik. PDF privat tetap memakai Netlify Blobs; penyimpanan privat Contabo diblokir sebelum unggah.', 'PRIVATE_STORAGE_PUBLIC_BUCKET');
   try {
     const siteID = process.env.NETLIFY_SITE_ID;
     const token = process.env.NETLIFY_BLOBS_TOKEN;

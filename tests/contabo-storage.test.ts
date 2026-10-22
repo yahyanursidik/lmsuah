@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   contaboConfig,
-  contaboPrivateStore,
   putPublicMedia,
 } from "../netlify/functions/utils/contabo-storage";
+import { privateTranscriptStore } from "../netlify/functions/utils/pdf-files";
 const state = vi.hoisted(() => ({ send: vi.fn() }));
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
@@ -90,24 +90,18 @@ describe("Contabo bucket access", () => {
     expect(() => contaboConfig()).toThrow(/belum dikonfigurasi/);
     expect(state.send).not.toHaveBeenCalled();
   });
-  it("blocks private writes until privacy is explicitly verified", () => {
-    expect(() => contaboPrivateStore()).toThrow(/belum diverifikasi/);
+  it("blocks private Contabo writes before reaching storage", () => {
+    expect(() =>
+      privateTranscriptStore("contabo/private/transcripts/fixture.pdf"),
+    ).toThrow(/Contabo diblokir/);
     expect(state.send).not.toHaveBeenCalled();
   });
-  it("uses private ACL without returning a public URL for private PDFs", async () => {
+  it("cannot bypass the public bucket block by setting a verification flag", () => {
     vi.stubEnv("CONTABO_PRIVATE_PREFIX_VERIFIED", "true");
-    const store = contaboPrivateStore();
-    await store.set(
-      "contabo/private/transcripts/program/version.pdf",
-      new ArrayBuffer(1),
-      { onlyIfNew: true, metadata: { sha256: "fixture" } },
-    );
-    expect(state.send.mock.calls[0][0].input).toMatchObject({
-      Key: "private/transcripts/program/version.pdf",
-      ACL: "private",
-      CacheControl: "private, no-store",
-      IfNoneMatch: "*",
-    });
-    expect("publicUrl" in store).toBe(false);
+    vi.stubEnv("LMS_PRIVATE_PDF_STORAGE", "contabo");
+    expect(() =>
+      privateTranscriptStore("contabo/private/transcripts/fixture.pdf"),
+    ).toThrow(/bersifat publik/);
+    expect(state.send).not.toHaveBeenCalled();
   });
 });

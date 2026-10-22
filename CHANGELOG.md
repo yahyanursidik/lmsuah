@@ -8,7 +8,8 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 - Menambahkan unggah foto/PDF publik langsung ke Contabo, sampul Program Kajian dengan pratinjau dan indikator proses, serta adapter PDF privat terpisah pada lmsuahprivate. Bucket publik tetap dilarang untuk konten privat; berkas Netlify lama tetap terbaca.
 - E2E browser pada salinan lulus untuk admin, reviewer independen, publik dan peserta berizin: sampul tersimpan/tampil, error gambar rusak mempertahankan sampul, PDF dirender pada mobile, range 206, larangan unduh/akses tanpa izin dan mode layar penuh. Seluruh fixture dibersihkan dan jumlah baris kembali semula.
-- Seluruh 418 tes/56 file, lint 0 error/0 warning, TypeScript dan build produksi lulus. Menambahkan runner Playwright yang dapat diulang; pengujian tidak mengubah database sumber, policy bucket atau role produksi.
+- Seluruh 419 tes/57 file, lint 0 error/0 warning, TypeScript dan build produksi lulus. Menambahkan runner Playwright yang dapat diulang; pengujian tidak mengubah database sumber, policy bucket atau role produksi.
+- Endpoint /api/health kini mengikuti versi package.json dan dikawal tes konsistensi dengan package-lock.json.
 - Migrasi produksi 0010–0014 telah diterapkan dengan izin setelah uji salinan lulus, tanpa penulisan baris aplikasi. Adapter privat tidak memerlukan migrasi baru. Flag privat/revisi tidak diaktifkan oleh rilis; pembaca memerlukan izin transcript.read. Catatan: docs/releases/v0.4.0.md.
 
 ## [0.3.3] — 2026-10-22

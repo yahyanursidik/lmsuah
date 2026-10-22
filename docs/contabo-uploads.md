@@ -2,7 +2,7 @@
 
 Status pengembangan: 2026-10-22. Unggah/baca foto WebP dan PDF publik pada lmsuah serta PDF privat pada bucket terpisah lmsuahprivate sudah lulus uji nyata. Bucket publik tetap dilarang untuk PDF privat. Pengujian browser nyata pada salinan sudah lulus, termasuk visual PDF mobile dan sampul publik/peserta. Aktivasi fitur privat/revisi serta pemberian izin produksi tetap terpisah.
 
-Kandidat terbaru: seluruh 418 tes/56 file lulus, lint 0 error/0 warning, typecheck/build produksi lulus. Tiga fixture privat baru (probe awal, uji adapter, skrip smoke) dibersihkan dan HEAD 404 dikonfirmasi. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14; catatan paket v0.4.0 tersedia di docs/releases/v0.4.0.md; gate visual E2E kini selesai pada salinan.
+Kandidat terbaru: seluruh 419 tes/57 file lulus, lint 0 error/0 warning, typecheck/build produksi lulus. Tiga fixture privat baru (probe awal, uji adapter, skrip smoke) dibersihkan dan HEAD 404 dikonfirmasi. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14; catatan paket v0.4.0 tersedia di docs/releases/v0.4.0.md; gate visual E2E kini selesai pada salinan.
 
 Paket rilis disiapkan melalui [PR #15](https://github.com/yahyanursidik/lmsuah/pull/15). Preview commit 0648b20 berstatus Ready: halaman 200, GET media-upload 405 JSON, POST tanpa autentikasi 401 JSON, metadata program 200 JSON. Fungsi native berhasil dimuat pada Linux; pemeriksaan ini bukan bukti izin PUT bucket atau uji gambar end-to-end.
 

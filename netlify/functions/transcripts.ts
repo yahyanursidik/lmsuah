@@ -12,7 +12,7 @@ import { getDatabaseActorId, logMutationAudit } from './utils/contentHelper.js';
 import { canReadDrafts } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
 import { validateBody } from './utils/validation.js';
-import { privateTranscriptStore, readLimitedPdfBody, safePdfFilename, validatePdf } from './utils/pdf-files.js';
+import { privateTranscriptStore, privateTranscriptKey, readLimitedPdfBody, safePdfFilename, validatePdf } from './utils/pdf-files.js';
 import { nextTranscriptStatus } from '../../shared/review-policy.js';
 
 const actionSchema = z.object({ action: z.enum(['submit', 'approve', 'request_revision', 'publish', 'archive']), note: z.string().trim().min(3).max(2000) });
@@ -61,7 +61,7 @@ export default createHandler(async request => {
     if (existingDocumentId && existing?.lessonId !== lesson.id) throw new ForbiddenError('Dokumen harus berada dalam pertemuan yang sama.');
     const documentId = existing?.id || crypto.randomUUID();
     const versionId = crypto.randomUUID();
-    const blobKey = `${process.env.LMS_PRIVATE_PDF_STORAGE === 'contabo' ? 'contabo/private/' : ''}transcripts/${lesson.programId}/${lesson.id}/${documentId}/${versionId}.pdf`;
+    const blobKey = privateTranscriptKey(`transcripts/${lesson.programId}/${lesson.id}/${documentId}/${versionId}.pdf`);
     const store = privateTranscriptStore(blobKey);
     const result = await store.set(blobKey, bytes.buffer, { onlyIfNew: true, metadata: { mime: 'application/pdf', sha256 } });
     if (!result.modified) throw new HttpError(409, 'Kunci versi PDF sudah ada. Unggah kembali sebagai versi baru.');

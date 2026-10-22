@@ -1,8 +1,8 @@
 # Unggah media Contabo dan sampul Program Kajian
 
-Status pengembangan: 2026-10-22. Unggah/baca foto WebP dan PDF publik nyata sudah lulus. Konten privat Contabo diblokir karena Public URL bucket membacanya meski ACL private; semua objek uji dibersihkan. Fitur masih draft, visual browser belum terkonfirmasi.
+Status pengembangan: 2026-10-22. Unggah/baca foto WebP dan PDF publik pada lmsuah serta PDF privat pada bucket terpisah lmsuahprivate sudah lulus uji nyata. Bucket publik tetap dilarang untuk PDF privat. Fitur masih draft; verifikasi visual browser belum terkonfirmasi.
 
-Kandidat rilis terisolasi: 399 tes/55 file lulus, tambahan pengaman URL lulus 8 tes Contabo; lint/typecheck/build lulus. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14, sedangkan unggahan tetap kandidat draft v0.4.0.
+Kandidat terbaru: seluruh 418 tes/56 file lulus, lint 0 error/0 warning, typecheck/build produksi lulus. Tiga fixture privat baru (probe awal, uji adapter, skrip smoke) dibersihkan dan HEAD 404 dikonfirmasi. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14; unggahan tetap kandidat draft v0.4.0 sampai gate visual E2E selesai.
 
 Kandidat dipush sebagai [draft PR #15](https://github.com/yahyanursidik/lmsuah/pull/15). Preview commit 0648b20 berstatus Ready: halaman 200, GET media-upload 405 JSON, POST tanpa autentikasi 401 JSON, metadata program 200 JSON. Fungsi native berhasil dimuat pada Linux; pemeriksaan ini bukan bukti izin PUT bucket atau uji gambar end-to-end.
 
@@ -36,9 +36,9 @@ Rujukan: [Netlify native modules](https://docs.netlify.com/build/functions/confi
 
 ## PDF privat tetap opt-in
 
-PDF privat tetap memakai Netlify Blobs. Key Netlify lama tetap terbaca. Key contabo/ ditolak dengan PRIVATE_STORAGE_PUBLIC_BUCKET sebelum ada PUT atau penyimpanan versi; tidak ada pemindahan dokumen lama.
+Default PDF privat tetap Netlify Blobs dan key Netlify lama tetap terbaca. Provider baru dipilih secara eksplisit dengan LMS_PRIVATE_PDF_STORAGE=contabo. Key baru contabo-private-v1/transcripts/... terikat ke bucket lmsuahprivate, bukan lmsuah; key contabo/ lama tetap ditolak sebelum PUT atau penulisan versi. Tidak ada pemindahan dokumen lama.
 
-Uji nyata berkas sintetis ber-ACL private menghasilkan Public URL HTTP 200 dengan hash byte PDF yang sama, sedangkan URL bucket S3 tanpa tanda tangan 401. Jadi ACL private tidak melindungi berkas dari Public URL bucket ini. Adapter privat Contabo dihapus; mengatur flag verifikasi lama menjadi true tidak dapat membukanya. Gunakan Netlify Blobs atau bucket privat terpisah dengan persetujuan/tes baru. Policy bucket dan feature flags tidak diubah.
+Uji historis pada bucket publik lmsuah menghasilkan Public URL HTTP 200/hash PDF sama walaupun ACL private. Jalur tersebut tetap diblokir. Setelah pengguna menyediakan lmsuahprivate, uji signed PUT/GET lulus, sedangkan dua URL anonim menolak dengan 401 dan 403. Adapter memakai ACL private, cache no-store, conditional If-None-Match: * untuk mencegah penimpaan, dan memeriksa penolakan anonim sebelum metadata disimpan. Objek baru dibersihkan jika pemeriksaan privasi gagal; kegagalan pembersihan dilaporkan. Policy bucket dan feature flags tidak diubah.
 
 LMS_PROGRAM_REVISIONS_ENABLED dan LMS_PRIVATE_PDF_ENABLED tidak diaktifkan oleh perubahan ini.
 
@@ -56,7 +56,7 @@ Pengguna mengizinkan produksi hanya setelah uji salinan lulus. Salinan Neon terb
 - Smoke GET produksi /api/health, /api/programs, /api/lessons dan /api/schedules: HTTP 200, JSON valid.
 - Preflight SELECT-only setelah migrasi: tidak ada migrasi tertunda, konflik enrollment/progres 0, seluruh definisi izin tersedia dan schema revisi/PDF siap. Kesiapan schema tidak berarti feature flags atau penyimpanan privat sudah diaktifkan.
 
-Verifikasi kode: 398 tes dalam 55 file lulus; tambahan alias S3/allowlist scanner lulus 7 tes dalam 2 file. Lint 0 error/0 warning, typecheck dan build produksi lulus. Localhost aktif kembali pada port 5180; POST unggah tanpa login menghasilkan 401 JSON, GET menghasilkan 405 JSON, dan metadata program 200 JSON. Verifikasi visual browser serta unggah/unduh bucket nyata belum terkonfirmasi.
+Verifikasi kode: 398 tes dalam 55 file lulus; tambahan alias S3/allowlist scanner lulus 7 tes dalam 2 file. Lint 0 error/0 warning, typecheck dan build produksi lulus. Localhost aktif kembali pada port 5180; POST unggah tanpa login menghasilkan 401 JSON, GET menghasilkan 405 JSON, dan metadata program 200 JSON. Catatan historis ini telah dilengkapi oleh uji bucket nyata di bagian terbaru; verifikasi visual browser tetap belum terkonfirmasi.
 
 Migrasi 0014 hanya menambah kolom nullable programs.cover_image. Pembaca program tetap kompatibel sebelum migrasi; snapshot lama tanpa coverImage tetap valid tanpa mengubah format/hash historis.
 
@@ -70,4 +70,6 @@ node --liftoff-only --no-wasm-tier-up --wasm-lazy-compilation --import tsx netli
 
 Uji storage nyata: HeadBucket berhasil; PNG diolah menjadi WebP, PUT/GET publik WebP dan PDF menghasilkan HTTP 200/MIME sesuai/hash identik. Probe privasi dua kali mengonfirmasi akses anonim PDF private pada Public URL. Delapan fixture total dihapus dan HEAD 404 terverifikasi; tidak ada objek lama yang disentuh. Smoke script scripts/contabo-smoke.ts secara default hanya menguji publik; --check-private-acl adalah probe negatif yang saat ini diharapkan gagal dan selalu membersihkan fixture.
 
-Pengguna memilih menyiapkan bucket Contabo privat terpisah. Adapter privat baru belum diaktifkan atau dibuat sebelum nama/endpoint bucket diterima dan uji anonim lulus. Regresi pengaman terbaru: 39 tes pada 4 file lulus; pembaca Netlify lama tetap berfungsi. Tidak ada perubahan policy bucket atau data pengguna.
+Bucket privat yang disetujui: lmsuahprivate; CONTABO_PRIVATE_ENDPOINT=https://sin1.contabostorage.com (alamat berakhiran /lmsuahprivate juga dinormalisasi), CONTABO_PRIVATE_BUCKET=lmsuahprivate. Kedua nilai memiliki default aman tersebut. Kredensial memakai pasangan server S3_* atau CONTABO_* yang sama dan sudah diuji; jangan mengganti S3_BUCKET publik menjadi nama bucket privat. Tidak ada public URL/presigned URL privat yang dikirim ke klien: pembacaan tetap melalui /api/transcript-file/:id setelah izin/versi diperiksa.
+
+Uji ulang yang dapat direproduksi: node --import tsx scripts/contabo-private-smoke.ts --approved-test-objects. Gunakan CONTABO_SMOKE_ENV_FILE untuk menunjuk .env lokal dari worktree; jangan salin secret ke repository. Script hanya membuat PDF sintetis ber-UUID, memeriksa hash signed GET, penolakan penimpaan, dan status/hash dua URL anonim, lalu menghapus fixture dan memverifikasi HEAD 404. Aktifkan provider/feature flags produksi hanya dalam langkah aktivasi terpisah setelah E2E; rilis kode tidak mengubahnya. Tidak ada migrasi database baru untuk adapter ini.

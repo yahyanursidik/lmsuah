@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
 import { HttpError } from './http-error.js';
+import { contaboPrivateStore, PRIVATE_CONTABO_PREFIX } from './contabo-private.js';
 
 // Synchronous Netlify Functions have a request-size limit. Keep binary uploads
 // below that limit; larger files need a separately reviewed multipart flow.
@@ -36,12 +37,19 @@ export async function readLimitedPdfBody(request: Request) {
   return bytes;
 }
 export function privateTranscriptStore(key?: string) {
+  if (key?.startsWith(PRIVATE_CONTABO_PREFIX)) return contaboPrivateStore();
   if (key?.startsWith('contabo/')) throw new HttpError(503, 'Bucket Contabo lmsuah bersifat publik. PDF privat tetap memakai Netlify Blobs; penyimpanan privat Contabo diblokir sebelum unggah.', 'PRIVATE_STORAGE_PUBLIC_BUCKET');
   try {
     const siteID = process.env.NETLIFY_SITE_ID;
     const token = process.env.NETLIFY_BLOBS_TOKEN;
     return getStore({ name: 'private-kajian-transcripts', consistency: 'strong', ...(siteID && token ? { siteID, token } : {}) });
   } catch { throw new HttpError(503, 'Penyimpanan PDF privat belum dikonfigurasi di server.', 'STORAGE_NOT_READY'); }
+}
+export function privateTranscriptKey(path: string) {
+  const provider = process.env.LMS_PRIVATE_PDF_STORAGE || 'netlify';
+  if (provider === 'contabo') return PRIVATE_CONTABO_PREFIX + path;
+  if (provider === 'netlify') return path;
+  throw new HttpError(503, 'Penyedia PDF privat tidak valid. Gunakan netlify atau contabo.', 'PRIVATE_STORAGE_CONFIG_INVALID');
 }
 export function pdfRange(value: string | null, size: number): { start: number; end: number } | null {
   if (!value) return null;

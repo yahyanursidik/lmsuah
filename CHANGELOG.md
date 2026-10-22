@@ -4,7 +4,7 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
-- Kandidat v0.4.0: unggah foto/PDF publik ke Contabo dan sampul Program Kajian dengan pratinjau, status proses, validasi server dan kompatibilitas S3_*. Belum dirilis; menunggu uji bucket nyata.
+- Kandidat v0.4.0: unggah foto/PDF publik ke Contabo, sampul Program Kajian, dan adapter PDF privat terpisah ke lmsuahprivate. Uji nyata publik/privat, penolakan anonim/penimpaan, 418 tes, lint dan build lulus. Belum dirilis; gate visual E2E masih terbuka. Tidak mengaktifkan flag privat/revisi.
 - Migrasi produksi 0010–0014 telah diterapkan dengan izin setelah uji salinan lulus, tanpa penulisan baris aplikasi/perubahan flags. Bukti: docs/contabo-uploads.md. Gate rilis: docs/releases/v0.4.0-draft.md.
 
 ## [0.3.3] — 2026-10-22

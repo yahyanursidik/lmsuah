@@ -4,6 +4,12 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-10-22
+
+- Memperbaiki deploy Netlify yang terhenti karena nama bucket publik S3_BUCKET terdeteksi sebagai secret. Hanya key konfigurasi S3 publik yang dikecualikan; access key, secret key, database dan OAuth secret tetap dipindai.
+- Menambahkan tes allowlist scanner yang menolak pengecualian credential keys, penonaktifan scanner, atau pengabaian seluruh path.
+- Hotfix tidak menyertakan fitur unggah Contabo/sampul yang masih menunggu uji unggah nyata. Catatan: docs/releases/v0.3.3.md.
+
 ## [0.3.2] — 2026-10-22
 
 - Memperbaiki jalur aset beranda yang salah dan pemetaan foto lokasi, termasuk ejaan Ukhuwwah. URL foto khusus lokasi kini diprioritaskan, bukan diabaikan.

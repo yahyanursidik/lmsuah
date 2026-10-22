@@ -30,6 +30,25 @@ const request = (method: string, path = '/api/announcements') => new Request(`ht
 beforeEach(() => { vi.clearAllMocks(); mocks.session = null; mocks.rows = []; });
 
 describe('Announcement sessions and access', () => {
+  it.each([
+    ['/masjid-al-ukhuwah.jpg', '/masjid-ukhuwah.jpg'],
+    [' https://cdn.example.test/foto.jpg?sig=keep ', 'https://cdn.example.test/foto.jpg?sig=keep'],
+  ])('stores validated image %s rather than rejecting local assets', async (imageUrl, expected) => {
+    mocks.session = { userId: 'admin-one', roles: ['administrator'] };
+    const response = await handler(new Request('https://example.test/api/announcements', {
+      method: 'POST', body: JSON.stringify({ title: 'Foto', content: 'Informasi', imageUrl }),
+    }), context);
+    expect(response.status).toBe(200);
+    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({ imageUrl: expected }));
+  });
+  it.each(['javascript:alert(1)', 'https://user:secret@example.test/foto.jpg'])('rejects unsafe image URLs before writing: %s', async imageUrl => {
+    mocks.session = { userId: 'admin-one', roles: ['administrator'] };
+    const response = await handler(new Request('https://example.test/api/announcements', {
+      method: 'POST', body: JSON.stringify({ title: 'Foto', content: 'Informasi', imageUrl }),
+    }), context);
+    expect(response.status).toBe(400);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['POST', 'PATCH', 'DELETE'])('requires a session for %s', async method => {
     expect((await handler(request(method, '/api/announcements/item-one'), context)).status).toBe(401);
     expect(mocks.insert).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.remove).not.toHaveBeenCalled();

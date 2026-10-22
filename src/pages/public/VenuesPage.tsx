@@ -1,15 +1,11 @@
 import { useMemo, useState } from 'react';
+import { AppImage } from '../../components/ui/AppImage';
+import { getVenueFallbackImage } from '../../lib/image-source';
 import { Link, useLocation } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { Search } from 'lucide-react';
 import { MOCK_VENUES, Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
-
-const getVenueImage = (venue: Pick<Venue, 'id' | 'name' | 'image'>) => {
-  if (venue.image?.startsWith('/masjid')) return venue.image;
-  if (venue.id.includes('ukhuwah') || venue.name.toLowerCase().includes('ukhuwah')) return '/masjid-ukhuwah.jpg';
-  return '/masjid-umar.jpg';
-};
 
 export function VenuesPage() {
   const location = useLocation();
@@ -53,8 +49,10 @@ export function VenuesPage() {
             className="flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30"
           >
             <div className="h-56 overflow-hidden bg-stone-100 relative">
-              <img
-                src={getVenueImage(venue)}
+              <AppImage
+                src={venue.image}
+                fallbackSrc={getVenueFallbackImage(venue)}
+                kind="venue"
                 alt={venue.name}
                 className="h-full w-full object-cover"
               />

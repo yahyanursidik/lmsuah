@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AppImage } from '../../components/ui/AppImage';
 import { useLocation, Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { MOCK_PROGRAMS, Program } from '../../mock/publicData';
@@ -110,8 +111,9 @@ export function ProgramsPage() {
               className="group flex flex-col justify-between rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-xs hover:shadow-md transition-all"
             >
               <div className="relative h-48 overflow-hidden bg-stone-100">
-                <img
-                  src={prog.coverImage || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&q=80&w=800'}
+                <AppImage
+                  src={prog.coverImage}
+                  kind="program"
                   alt={prog.title}
                   className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />

@@ -1,5 +1,6 @@
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R5 V4 · design-system: design.md */
 import { useId, useState, type ReactNode } from 'react';
+import { AppImage } from "./AppImage";
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight, ExternalLink, LogOut, Search, ShieldCheck } from 'lucide-react';
 import { filterPortalNavigation, getPortalTrail, isPortalItemActive, type Portal } from '@/lib/portal-navigation';
@@ -14,7 +15,7 @@ export function PortalSidebar({ portal, identity, isAdmin, onNavigate, onLogout,
   const navigate = () => { setSearch(''); onNavigate(); };
   return <div className="portal-sidebar">
     <Link to={portal === 'admin' ? '/admin' : '/dashboard'} className="portal-brand" onClick={navigate}>
-      <img src="/logo-abu-haidar.jpg" width="40" height="40" alt="" />
+      <AppImage src="/logo-abu-haidar.jpg" kind="brand" loading="eager" width="40" height="40" alt="" />
       <span><strong>Portal Kajian UAH</strong><small>{portal === 'admin' ? 'Ruang admin' : 'Ruang belajar peserta'}</small></span>
     </Link>
     <div className="portal-menu-search">

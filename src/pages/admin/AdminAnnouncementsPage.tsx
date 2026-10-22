@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AppImage } from "../../components/ui/AppImage";
 import { useList, useDelete } from '@refinedev/core';
 import { Plus, Edit, Trash2, Link as LinkIcon, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -71,7 +72,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
             <Card key={item.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
               {item.imageUrl && (
                 <div className="h-32 bg-slate-100 rounded-t-lg overflow-hidden border-b border-slate-100">
-                  <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                  <AppImage src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
                 </div>
               )}
               <div className="p-5 flex-1 flex flex-col">

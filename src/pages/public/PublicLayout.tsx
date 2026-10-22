@@ -1,5 +1,6 @@
 /* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4 · design-system: design.md */
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
+import { AppImage } from "../../components/ui/AppImage";
 import { useGetIdentity } from '@refinedev/core';
 import { BookOpen, CalendarDays, Home, MapPin, Menu, UserRound, ArrowRight } from 'lucide-react';
 import { isAdminRole } from '../../providers/authProvider';
@@ -27,7 +28,7 @@ export function PublicLayout() {
     <header className="sticky top-0 z-30 border-b border-[var(--color-rule)] bg-[var(--color-surface)]">
       <div className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex min-h-11 min-w-0 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]">
-          <img src="/logo-abu-haidar.jpg" alt="" width="44" height="44" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+          <AppImage src="/logo-abu-haidar.jpg" kind="brand" loading="eager" alt="" width="44" height="44" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
           <span className="min-w-0"><span className="block truncate text-sm font-bold sm:text-base">Kajian Abu Haidar</span><span className="block text-xs text-[var(--color-ink-2)]">Ruang belajar bersama</span></span>
         </Link>
         <nav aria-label="Navigasi utama" className="hidden items-center gap-1 lg:flex">

@@ -5,6 +5,7 @@ import { venues } from './db/schema/index.js';
 import { eq, and, asc, desc, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
+import { imageSourceSchema } from './utils/image-validation.js';
 import { ForbiddenError } from './middleware/auth.js';
 import {
   getOptionalAuth,
@@ -33,7 +34,7 @@ const venueSchema = z.object({
   description: z.string().optional(),
   capacity: z.string().optional(),
   phone: z.string().optional(),
-  image: z.string().optional(),
+  image: imageSourceSchema.optional(),
   status: z.enum(['active', 'inactive']).optional().default('active'),
 });
 

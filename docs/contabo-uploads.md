@@ -4,6 +4,8 @@ Status pengembangan: 2026-10-22. Belum dirilis; unggah nyata ke bucket menunggu 
 
 Kandidat rilis terisolasi: 399 tes/55 file lulus, tambahan pengaman URL lulus 8 tes Contabo; lint/typecheck/build lulus. Hotfix deploy v0.3.3 sudah dirilis melalui PR #14, sedangkan unggahan tetap kandidat draft v0.4.0.
 
+Kandidat dipush sebagai [draft PR #15](https://github.com/yahyanursidik/lmsuah/pull/15). Preview commit 0648b20 berstatus Ready: halaman 200, GET media-upload 405 JSON, POST tanpa autentikasi 401 JSON, metadata program 200 JSON. Fungsi native berhasil dimuat pada Linux; pemeriksaan ini bukan bukti izin PUT bucket atau uji gambar end-to-end.
+
 ## Media publik
 
 Admin/editor dapat memilih JPEG, PNG, atau WebP (maksimal 4 MiB); server memverifikasi dan mendekode gambar, membatasi 20 megapiksel, mengoreksi orientasi, menghapus metadata, dan menyimpan WebP maksimal 1600 × 1600. Sampul program, foto lokasi, dan gambar pengumuman memakai pemilih/pratinjau yang sama. URL manual tetap didukung untuk kompatibilitas.

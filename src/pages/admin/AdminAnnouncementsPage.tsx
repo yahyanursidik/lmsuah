@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { AdminAnnouncementForm } from './AdminAnnouncementForm';
 import type { Announcement } from '../../types';
+import { getErrorMessage } from '../../lib/error-message';
 
 export const AdminAnnouncementsPage: React.FC = () => {
   const { query: listQuery, result } = useList<Announcement>({
@@ -18,7 +19,8 @@ export const AdminAnnouncementsPage: React.FC = () => {
   const announcements = result?.data || [];
   const isLoading = listQuery?.isLoading;
 
-  const { mutate: deleteMutate } = useDelete();
+  const { mutate: deleteMutate, mutation: deleteMutation } = useDelete();
+  const [deleteError, setDeleteError] = useState('');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -34,16 +36,19 @@ export const AdminAnnouncementsPage: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    if (deleteMutation.isPending) return;
+    setDeleteError('');
     if (window.confirm('Yakin ingin menghapus pengumuman ini?')) {
       deleteMutate({
         resource: 'announcements',
         id,
-      });
+      }, { onSuccess: () => listQuery.refetch(), onError: error => setDeleteError(getErrorMessage(error, 'Pengumuman gagal dihapus.')) });
     }
   };
 
   return (
     <div className="space-y-6">
+      {deleteError && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{deleteError}</p>}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold text-slate-800">Pengumuman</h1>
@@ -115,6 +120,8 @@ export const AdminAnnouncementsPage: React.FC = () => {
                       variant="outline" 
                       size="sm"
                       onClick={() => handleDelete(item.id)}
+                      aria-label={`Hapus ${item.title}`}
+                      disabled={deleteMutation.isPending}
                       className="border-red-200 hover:bg-red-50 hover:border-red-300 text-red-500"
                       title="Hapus"
                     >

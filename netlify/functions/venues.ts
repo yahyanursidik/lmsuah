@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
 import { imageSourceSchema } from './utils/image-validation.js';
 import { ForbiddenError } from './middleware/auth.js';
+import { HttpError } from './utils/http-error.js';
+import { assertDeletionAllowed, validateDeletionId } from './utils/deletion-policy.js';
 import {
   getOptionalAuth,
   parseQueryParams,
@@ -167,7 +169,7 @@ const venuesHandler = async (request: Request) => {
     const existing = await db.select().from(venues).where(eq(venues.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Lokasi tidak ditemukan');
+      throw new HttpError(404, 'Lokasi tidak ditemukan');
     }
 
     const authSession = requireContentUpdateAccess(session);
@@ -205,16 +207,18 @@ const venuesHandler = async (request: Request) => {
 
   if (method === 'DELETE') {
     if (!resourceId) {
-      throw new Error('ID lokasi diperlukan untuk menghapus');
+      throw new HttpError(400, 'ID lokasi diperlukan untuk menghapus');
     }
 
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const existing = await db.select().from(venues).where(eq(venues.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Lokasi tidak ditemukan');
+      throw new HttpError(404, 'Lokasi tidak ditemukan');
     }
 
+    await assertDeletionAllowed('venues', resourceId);
     await db.delete(venues).where(eq(venues.id, resourceId));
 
     logMutationAudit('DELETE', 'venues', resourceId, authSession.userId, {

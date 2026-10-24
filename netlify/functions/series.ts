@@ -9,6 +9,7 @@ import { validateBody, ValidationError } from './utils/validation.js';
 import { ForbiddenError } from './middleware/auth.js';
 import { canReadDrafts } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
+import { validateDeletionId } from './utils/deletion-policy.js';
 import { featureRequested } from './utils/advanced-features.js';
 import { assertLegacyWorkspaceWritable, legacyWorkspaceGuardWrites } from './utils/program-snapshots.js';
 import { readPublishedCollection } from './utils/publication-readers.js';
@@ -195,7 +196,7 @@ const seriesHandler = async (request: Request) => {
     const existing = await db.select().from(series).where(eq(series.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Seri tidak ditemukan');
+      throw new HttpError(404, 'Seri tidak ditemukan');
     }
 
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
@@ -238,20 +239,20 @@ const seriesHandler = async (request: Request) => {
 
   if (method === 'DELETE') {
     if (!resourceId) {
-      throw new Error('ID seri diperlukan untuk menghapus');
+      throw new HttpError(400, 'ID seri diperlukan untuk menghapus');
     }
 
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const existing = await db.select().from(series).where(eq(series.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Seri tidak ditemukan');
+      throw new HttpError(404, 'Seri tidak ditemukan');
     }
 
     await assertLegacyWorkspaceWritable(existing[0].programId);
     const deleteQuery = db.delete(series).where(eq(series.id, resourceId));
-    if (featureRequested('programRevisions')) await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${existing[0].programId}`}, 0))`), ...legacyWorkspaceGuardWrites([existing[0].programId]), deleteQuery]);
-    else await deleteQuery;
+    await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${existing[0].programId}`}, 0))`), ...legacyWorkspaceGuardWrites([existing[0].programId]), db.delete(seriesBooks).where(eq(seriesBooks.seriesId, resourceId)), deleteQuery]);
 
     logMutationAudit('DELETE', 'series', resourceId, authSession.userId, {
       deletedTitle: existing[0].title,

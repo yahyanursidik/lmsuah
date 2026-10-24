@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useList, useDelete } from '@refinedev/core';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { AdminLessonForm } from './AdminLessonForm';
+import { getErrorMessage } from '../../lib/error-message';
 
 interface Lesson {
   id: string;
@@ -19,6 +20,7 @@ export function AdminLessonsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
   const { query: listQuery, result: listResult } = useList<Lesson>({
     resource: 'lessons',
@@ -28,14 +30,16 @@ export function AdminLessonsPage() {
   });
   const refetch = listQuery?.refetch;
 
-  const { mutate: deleteLesson } = useDelete();
+  const { mutate: deleteLesson, mutation: deleteMutation } = useDelete();
 
   const lessons = listResult?.data || [];
   const isLoading = listQuery?.isLoading ?? false;
 
   const handleDelete = (id: string) => {
+    if (deleteMutation.isPending) return;
+    setDeleteError('');
     if (window.confirm('Yakin ingin menghapus lesson ini? (Termasuk video dan markers terkait)')) {
-      deleteLesson({ resource: 'lessons', id }, { onSuccess: () => refetch() });
+      deleteLesson({ resource: 'lessons', id }, { onSuccess: () => refetch(), onError: error => setDeleteError(getErrorMessage(error, 'Pertemuan gagal dihapus.')) });
     }
   };
 
@@ -46,6 +50,7 @@ export function AdminLessonsPage() {
 
   return (
     <div className="program-workspace space-y-6">
+      {deleteError && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{deleteError}</p>}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-slate-900">Pengelolaan Materi (Lessons)</h1>
         <button
@@ -120,6 +125,8 @@ export function AdminLessonsPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(lesson.id)}
+                          aria-label={`Hapus ${lesson.title}`}
+                          disabled={deleteMutation.isPending}
                           className="p-2 text-stone-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                           title="Hapus"
                         >
@@ -162,6 +169,8 @@ export function AdminLessonsPage() {
                 </button>
                 <button
                   onClick={() => handleDelete(lesson.id)}
+                  aria-label={`Hapus ${lesson.title}`}
+                  disabled={deleteMutation.isPending}
                   className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
                 >
                   Hapus

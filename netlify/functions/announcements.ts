@@ -8,6 +8,7 @@ import { validateBody } from './utils/validation.js';
 import { requireAuth, requireRole } from './middleware/auth.js';
 import { getDatabaseActorId, getOptionalAuth } from './utils/contentHelper.js';
 import { HttpError } from './utils/http-error.js';
+import { validateDeletionId } from './utils/deletion-policy.js';
 import { imageSourceSchema } from './utils/image-validation.js';
 
 const ADMIN_ROLES = ['admin', 'administrator', 'super_administrator'];
@@ -103,7 +104,9 @@ const announcementsHandler = async (request: Request) => {
         throw new HttpError(400, 'ID pengumuman diperlukan.');
       }
       
-      await db.delete(announcements).where(eq(announcements.id, id));
+      validateDeletionId(id);
+      const deleted = await db.delete(announcements).where(eq(announcements.id, id)).returning({ id: announcements.id });
+      if (!deleted.length) throw new HttpError(404, 'Pengumuman tidak ditemukan.');
       return { success: true };
     }
 

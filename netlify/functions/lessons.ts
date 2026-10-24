@@ -12,6 +12,7 @@ import { canReadDrafts, publicQuizMetadata } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
 import { publishedTranscriptMaterials } from './utils/transcript-materials.js';
 import { featureRequested } from './utils/advanced-features.js';
+import { assertDeletionAllowed, lessonDeletionCleanup, validateDeletionId } from './utils/deletion-policy.js';
 import { assertLegacyWorkspaceWritable, getProgramPublication, legacyWorkspaceGuardWrites, publishedSnapshotLesson } from './utils/program-snapshots.js';
 import { publicPublicationLesson } from '../../shared/publication-projection.js';
 import { readPublishedLessonList } from './utils/publication-readers.js';
@@ -398,9 +399,13 @@ const lessonsHandler = async (request: Request) => {
   if (method === 'DELETE') {
     if (!resourceId) throw new Error('ID lesson diperlukan');
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const [existing] = await db.select().from(lessons).where(eq(lessons.id, resourceId)).limit(1);
     if (!existing) throw new HttpError(404, 'Pertemuan tidak ditemukan');
     await assertLegacyWorkspaceWritable(existing.programId);
+    await assertDeletionAllowed('lessons', resourceId);
+    writes.push(...await lessonDeletionCleanup(resourceId));
+    writes.push(db.execute(sql`delete from bookmarks where resource_type = 'lesson' and resource_id = ${resourceId}`));
     
     const quizIds = db.select({ id: quizzes.id }).from(quizzes).where(eq(quizzes.lessonId, resourceId));
     const questionIds = db.select({ id: questions.id }).from(questions).where(inArray(questions.quizId, quizIds));

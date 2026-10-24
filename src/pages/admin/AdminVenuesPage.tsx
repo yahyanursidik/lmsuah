@@ -31,6 +31,7 @@ export function AdminVenuesPage() {
   const [editingVenue, setEditingVenue] = useState<VenueItem | null>(null);
   const [query, setQuery] = useState('');
   const [formError, setFormError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | VenueItem['status']>('all');
 
   const [formData, setFormData] = useState({
@@ -143,6 +144,8 @@ export function AdminVenuesPage() {
   };
 
   const handleDelete = (id: string) => {
+    if (deleteMutation?.isPending) return;
+    setDeleteError('');
     if (confirm('Apakah Anda yakin ingin menghapus lokasi majelis ini?')) {
       deleteVenue(
         {
@@ -151,6 +154,7 @@ export function AdminVenuesPage() {
         },
         {
           onSuccess: () => refetch(),
+          onError: error => setDeleteError(getErrorMessage(error, 'Lokasi gagal dihapus.')),
         }
       );
     }
@@ -158,6 +162,7 @@ export function AdminVenuesPage() {
 
   return (
     <div className="space-y-8">
+      {deleteError && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{deleteError}</p>}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -273,6 +278,8 @@ export function AdminVenuesPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => handleDelete(v.id)}
+                            aria-label={`Hapus ${v.name}`}
+                            disabled={deleteMutation?.isPending}
                             className="text-red-400 hover:text-red-300 hover:bg-red-950/30"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -311,6 +318,8 @@ export function AdminVenuesPage() {
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDelete(v.id)}
+                        aria-label={`Hapus ${v.name}`}
+                        disabled={deleteMutation?.isPending}
                         className="text-red-400 min-h-[44px]"
                       >
                         Hapus

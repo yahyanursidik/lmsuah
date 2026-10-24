@@ -4,6 +4,7 @@ import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
 import { programs, lessons, lessonVideos, lessonAttachments, schedules, venues, series, seriesBooks, books, transcriptDocuments, transcriptVersions, programPublications, programRevisions } from './db/schema/index.js';
 import { featureRequested } from './utils/advanced-features.js';
+import { assertDeletionAllowed, validateDeletionId } from './utils/deletion-policy.js';
 import { assertLegacyWorkspaceWritable, legacyWorkspaceGuardWrites } from './utils/program-snapshots.js';
 import type { PublicationProgram } from '../../shared/program-publication.js';
 import { canReadDrafts } from './utils/content-policy.js';
@@ -240,17 +241,19 @@ const programsHandler = async (request: Request) => {
 
   if (method === 'DELETE') {
     if (!resourceId) {
-      throw new Error('ID program diperlukan untuk menghapus');
+      throw new HttpError(400, 'ID program diperlukan untuk menghapus');
     }
 
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const existing = await db.select(programReadColumns()).from(programs).where(eq(programs.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Program tidak ditemukan');
+      throw new HttpError(404, 'Program tidak ditemukan');
     }
 
-    await db.delete(programs).where(eq(programs.id, resourceId));
+    await assertDeletionAllowed('programs', resourceId);
+    await db.batch([db.execute(sql`delete from bookmarks where resource_type = 'program' and resource_id = ${resourceId}`), db.delete(programs).where(eq(programs.id, resourceId))]);
 
     logMutationAudit('DELETE', 'programs', resourceId, authSession.userId, {
       deletedTitle: existing[0].title,

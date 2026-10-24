@@ -8,6 +8,7 @@ import { validateBody } from './utils/validation.js';
 import { ForbiddenError } from './middleware/auth.js';
 import { canReadDrafts } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
+import { assertDeletionAllowed, validateDeletionId } from './utils/deletion-policy.js';
 import {
   getOptionalAuth,
   parseQueryParams,
@@ -151,7 +152,7 @@ const booksHandler = async (request: Request) => {
     const existing = await db.select().from(books).where(eq(books.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Buku tidak ditemukan');
+      throw new HttpError(404, 'Buku tidak ditemukan');
     }
 
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
@@ -186,16 +187,18 @@ const booksHandler = async (request: Request) => {
 
   if (method === 'DELETE') {
     if (!resourceId) {
-      throw new Error('ID buku diperlukan untuk menghapus');
+      throw new HttpError(400, 'ID buku diperlukan untuk menghapus');
     }
 
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const existing = await db.select().from(books).where(eq(books.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Buku tidak ditemukan');
+      throw new HttpError(404, 'Buku tidak ditemukan');
     }
 
+    await assertDeletionAllowed('books', resourceId);
     await db.delete(books).where(eq(books.id, resourceId));
 
     logMutationAudit('DELETE', 'books', resourceId, authSession.userId, {

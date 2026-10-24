@@ -12,6 +12,7 @@ import { featureRequested } from './utils/advanced-features.js';
 import { assertLegacyWorkspaceWritable, legacyWorkspaceGuardWrites } from './utils/program-snapshots.js';
 import { readPublishedCollection } from './utils/publication-readers.js';
 import { HttpError } from './utils/http-error.js';
+import { assertDeletionAllowed, validateDeletionId } from './utils/deletion-policy.js';
 import {
   getOptionalAuth,
   parseQueryParams,
@@ -204,7 +205,7 @@ const chaptersHandler = async (request: Request) => {
     const existing = await db.select().from(chapters).where(eq(chapters.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Bab tidak ditemukan');
+      throw new HttpError(404, 'Bab tidak ditemukan');
     }
     if (featureRequested('programRevisions') && !existing[0].programId) throw new HttpError(409, 'Bab bersama hanya dibaca pada alur revisi terpisah. Gunakan modul milik program agar program lain tidak berubah.');
     if (body.programId && body.programId !== existing[0].programId) throw new ValidationError('Modul tidak dapat dipindahkan antarprogram. Pindahkan pertemuannya, bukan identitas modul.');
@@ -240,18 +241,20 @@ const chaptersHandler = async (request: Request) => {
 
   if (method === 'DELETE') {
     if (!resourceId) {
-      throw new Error('ID bab diperlukan untuk menghapus');
+      throw new HttpError(400, 'ID bab diperlukan untuk menghapus');
     }
 
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const existing = await db.select().from(chapters).where(eq(chapters.id, resourceId)).limit(1);
 
     if (!existing[0]) {
-      throw new Error('Bab tidak ditemukan');
+      throw new HttpError(404, 'Bab tidak ditemukan');
     }
 
     await assertLegacyWorkspaceWritable(existing[0].programId);
     if (featureRequested('programRevisions') && !existing[0].programId) throw new HttpError(409, 'Bab bersama tidak dihapus melalui alur revisi program.');
+    await assertDeletionAllowed('chapters', resourceId);
     const deleteQuery = db.delete(chapters).where(eq(chapters.id, resourceId));
     if (featureRequested('programRevisions') && existing[0].programId) await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${existing[0].programId}`}, 0))`), ...legacyWorkspaceGuardWrites([existing[0].programId]), deleteQuery]);
     else await deleteQuery;

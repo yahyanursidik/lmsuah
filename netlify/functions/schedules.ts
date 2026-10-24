@@ -16,6 +16,7 @@ import {
   getDatabaseActorId,
 } from './utils/contentHelper.js';
 import { HttpError } from './utils/http-error.js';
+import { validateDeletionId } from './utils/deletion-policy.js';
 
 const ALLOWED_FILTERS = ['venueId', 'programId', 'status', 'category', 'type', 'day', 'date'];
 const ALLOWED_SORTS = ['createdAt', 'updatedAt', 'date', 'startTime', 'title'];
@@ -210,6 +211,7 @@ const schedulesHandler = async (request: Request) => {
     }
 
     const authSession = requireContentDeleteAccess(session);
+    validateDeletionId(resourceId);
     const existing = await db.select().from(schedules).where(eq(schedules.id, resourceId)).limit(1);
 
     if (!existing[0]) {

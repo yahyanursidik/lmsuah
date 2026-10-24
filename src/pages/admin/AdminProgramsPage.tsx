@@ -116,6 +116,7 @@ export function AdminProgramsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProgram, setEditingProgram] = useState<ProgramItem | null>(null);
   const [programToDelete, setProgramToDelete] = useState<ProgramItem | null>(null);
+  const [deleteError, setDeleteError] = useState('');
   const [formData, setFormData] = useState<ProgramFormData>(EMPTY_FORM);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -142,7 +143,7 @@ export function AdminProgramsPage() {
   const { mutate: deleteProgram, mutation: deleteMutation } = useDelete();
 
   const isSaving = Boolean(createMutation?.isPending || updateMutation?.isPending) || uploading;
-  const isDeleting = Boolean(deleteMutation?.isPending);
+  const isDeleting = Boolean(deleteMutation?.isPending || updateMutation?.isPending);
   const initialForm = editingProgram ? { title: editingProgram.title, slug: editingProgram.slug, description: editingProgram.description || '', coverImage: editingProgram.coverImage || '', status: editingProgram.status } : EMPTY_FORM;
   const formDialog = useDialog({ open: isModalOpen, pending: isSaving, dirty: JSON.stringify(formData) !== JSON.stringify(initialForm), onClose: () => setIsModalOpen(false) });
   const deleteDialog = useDialog({ open: !!programToDelete, pending: isDeleting, onClose: () => setProgramToDelete(null) });
@@ -186,6 +187,7 @@ export function AdminProgramsPage() {
   }, [isModalOpen]);
 
   useEffect(() => {
+    setDeleteError('');
     if (programToDelete) requestAnimationFrame(() => deleteButtonRef.current?.focus());
   }, [programToDelete]);
 
@@ -256,7 +258,8 @@ export function AdminProgramsPage() {
   };
 
   const handleDelete = () => {
-    if (!programToDelete) return;
+    if (!programToDelete || isDeleting) return;
+    setDeleteError('');
     resetFeedback();
     deleteProgram(
       { resource: 'programs', id: programToDelete.id },
@@ -267,11 +270,23 @@ export function AdminProgramsPage() {
           refetch();
         },
         onError: (error) => {
-          setFeedback({ type: 'error', message: getErrorMessage(error, 'Program gagal dihapus.') });
-          setProgramToDelete(null);
+          setDeleteError(getErrorMessage(error, 'Program gagal dihapus.'));
         },
       }
     );
+  };
+
+  const handleArchive = () => {
+    if (!programToDelete || isDeleting) return;
+    setDeleteError('');
+    updateProgram({ resource: 'programs', id: programToDelete.id, values: { status: 'archived', expectedUpdatedAt: programToDelete.updatedAt } }, {
+      onSuccess: () => {
+        setFeedback({ type: 'success', message: `Program “${programToDelete.title}” diarsipkan. Konten dan riwayat peserta tetap disimpan.` });
+        setProgramToDelete(null);
+        void refetch();
+      },
+      onError: error => setDeleteError(getErrorMessage(error, 'Program gagal diarsipkan.')),
+    });
   };
 
   const handleChangeStatus = (program: ProgramItem) => {
@@ -376,8 +391,8 @@ export function AdminProgramsPage() {
           role={feedback.type === 'error' ? 'alert' : 'status'}
           className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${
             feedback.type === 'error'
-              ? 'border-rose-900/70 bg-rose-50/40 text-rose-200'
-              : 'border-emerald-900/70 bg-emerald-50/40 text-emerald-200'
+              ? 'border-rose-300 bg-rose-50 text-rose-800'
+              : 'border-emerald-300 bg-emerald-50 text-emerald-900'
           }`}
         >
           <div className="flex items-start gap-2">
@@ -579,9 +594,11 @@ export function AdminProgramsPage() {
           <div ref={deleteDialog.ref} tabIndex={-1} role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description" className="w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl sm:p-6">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-300"><Trash2 className="h-5 w-5" aria-hidden="true" /></div>
             <h2 id="delete-program-title" className="mt-4 text-lg font-bold text-slate-900">Hapus program?</h2>
-            <p id="delete-program-description" className="mt-2 text-sm leading-6 text-slate-500">“{programToDelete.title}” akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>
+            <p id="delete-program-description" className="mt-2 text-sm leading-6 text-slate-600">“{programToDelete.title}” hanya dapat dihapus permanen jika tidak memiliki pertemuan, modul, seri, jadwal, pendaftaran, atau revisi. Tindakan ini tidak dapat dibatalkan. Untuk program yang sudah digunakan, pilih Arsipkan; konten dan riwayat peserta tetap disimpan.</p>
+            {deleteError && <p role="alert" className="mt-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{deleteError}</p>}
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" onClick={() => setProgramToDelete(null)} disabled={isDeleting} className="text-slate-700 hover:bg-slate-200 hover:text-slate-900">Batal</Button>
+              {programToDelete.status !== 'archived' && <Button type="button" variant="outline" onClick={handleArchive} disabled={isDeleting}>Arsipkan</Button>}
               <Button ref={deleteButtonRef} type="button" variant="destructive" onClick={handleDelete} disabled={isDeleting} className="bg-rose-600 text-slate-900 hover:bg-rose-500">
                 {isDeleting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
                 Hapus permanen

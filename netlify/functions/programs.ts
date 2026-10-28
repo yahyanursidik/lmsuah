@@ -2,7 +2,7 @@ import type { Config } from '@netlify/functions';
 import { programReadColumns } from "./utils/program-columns.js";
 import { createHandler } from './middleware/handler.js';
 import { db } from './utils/db.js';
-import { programs, lessons, lessonVideos, lessonAttachments, schedules, venues, series, seriesBooks, books, transcriptDocuments, transcriptVersions, programPublications, programRevisions } from './db/schema/index.js';
+import { programs, lessons, schedules, venues, series, seriesBooks, books, programPublications, programRevisions } from './db/schema/index.js';
 import { featureRequested } from './utils/advanced-features.js';
 import { assertDeletionAllowed, validateDeletionId } from './utils/deletion-policy.js';
 import { assertLegacyWorkspaceWritable, legacyWorkspaceGuardWrites } from './utils/program-snapshots.js';
@@ -10,6 +10,7 @@ import type { PublicationProgram } from '../../shared/program-publication.js';
 import { canReadDrafts } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
 import { programReadiness } from '../../shared/program-readiness.js';
+import { lessonMaterialCounts } from './utils/lesson-material-counts.js';
 import { eq, and, asc, desc, count, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
@@ -193,13 +194,15 @@ const programsHandler = async (request: Request) => {
       if (body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined) await assertLegacyWorkspaceWritable(resourceId);
     }
     if (body.status === 'published') {
-      const items = await db.select({ status: lessons.status, materialCount: sql<number>`(
-        select count(*) from ${lessonVideos} where ${lessonVideos.lessonId} = ${lessons.id}
-      ) + (select count(*) from ${lessonAttachments} where ${lessonAttachments.lessonId} = ${lessons.id})
-      + ${featureRequested('privatePdf') ? sql`(select count(*) from ${transcriptVersions} inner join ${transcriptDocuments} on ${transcriptVersions.documentId} = ${transcriptDocuments.id} where ${transcriptDocuments.lessonId} = ${lessons.id} and ${transcriptVersions.status} = 'published')` : sql`0`}` })
+      const items = await db.select({ id: lessons.id, title: lessons.title, status: lessons.status })
         .from(lessons).where(eq(lessons.programId, resourceId));
-      const failed = programReadiness({ ...existing[0], ...body }, items).filter(check => !check.ready);
-      if (failed.length) throw new HttpError(409, `Program belum siap: ${failed.map(check => check.label).join('; ')}.`, 'PROGRAM_NOT_READY');
+      const counts = await lessonMaterialCounts(items.filter(item => item.status === 'published').map(item => item.id));
+      const failed = programReadiness({ ...existing[0], ...body }, items.map(item => ({ ...item, materialCount: counts.get(item.id) || 0 }))).filter(check => !check.ready);
+      if (failed.length) {
+        const missing = items.filter(item => item.status === 'published' && !counts.get(item.id));
+        const detail = missing.length ? ` Pertemuan tanpa materi: ${missing.map(item => item.title).join('; ')}. Tambahkan materi atau ubah pertemuan menjadi draft.` : '';
+        throw new HttpError(409, `Program belum siap: ${failed.map(check => check.label).join('; ')}.${detail}`, 'PROGRAM_NOT_READY');
+      }
     }
     const databaseActorId = getDatabaseActorId(authSession);
     if (body.slug && body.slug !== existing[0].slug) {

@@ -11,6 +11,7 @@ import { ForbiddenError } from './middleware/auth.js';
 import { canReadDrafts, publicQuizMetadata } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
 import { publishedTranscriptMaterials } from './utils/transcript-materials.js';
+import { lessonMaterialCounts } from './utils/lesson-material-counts.js';
 import { featureRequested } from './utils/advanced-features.js';
 import { assertDeletionAllowed, lessonDeletionCleanup, validateDeletionId } from './utils/deletion-policy.js';
 import { assertLegacyWorkspaceWritable, getProgramPublication, legacyWorkspaceGuardWrites, publishedSnapshotLesson } from './utils/program-snapshots.js';
@@ -204,20 +205,16 @@ const lessonsHandler = async (request: Request) => {
 
     const lessonIds = data.map((item) => item.id);
     const quizPointers = featureRequested('programRevisions') && lessonIds.length ? await db.select().from(lessonQuizDrafts).where(inArray(lessonQuizDrafts.lessonId, lessonIds)) : [];
-    const transcriptMaterials = await publishedTranscriptMaterials(lessonIds);
-    const [videos, attachments, lessonQuizzes] = lessonIds.length > 0
+    const [materialCounts, lessonQuizzes] = lessonIds.length > 0
       ? await Promise.all([
-          db.select({ lessonId: lessonVideos.lessonId }).from(lessonVideos).where(inArray(lessonVideos.lessonId, lessonIds)),
-          db.select({ lessonId: lessonAttachments.lessonId }).from(lessonAttachments).where(inArray(lessonAttachments.lessonId, lessonIds)),
+          lessonMaterialCounts(lessonIds),
            db.select({ lessonId: quizzes.lessonId }).from(quizzes).where(and(inArray(quizzes.lessonId, lessonIds), isGuestUser ? eq(quizzes.isPublished, true) : undefined)),
         ])
-      : [[], [], []];
+      : [new Map<string, number>(), []];
 
     const enrichedData = data.map((item) => ({
       ...item,
-      materialCount:
-        videos.filter((video) => video.lessonId === item.id).length +
-        attachments.filter((attachment) => attachment.lessonId === item.id).length + transcriptMaterials.filter(material => material.lessonId === item.id).length,
+      materialCount: materialCounts.get(item.id) || 0,
       hasQuiz: quizPointers.some(pointer => pointer.lessonId === item.id) ? Boolean(quizPointers.find(pointer => pointer.lessonId === item.id)?.quizId) : lessonQuizzes.some((quiz) => quiz.lessonId === item.id),
     }));
 

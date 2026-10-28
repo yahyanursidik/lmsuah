@@ -86,6 +86,14 @@ export function AdminProgramSetupPage() {
     heading.current?.focus();
   }, [step]);
   useEffect(() => {
+    if (step === 3) {
+      void programQuery.query.refetch();
+      void meetings.query.refetch();
+    }
+    // Refresh when entering review, including after edits in the curriculum.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, id]);
+  useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (dirty) event.preventDefault();
     };
@@ -278,7 +286,9 @@ export function AdminProgramSetupPage() {
       {step === 3 && (
         <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5">
           <h3 className="font-bold">Checklist sebelum publikasi</h3>
-          {meetings.query.isError ? (
+          {meetings.query.isFetching || programQuery.query.isFetching ? (
+            <p role="status">Memeriksa kesiapan terbaru…</p>
+          ) : meetings.query.isError ? (
             <ErrorAlert
               message="Kesiapan program belum dapat diperiksa."
               onRetry={refresh}
@@ -309,6 +319,7 @@ export function AdminProgramSetupPage() {
             membuat jadwal atau mendaftarkan peserta.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
+            <button className={action} onClick={refresh} disabled={meetings.query.isFetching || programQuery.query.isFetching || mutation.isPending}>Periksa ulang kesiapan</button>
             <Link
               className={action}
               to={`/belajar/program/${id}`}
@@ -323,7 +334,10 @@ export function AdminProgramSetupPage() {
               disabled={
                 !publisher ||
                 !ready ||
-                meetings.query.isLoading ||
+                 meetings.query.isLoading ||
+                 meetings.query.isFetching ||
+                 programQuery.query.isFetching ||
+                 programQuery.query.isError ||
                 meetings.query.isError ||
                 mutation.isPending || uploading ||
                 program.status === "published"
@@ -346,7 +360,10 @@ export function AdminProgramSetupPage() {
                           "Program berhasil diterbitkan. Draft pertemuan tetap tidak terlihat publik.",
                       });
                     },
-                    onError: failure,
+                    onError: (error) => {
+                      failure(error);
+                      refresh();
+                    },
                   },
                 );
               }}

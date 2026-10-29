@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { programCategoryLabel, programCategoryOptions } from '../../../shared/program-category';
 import { AppImage } from '../../components/ui/AppImage';
 import { useLocation, Link } from 'react-router-dom';
 import { useList } from '@refinedev/core';
@@ -8,10 +9,8 @@ import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public
 
 export function ProgramsPage() {
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<string>('Semua');
+  const [category, setCategory] = useState<string | null>(null);
   const location = useLocation();
-
-  const categories = ['Semua', 'Fiqih', 'Aqidah', 'Akhlaq', 'Hadits'];
 
   const { query: listQuery, result: listResult } = useList<Program>({
     resource: 'programs',
@@ -27,6 +26,7 @@ export function ProgramsPage() {
   const isLoading = listQuery.isLoading;
   const isError = listQuery.isError;
   const refetch = listQuery.refetch;
+  const categories = programCategoryOptions(rawPrograms);
 
   const filteredPrograms = rawPrograms.filter((prog) => {
     const matchesSearch =
@@ -34,7 +34,7 @@ export function ProgramsPage() {
       (prog.description || '').toLowerCase().includes(search.toLowerCase()) ||
       (prog.bookTitle || '').toLowerCase().includes(search.toLowerCase());
 
-    const matchesCategory = category === 'Semua' || prog.category === category;
+    const matchesCategory = category === null || programCategoryLabel(prog.category) === category;
 
     return matchesSearch && matchesCategory;
   });
@@ -68,18 +68,19 @@ export function ProgramsPage() {
         </div>
 
         {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0">
-          {categories.map((cat) => (
+        <div aria-label="Filter kategori program" className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto pb-2 sm:max-w-[60%] sm:pb-0">
+          {[null, ...categories].map((cat) => (
             <button
-              key={cat}
+              key={cat === null ? 'all' : `category-${cat}`}
               onClick={() => setCategory(cat)}
+              aria-pressed={category === cat}
               className={`rounded-lg px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors min-h-[44px] flex items-center ${
                 category === cat
                   ? 'bg-emerald-900 text-white'
                   : 'bg-stone-100 text-slate-700 hover:bg-stone-200'
               }`}
             >
-              {cat}
+              {cat === null ? 'Semua' : cat}
             </button>
           ))}
         </div>
@@ -100,7 +101,7 @@ export function ProgramsPage() {
           actionText="Reset Filter"
           onAction={() => {
             setSearch('');
-            setCategory('Semua');
+            setCategory(null);
           }}
         />
       ) : (
@@ -117,8 +118,8 @@ export function ProgramsPage() {
                   alt={prog.title}
                   className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                <span className="absolute top-3 left-3 rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
-                  {prog.category || 'Kajian'}
+                <span title={programCategoryLabel(prog.category)} className="absolute top-3 left-3 max-w-[60%] truncate rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
+                  {programCategoryLabel(prog.category)}
                 </span>
                 <span className="absolute top-3 right-3 rounded-md bg-emerald-900/90 px-2.5 py-1 text-xs font-semibold text-emerald-100 backdrop-blur-xs">
                   {prog.status || 'published'}

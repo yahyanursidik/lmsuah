@@ -1,6 +1,7 @@
 /* Hallmark · genre: modern-minimal · macrostructure: Guided Workbench · design-system: design.md · designed-as-app */
 import { useEffect, useRef, useState } from "react";
 import { ImageUrlField } from '../../components/ui/ImageUrlField';
+import { ProgramCategoryField } from '../../components/ui/ProgramCategoryField';
 import { useUploadsPending } from '../../lib/media-upload-state';
 import { useList, useOne, usePermissions, useUpdate } from "@refinedev/core";
 import { Link, useOutletContext, useParams, useSearchParams } from "react-router-dom";
@@ -18,6 +19,7 @@ interface Program {
   slug: string;
   description?: string;
   coverImage?: string | null;
+  category?: string | null;
   status: string;
 }
 interface Meeting {
@@ -62,7 +64,7 @@ export function AdminProgramSetupPage() {
     "publisher",
   ].includes(permissions || "");
   const { mutate: update, mutation } = useUpdate();
-  const [form, setForm] = useState({ title: "", slug: "", description: "", coverImage: "" });
+  const [form, setForm] = useState({ title: "", slug: "", description: "", coverImage: "", category: "" });
   const [dirty, setDirty] = useState(false);
   const [quizLesson, setQuizLesson] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -79,6 +81,7 @@ export function AdminProgramSetupPage() {
         slug: program.slug,
         description: program.description || "",
         coverImage: program.coverImage || "",
+        category: program.category || "",
       });
     }
   }, [program, dirty]);
@@ -193,6 +196,7 @@ export function AdminProgramSetupPage() {
           className="space-y-5 rounded-xl border border-slate-200 bg-white p-5"
         >
           <ImageUrlField value={form.coverImage} onChange={coverImage => { setDirty(true); setForm(previous => ({ ...previous, coverImage })); }} label="Sampul Program Kajian (opsional)" />
+          <ProgramCategoryField value={form.category} onChange={category => { setDirty(true); setForm(previous => ({ ...previous, category })); }} />
           <label className="block space-y-2 text-sm font-semibold">
             Judul *
             <input

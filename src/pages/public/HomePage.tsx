@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AppImage } from '../../components/ui/AppImage';
+import { programCategoryLabel } from '../../../shared/program-category';
 import { getVenueFallbackImage } from '../../lib/image-source';
 import { useList } from '@refinedev/core';
 import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES, type ScheduleItem, type Venue } from '../../mock/publicData';
@@ -32,7 +33,7 @@ export function HomePage() {
       id: prog.id,
       title: prog.title,
       description: prog.description || 'Pembahasan modul kitab induk syar\'i.',
-      category: prog.category || 'Fiqih',
+      category: programCategoryLabel(prog.category),
       bookTitle: prog.bookTitle || prog.title,
       totalLessons: progLessons.length,
       coverImage: prog.coverImage,
@@ -156,7 +157,7 @@ export function HomePage() {
                   kind="program"
                   className="h-full w-full object-cover"
                 />
-                <span className="absolute top-3 left-3 rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
+                <span title={prog.category} className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
                   {prog.category}
                 </span>
               </div>

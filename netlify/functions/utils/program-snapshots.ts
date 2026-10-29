@@ -54,7 +54,7 @@ export async function buildSourceSnapshot(programId: string, includeDrafts = fal
     ids.length ? db.select().from(quizzes).where(inArray(quizzes.lessonId, ids)).orderBy(desc(quizzes.createdAt), desc(quizzes.id)) : [],
     ids.length ? db.select().from(lessonQuizDrafts).where(inArray(lessonQuizDrafts.lessonId, ids)) : [],
     publishedTranscriptMaterials(ids),
-    db.select({ category: schedules.category, instructor: schedules.speaker, day: schedules.day, startTime: schedules.startTime, venueName: venues.name }).from(schedules).innerJoin(venues, eq(venues.id, schedules.venueId)).where(and(eq(schedules.programId, programId), eq(schedules.status, 'Rutin'))).orderBy(desc(schedules.date)).limit(1),
+    db.select({ instructor: schedules.speaker, day: schedules.day, startTime: schedules.startTime, venueName: venues.name }).from(schedules).innerJoin(venues, eq(venues.id, schedules.venueId)).where(and(eq(schedules.programId, programId), eq(schedules.status, 'Rutin'))).orderBy(desc(schedules.date)).limit(1),
   ]);
   const groupIds = groups.map(item => item.id);
   const references = groupIds.length ? await db.select({ seriesId: seriesBooks.seriesId, id: books.id, title: books.title, slug: books.slug, author: books.author, status: books.status }).from(seriesBooks).innerJoin(books, eq(books.id, seriesBooks.bookId)).where(inArray(seriesBooks.seriesId, groupIds)).orderBy(asc(seriesBooks.sequence)) : [];
@@ -70,7 +70,7 @@ export async function buildSourceSnapshot(programId: string, includeDrafts = fal
   const snapshot: ProgramPublicationSnapshot = {
     schemaVersion: 1,
     program: { id: program.id, title: program.title, slug: program.slug, description: program.description, coverImage: program.coverImage,
-      category: agenda[0]?.category || undefined, instructor: agenda[0]?.instructor, routineSchedule: agenda[0] ? [agenda[0].day, agenda[0].startTime].filter(Boolean).join(' · ') : undefined, venueName: agenda[0]?.venueName },
+      category: program.category || undefined, instructor: agenda[0]?.instructor, routineSchedule: agenda[0] ? [agenda[0].day, agenda[0].startTime].filter(Boolean).join(' · ') : undefined, venueName: agenda[0]?.venueName },
     chapters: modules.map(module => ({ id: localModules.get(module.id)!, programId, bookId: module.bookId, title: module.title, sequence: module.sequence })),
     series: groups.map(group => ({ id: group.id, programId, slug: group.slug, title: group.title, description: group.description, sequence: group.sequence, status: group.status, books: references.filter(book => book.seriesId === group.id).map(book => ({ id: book.id, title: book.title, slug: book.slug, author: book.author, status: book.status })) })),
     lessons: items.map(lesson => {

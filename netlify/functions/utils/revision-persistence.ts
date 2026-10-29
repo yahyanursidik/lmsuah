@@ -10,6 +10,7 @@ export async function normalizeRevisionSnapshot(input: unknown, base: ProgramPub
   const parsed = revisionSnapshotSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(400, parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
   const snapshot = parsed.data;
+  if (snapshot.program.category !== undefined) snapshot.program.category = snapshot.program.category.trim();
   if (Buffer.byteLength(JSON.stringify(snapshot)) > 4 * 1024 * 1024) throw new HttpError(413, 'Snapshot revisi maksimal 4 MB. Bagi program yang terlalu besar sebelum mengajukan revisi.');
   if (snapshot.program.id !== programId || snapshot.lessons.some(item => item.programId !== programId) || snapshot.series.some(item => item.programId !== programId) || snapshot.chapters.some(item => item.programId !== programId)) throw new HttpError(400, 'Seluruh isi revisi harus berada di program yang sama.');
   for (const items of [snapshot.lessons, snapshot.chapters, snapshot.series]) if (new Set(items.map(item => item.id)).size !== items.length) throw new HttpError(400, 'ID konten dalam revisi tidak boleh berulang.');
@@ -99,7 +100,7 @@ export async function revisionSourceWrites(snapshot: ProgramPublicationSnapshot,
   const programId = snapshot.program.id;
   const ids = snapshot.lessons.map(item => item.id);
   const writes: BatchItem<'pg'>[] = [];
-  writes.push(db.update(programs).set({ title: snapshot.program.title, slug: snapshot.program.slug, description: snapshot.program.description, coverImage: snapshot.program.coverImage || null, status: 'published', updatedAt: new Date(), updatedBy: actorId }).where(eq(programs.id, programId)));
+  writes.push(db.update(programs).set({ title: snapshot.program.title, slug: snapshot.program.slug, description: snapshot.program.description, coverImage: snapshot.program.coverImage || null, category: snapshot.program.category || null, status: 'published', updatedAt: new Date(), updatedBy: actorId }).where(eq(programs.id, programId)));
   writes.push(db.update(series).set({ status: 'archived', updatedAt: new Date(), updatedBy: actorId }).where(eq(series.programId, programId)));
   for (const group of snapshot.series) {
     const values = { programId, title: group.title, slug: group.slug, description: group.description, sequence: group.sequence, status: group.status, updatedAt: new Date(), updatedBy: actorId };

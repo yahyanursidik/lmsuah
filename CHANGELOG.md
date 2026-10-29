@@ -4,6 +4,10 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
+- Kategori program kini disimpan mandiri, dapat diatur pada tambah/edit, persiapan, dan draft revisi; kategori jadwal tidak lagi menimpa kategori program.
+- Menghapus default “Fiqih” pada beranda, memakai label netral “Kajian” untuk kategori kosong, dan menambahkan filter kategori dinamis di publik/admin termasuk kategori kustom.
+- Menambahkan migrasi aditif `0015_program_category`; tidak ada klasifikasi otomatis data lama atau perubahan snapshot yang sudah disetujui. Panduan penerapan: `docs/program-categories.md`.
+
 ## [0.4.0] — 2026-10-22
 
 - Menambahkan unggah foto/PDF publik langsung ke Contabo, sampul Program Kajian dengan pratinjau dan indikator proses, serta adapter PDF privat terpisah pada lmsuahprivate. Bucket publik tetap dilarang untuk konten privat; berkas Netlify lama tetap terbaca.

@@ -44,8 +44,10 @@ describe('Program setup and readiness', () => {
   });
   it('information step saves a partial payload rather than publishing implicitly', () => {
     renderSetup('information');
+    fireEvent.change(screen.getByLabelText('Kategori program (opsional)'), { target: { value: 'Tauhid' } });
     fireEvent.submit(screen.getByRole('button', { name: 'Simpan & lanjutkan' }).closest('form')!);
     expect(fixtures.update).toHaveBeenCalledWith(expect.objectContaining({ resource: 'programs', values: expect.not.objectContaining({ status: 'published' }) }), expect.any(Object));
+    expect(fixtures.update).toHaveBeenCalledWith(expect.objectContaining({ values: expect.objectContaining({ category: 'Tauhid' }) }), expect.any(Object));
   });
   it('refreshes the checklist when review opens and supports a manual recheck', () => {
     renderSetup();

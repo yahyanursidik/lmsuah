@@ -6,7 +6,7 @@ export interface Program {
   subtitle: string;
   description: string;
   instructor: string;
-  category: 'Fiqih' | 'Aqidah' | 'Hadits' | 'Akhlaq' | 'Tafsir';
+  category?: string | null;
   status: 'Berlangsung' | 'Selesai' | 'Akan Datang';
   totalLessons: number;
   completedLessons?: number;

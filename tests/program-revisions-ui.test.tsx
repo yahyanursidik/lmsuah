@@ -61,6 +61,15 @@ describe('Review and revision workspace', () => {
     expect((screen.getByRole('textbox', { name: 'Judul program *' }) as HTMLInputElement).value).toBe('Isi lokal yang aman');
     expect(JSON.parse(fixture.fetch.mock.calls[0]![1].body)).toMatchObject({ action: 'save', expectedHash: 'a'.repeat(64), snapshot: { program: { title: 'Isi lokal yang aman' } } });
   });
+  it('saves category changes in the revision snapshot, not through a direct program update', async () => {
+    fixture.fetch.mockRejectedValue({ message: 'Server belum tersedia' });
+    render(show());
+    fireEvent.change(await screen.findByLabelText('Kategori program (opsional)'), { target: { value: 'Tauhid' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Simpan draft revisi' }));
+    await waitFor(() => expect(fixture.fetch).toHaveBeenCalledOnce());
+    expect(fixture.fetch.mock.calls[0]![0]).toBe('/api/program-revisions/revision-1');
+    expect(JSON.parse(fixture.fetch.mock.calls[0]![1].body)).toMatchObject({ action: 'save', snapshot: { program: { category: 'Tauhid' } } });
+  });
   it('does not carry a private unsaved draft into another signed-in account', async () => {
     const view = render(show());
     fireEvent.change(await screen.findByRole('textbox', { name: 'Judul program *' }), { target: { value: 'Draft privat penulis' } });

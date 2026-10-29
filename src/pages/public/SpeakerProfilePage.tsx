@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AppImage } from '../../components/ui/AppImage';
+import { programCategoryLabel } from '../../../shared/program-category';
 import { useList } from '@refinedev/core';
 import { MOCK_SPEAKER, MOCK_PROGRAMS } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
@@ -82,7 +83,7 @@ export function SpeakerProfilePage() {
               <div key={prog.id} className="rounded-xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-3">
                 <div className="space-y-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded inline-block">
-                    {prog.category}
+                    {programCategoryLabel(prog.category)}
                   </span>
                   <h3 className="font-bold text-slate-900 text-base">{prog.title}</h3>
                   <p className="text-xs text-slate-600 line-clamp-2">{prog.description}</p>

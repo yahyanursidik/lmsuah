@@ -3,6 +3,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ImageUrlField } from '@/components/ui/ImageUrlField';
+import { ProgramCategoryField } from '@/components/ui/ProgramCategoryField';
+import { programCategoryLabel, programCategoryOptions } from '../../../shared/program-category';
 import { useUploadsPending } from '@/lib/media-upload-state';
 import { useNavigate } from 'react-router-dom';
 import { useCreate, useDelete, useList, useOne, useUpdate } from '@refinedev/core';
@@ -45,6 +47,7 @@ interface ProgramItem {
   title: string;
   description?: string;
   coverImage?: string | null;
+  category?: string | null;
   status: ProgramStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -55,6 +58,7 @@ interface ProgramFormData {
   slug: string;
   description: string;
   coverImage: string;
+  category: string;
   status: ProgramStatus;
 }
 
@@ -63,6 +67,7 @@ const EMPTY_FORM: ProgramFormData = {
   slug: '',
   description: '',
   coverImage: '',
+  category: '',
   status: 'draft',
 };
 
@@ -120,6 +125,7 @@ export function AdminProgramsPage() {
   const [formData, setFormData] = useState<ProgramFormData>(EMPTY_FORM);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('updated-desc');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -144,7 +150,7 @@ export function AdminProgramsPage() {
 
   const isSaving = Boolean(createMutation?.isPending || updateMutation?.isPending) || uploading;
   const isDeleting = Boolean(deleteMutation?.isPending || updateMutation?.isPending);
-  const initialForm = editingProgram ? { title: editingProgram.title, slug: editingProgram.slug, description: editingProgram.description || '', coverImage: editingProgram.coverImage || '', status: editingProgram.status } : EMPTY_FORM;
+  const initialForm = editingProgram ? { title: editingProgram.title, slug: editingProgram.slug, description: editingProgram.description || '', coverImage: editingProgram.coverImage || '', category: editingProgram.category || '', status: editingProgram.status } : EMPTY_FORM;
   const formDialog = useDialog({ open: isModalOpen, pending: isSaving, dirty: JSON.stringify(formData) !== JSON.stringify(initialForm), onClose: () => setIsModalOpen(false) });
   const deleteDialog = useDialog({ open: !!programToDelete, pending: isDeleting, onClose: () => setProgramToDelete(null) });
 
@@ -162,12 +168,14 @@ export function AdminProgramsPage() {
     const query = searchQuery.trim().toLowerCase();
     const filtered = programsList.filter((program) => {
       const matchesStatus = statusFilter === 'all' || program.status === statusFilter;
+      const matchesCategory = !categoryFilter || programCategoryLabel(program.category) === categoryFilter;
       const matchesQuery =
         !query ||
         program.title.toLowerCase().includes(query) ||
         program.slug.toLowerCase().includes(query) ||
-        program.description?.toLowerCase().includes(query);
-      return matchesStatus && Boolean(matchesQuery);
+        program.description?.toLowerCase().includes(query) ||
+        programCategoryLabel(program.category).toLowerCase().includes(query);
+      return matchesStatus && matchesCategory && Boolean(matchesQuery);
     });
 
     return [...filtered].sort((a, b) => {
@@ -176,11 +184,11 @@ export function AdminProgramsPage() {
       if (sortBy === 'status') return a.status.localeCompare(b.status, 'id');
       return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
     });
-  }, [programsList, searchQuery, sortBy, statusFilter]);
+  }, [programsList, searchQuery, sortBy, statusFilter, categoryFilter]);
   const pageCount = Math.max(1, Math.ceil(filteredPrograms.length / 12));
   const currentPage = Math.min(page, pageCount);
   const visiblePrograms = filteredPrograms.slice((currentPage - 1) * 12, currentPage * 12);
-  useEffect(() => setPage(1), [searchQuery, statusFilter, sortBy]);
+  useEffect(() => setPage(1), [searchQuery, statusFilter, sortBy, categoryFilter]);
 
   useEffect(() => {
     if (isModalOpen) requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -210,6 +218,7 @@ export function AdminProgramsPage() {
       slug: program.slug,
       description: program.description || '',
       coverImage: program.coverImage || '',
+      category: program.category || '',
       status: program.status,
     });
     setIsModalOpen(true);
@@ -325,6 +334,7 @@ export function AdminProgramsPage() {
   };
 
   const clearFilters = () => {
+    setCategoryFilter('');
     setSearchQuery('');
     setStatusFilter('all');
   };
@@ -413,7 +423,7 @@ export function AdminProgramsPage() {
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Cari judul, slug, atau deskripsi…"
+              placeholder="Cari judul, kategori, slug, atau deskripsi…"
               aria-label="Cari program"
               className="min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30"
             />
@@ -425,6 +435,13 @@ export function AdminProgramsPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="min-w-0">
+              <span className="sr-only">Filter kategori program</span>
+              <select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="min-h-11 w-full max-w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 sm:max-w-48">
+                <option value="">Semua kategori</option>
+                {programCategoryOptions(programsList).map(category => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </label>
             <label className="relative">
               <span className="sr-only">Urutkan program</span>
               <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
@@ -458,7 +475,7 @@ export function AdminProgramsPage() {
             <h2 id="program-list-title" className="text-sm font-semibold text-slate-800">Daftar program</h2>
             <p className="mt-1 text-xs text-slate-500">Menampilkan {filteredPrograms.length} dari {programsList.length} program</p>
           </div>
-          {(searchQuery || statusFilter !== 'all') && (
+          {(searchQuery || statusFilter !== 'all' || categoryFilter) && (
             <button type="button" onClick={clearFilters} className="shrink-0 text-xs font-semibold text-emerald-600 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">Reset filter</button>
           )}
         </div>
@@ -500,6 +517,7 @@ export function AdminProgramsPage() {
 
                   <div className={viewMode === 'list' ? 'mt-3 lg:mt-2' : 'mt-5'}>
                     <h3 className="min-w-0 break-words text-lg font-bold leading-6 text-slate-900">{program.title}</h3>
+                    <p className="mt-1 break-words text-xs text-slate-600">Kategori: {programCategoryLabel(program.category)}</p>
                     <p className="mt-1 truncate font-mono text-xs text-slate-500">/programs/{program.slug}</p>
                     <p className={`mt-3 text-sm leading-6 text-slate-500 ${viewMode === 'grid' ? 'line-clamp-3 min-h-[4.5rem]' : 'line-clamp-2'}`}>
                       {program.description || 'Belum ada deskripsi. Lengkapi konteks program agar mudah dipahami peserta.'}
@@ -543,6 +561,7 @@ export function AdminProgramsPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
               <ImageUrlField value={formData.coverImage} onChange={coverImage => setFormData(previous => ({ ...previous, coverImage }))} label="Sampul Program Kajian (opsional)" />
+              <ProgramCategoryField value={formData.category} onChange={category => setFormData(previous => ({ ...previous, category }))} />
               {feedback?.type === 'error' && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{feedback.message}</p>}
               {!editingProgram && <p className="text-sm text-slate-600">Langkah 1: buat draft. Berikutnya Anda akan dipandu menambahkan pertemuan, materi, dan review publikasi.</p>}
               <label className="block space-y-2">

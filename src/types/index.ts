@@ -12,6 +12,7 @@ export interface Program {
   slug: string;
   description: string;
   coverImage?: string | null;
+  category?: string | null;
   status: 'draft' | 'published' | 'archived';
 }
 
@@ -80,4 +81,3 @@ export interface BookmarkItem {
   resourceId: string;
   createdAt: string;
 }
-

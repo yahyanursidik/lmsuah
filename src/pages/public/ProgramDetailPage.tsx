@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AppImage } from '../../components/ui/AppImage';
+import { programCategoryLabel } from '../../../shared/program-category';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useLearningData } from '../../lib/useLearningData';
 import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
@@ -136,7 +137,7 @@ export function ProgramDetailPage() {
             <div className="lg:col-span-8 space-y-4">
               <div className="flex items-center gap-3">
                 <span className="rounded-md bg-emerald-800 px-3 py-1 text-xs font-semibold text-emerald-200">
-                  {displayProgram.category || 'Kajian'}
+                  {programCategoryLabel(displayProgram.category)}
                 </span>
                 <span className="rounded-md bg-stone-800 px-3 py-1 text-xs font-semibold text-stone-300">
                   {displayProgram.status || 'Berlangsung'}

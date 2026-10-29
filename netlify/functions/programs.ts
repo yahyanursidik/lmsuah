@@ -11,6 +11,7 @@ import { canReadDrafts } from './utils/content-policy.js';
 import { HttpError } from './utils/http-error.js';
 import { programReadiness } from '../../shared/program-readiness.js';
 import { lessonMaterialCounts } from './utils/lesson-material-counts.js';
+import { PROGRAM_CATEGORY_MAX_LENGTH } from '../../shared/program-category.js';
 import { eq, and, asc, desc, count, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateBody } from './utils/validation.js';
@@ -34,6 +35,7 @@ const programSchema = z.object({
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(500).optional(),
   coverImage: imageSourceSchema.nullable().optional(),
+  category: z.string().trim().max(PROGRAM_CATEGORY_MAX_LENGTH).nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional().default('draft'),
 });
 
@@ -43,7 +45,7 @@ async function withProgramMetadata(items: Array<typeof programs.$inferSelect>, e
   if (!items.length) return [];
   const ids = items.map(item => item.id);
   const [agendas, references] = await Promise.all([
-    db.select({ programId: schedules.programId, category: schedules.category, instructor: schedules.speaker, day: schedules.day, startTime: schedules.startTime, venueName: venues.name })
+    db.select({ programId: schedules.programId, instructor: schedules.speaker, day: schedules.day, startTime: schedules.startTime, venueName: venues.name })
       .from(schedules).innerJoin(venues, eq(venues.id, schedules.venueId))
       .where(and(inArray(schedules.programId, ids), eq(schedules.status, 'Rutin'))).orderBy(desc(schedules.date), asc(schedules.id)),
     db.select({ programId: series.programId, title: books.title, author: books.author }).from(series)
@@ -55,7 +57,7 @@ async function withProgramMetadata(items: Array<typeof programs.$inferSelect>, e
     const agenda = agendas.find(schedule => schedule.programId === item.id);
     const reference = references.filter(book => book.programId === item.id);
     const publication = publications.find(candidate => candidate.programId === item.id);
-    return { ...item, ...(publication?.header || {}), status: item.status, coverImage: publication ? publication.header.coverImage || null : item.coverImage, category: agenda?.category || undefined, instructor: agenda?.instructor || undefined, venueName: agenda?.venueName || undefined,
+    return { ...item, ...(publication?.header || {}), status: item.status, coverImage: publication ? publication.header.coverImage || null : item.coverImage, category: publication ? publication.header.category || null : item.category, instructor: agenda?.instructor || undefined, venueName: agenda?.venueName || undefined,
       routineSchedule: agenda ? [agenda.day, agenda.startTime].filter(Boolean).join(' · ') : undefined,
       bookTitle: publication ? publication.header.bookTitle : [...new Set(reference.map(book => book.title))].join(', ') || undefined,
       author: publication ? publication.header.author : [...new Set(reference.map(book => book.author).filter(Boolean))].join(', ') || undefined,
@@ -162,6 +164,7 @@ const programsHandler = async (request: Request) => {
         title: body.title,
         description: body.description,
         ...(body.coverImage ? { coverImage: body.coverImage } : {}),
+        ...(body.category?.trim() ? { category: body.category } : {}),
         status: body.status,
         createdBy: databaseActorId,
         updatedBy: databaseActorId,
@@ -191,7 +194,7 @@ const programsHandler = async (request: Request) => {
     const authSession = requireContentUpdateAccess(session, existing[0].status, body.status);
     if (featureRequested('programRevisions')) {
       if (body.status === 'published') throw new HttpError(409, 'Terbitkan atau tampilkan kembali versi melalui Review & Revisi agar snapshot yang disetujui tetap terlindungi.');
-      if (body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined) await assertLegacyWorkspaceWritable(resourceId);
+      if (body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined || body.category !== undefined) await assertLegacyWorkspaceWritable(resourceId);
     }
     if (body.status === 'published') {
       const items = await db.select({ id: lessons.id, title: lessons.title, status: lessons.status })
@@ -217,6 +220,7 @@ const programsHandler = async (request: Request) => {
         ...(body.title && { title: body.title }),
         ...(body.description !== undefined && { description: body.description }),
         ...(body.coverImage !== undefined && (body.coverImage || null) !== (existing[0].coverImage || null) && { coverImage: body.coverImage || null }),
+        ...(body.category !== undefined && (body.category || null) !== (existing[0].category || null) && { category: body.category || null }),
         ...(body.status && { status: body.status }),
         updatedBy: databaseActorId,
         updatedAt: new Date(),
@@ -226,7 +230,7 @@ const programsHandler = async (request: Request) => {
     let updatedRows: Array<typeof programs.$inferSelect>;
     if (featureRequested('programRevisions')) {
       const results = await db.batch([db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`program:${resourceId}`}, 0))`),
-        ...(body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined ? legacyWorkspaceGuardWrites([resourceId]) : []), updateQuery]);
+        ...(body.title !== undefined || body.slug !== undefined || body.description !== undefined || body.coverImage !== undefined || body.category !== undefined ? legacyWorkspaceGuardWrites([resourceId]) : []), updateQuery]);
       updatedRows = results[results.length - 1] as Array<typeof programs.$inferSelect>;
     } else updatedRows = await updateQuery;
     const updatedProgram = updatedRows[0];

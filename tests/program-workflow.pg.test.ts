@@ -9,6 +9,7 @@ import progress from '../netlify/functions/progress';
 import enrollments from '../netlify/functions/enrollments';
 import quizzes from '../netlify/functions/quizzes';
 import lessons from '../netlify/functions/lessons';
+import programs from '../netlify/functions/programs';
 import transcripts from '../netlify/functions/transcripts';
 import transcriptFile from '../netlify/functions/transcript-file';
 import { featureAvailable } from '../netlify/functions/utils/advanced-features';
@@ -82,6 +83,30 @@ beforeAll(async () => {
 afterAll(async () => { await database?.client.close(); vi.unstubAllEnvs(); });
 
 describe('Production HTTP handler workflow on isolated PostgreSQL', () => {
+  it('keeps category edits private until approval and publication, and synchronizes the approved category', async () => {
+    const programId = await seedProgram();
+    await database.client.query("update programs set category='Tauhid' where id=$1", [programId]);
+    const first = await populate(await createDraft(programId));
+    expect(first.snapshot.program.category).toBe('Tauhid');
+    await publish(first);
+    const next = await createDraft(programId);
+    next.snapshot.program.category = '  Aqidah  ';
+    const saved = await data<Revision>(await call(revisions, `program-revisions/${next.id}`, 'author', 'PATCH', { action: 'save', note: 'Perbaiki kategori program', expectedHash: next.contentHash, snapshot: next.snapshot }));
+    expect(saved.snapshot.program.category).toBe('Aqidah');
+    expect(saved.contentHash).not.toBe(next.contentHash);
+    expect((await data<{ category: string }>(await call(programs, `programs/${programId}`, 'participant'))).category).toBe('Tauhid');
+    expect((await call(programs, `programs/${programId}`, 'author', 'PATCH', { category: 'Fiqih' })).status).toBe(409);
+    await publish(saved);
+    expect((await data<{ category: string }>(await call(programs, `programs/${programId}`, 'participant'))).category).toBe('Aqidah');
+    const source = await database.client.query<{ category: string }>('select category from programs where id=$1', [programId]);
+    expect(source.rows[0]!.category).toBe('Aqidah');
+    const old = await data<Revision>(await call(revisions, `program-revisions/${first.id}`, 'author'));
+    expect(old.snapshot.program.category).toBe('Tauhid');
+    const cleared = await createDraft(programId); cleared.snapshot.program.category = '';
+    const empty = await data<Revision>(await call(revisions, `program-revisions/${cleared.id}`, 'author', 'PATCH', { action: 'save', note: 'Kosongkan kategori', expectedHash: cleared.contentHash, snapshot: cleared.snapshot }));
+    await publish(empty);
+    expect((await data<{ category: string | null }>(await call(programs, `programs/${programId}`, 'participant'))).category).toBeNull();
+  });
   it('enables migrated features, but not disabled or incomplete installations', async () => {
     expect(await featureAvailable('privatePdf')).toBe(true);
     expect(await featureAvailable('programRevisions')).toBe(true);

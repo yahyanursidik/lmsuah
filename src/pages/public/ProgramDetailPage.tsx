@@ -1,318 +1,155 @@
-import { useState, useEffect, useMemo } from 'react';
-import { AppImage } from '../../components/ui/AppImage';
+import { useState } from 'react';
+import { useGetIdentity, useList, useOne } from '@refinedev/core';
+import { ArrowLeft, ArrowRight, Bookmark, CalendarDays, CheckCircle2, PlayCircle, Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { programCategoryLabel } from '../../../shared/program-category';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useLearningData } from '../../lib/useLearningData';
-import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
-import { useOne, useList, useGetIdentity } from '@refinedev/core';
-import { Bookmark, CheckCircle2, PlayCircle, BookOpen, UserCheck, PlusCircle } from 'lucide-react';
-import type { Program } from '../../mock/publicData';
+import { DiscoveryEmpty, DiscoveryError, DiscoveryHeader, DiscoveryLoading } from '../../components/public/DiscoveryUI';
 import { SEOHead } from '../../components/public/SEOHead';
-import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
-import {
-  isEnrolled,
-  isBookmarked,
-  toggleBookmark,
-  getProgramProgress,
-  getUserLessonProgress,
-} from '../../lib/userStore';
+import { AppImage } from '../../components/ui/AppImage';
+import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
+import { agendaPath, detailPath, directoryReturnPath, discoveryPaths, discoveryQueryOptions, isAbuHaidar } from '../../lib/public-discovery';
+import { useLearningData } from '../../lib/useLearningData';
+import { isBookmarked, toggleBookmark } from '../../lib/userStore';
+import type { Program } from '../../mock/publicData';
 
 export function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: identity } = useGetIdentity<{ id: string; name: string }>();
+  const { data: identity } = useGetIdentity<{ id: string }>();
   const userId = identity?.id || '';
   const learning = useLearningData(userId);
   const navigate = useNavigate();
   const location = useLocation();
-  const catalog = location.pathname.startsWith('/belajar') ? '/belajar/katalog' : '/programs';
+  const { catalog, schedule } = discoveryPaths(location.pathname);
+  const inPortal = catalog.startsWith('/belajar/');
+  const back = directoryReturnPath(catalog, location.state);
+  const lessonPrefix = inPortal ? '/belajar/lesson' : '/lesson';
+  const [bookmark, setBookmark] = useState<{ account: string; id: string; saved: boolean }>();
 
-  const { query: oneQuery, result: refineProgram } = useOne<Omit<Program, 'status' | 'lessons'> & { status: string }>({
+  const { query: programQuery, result: record } = useOne<Omit<Program, 'status' | 'lessons'> & { status: string; slug?: string }>({
     resource: 'programs',
-    id: id || '',
-    queryOptions: {
-      enabled: !!id,
-    },
+    id: id ? encodeURIComponent(id) : '',
+    queryOptions: { ...discoveryQueryOptions, enabled: !!id, retry: false },
   });
-  const displayProgram = refineProgram?.status === 'published' ? refineProgram : undefined;
+  const program = record?.status === 'published' && (record.id === id || record.slug === id) ? record : undefined;
 
-  const { query: lessonsQuery, result: lessonsListResult } = useList<{ id: string; title: string; sequence: number; date?: string; duration?: string; description?: string; status: string }>({
+  const { query: lessonsQuery, result: lessonResult } = useList<{
+    id: string; title: string; sequence: number; date?: string; duration?: string; description?: string; status: string;
+  }>({
     resource: 'lessons',
-    filters: displayProgram?.id ? [{ field: 'programId', operator: 'eq', value: displayProgram.id }, { field: 'status', operator: 'eq', value: 'published' }] : [],
+    filters: program ? [{ field: 'programId', operator: 'eq', value: program.id }, { field: 'status', operator: 'eq', value: 'published' }] : [],
     sorters: [{ field: 'sequence', order: 'asc' }],
     pagination: { mode: 'off' },
-    queryOptions: { enabled: !!displayProgram?.id },
+    queryOptions: { ...discoveryQueryOptions, enabled: !!program },
   });
 
-  const isLoading = oneQuery.isLoading;
-  const isError = oneQuery.isError;
-  const refetch = oneQuery.refetch;
+  const lessons = (lessonResult.data || []).filter(lesson => lesson.status === 'published');
+  const completed = new Set(learning.progress.filter(lesson => lesson.isCompleted).map(lesson => lesson.lessonId));
+  const completedCount = lessons.filter(lesson => completed.has(lesson.id)).length;
+  const next = lessons.find(lesson => !completed.has(lesson.id));
+  const resume = next || lessons[0];
+  const enrolled = !!program && learning.enrollments.some(entry => entry.programId === program.id && entry.status === 'active');
+  const saved = !!(program && userId && (bookmark?.account === userId && bookmark.id === program.id
+    ? bookmark.saved : isBookmarked(userId, 'program', program.id)));
+  const notFound = [403, 404].includes(programQuery.error?.statusCode || 0);
 
-  const lessons = useMemo(() => (lessonsListResult?.data || []).map((l, index) => ({
-        id: l.id,
-        title: l.title,
-        meetingNumber: l.sequence || index + 1,
-        date: l.date,
-        duration: l.duration,
-        summary: l.description,
-      })), [lessonsListResult?.data]);
-
-  const [enrolled, setEnrolled] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [progressInfo, setProgressInfo] = useState({ completedCount: 0, totalCount: 0, percentage: 0 });
-
-  useEffect(() => {
-    if (displayProgram?.id && userId) {
-      setEnrolled(isEnrolled(userId, displayProgram.id));
-      setBookmarked(isBookmarked(userId, 'program', displayProgram.id));
-      setProgressInfo(getProgramProgress(userId, lessons));
-    }
-  }, [displayProgram?.id, lessons, userId, learning.revision]);
-
-  const handleEnrollToggle = async () => {
-    if (!displayProgram?.id) return;
-    if (!userId) { navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`); return; }
-    if (await learning.follow(displayProgram.id)) setEnrolled(isEnrolled(userId, displayProgram.id));
-  };
-
-  const handleBookmarkToggle = () => {
-    if (!displayProgram?.id) return;
-    if (!userId) { navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`); return; }
-    const newState = toggleBookmark(userId, 'program', displayProgram.id);
-    setBookmarked(newState);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto max-w-7xl px-4 py-16 space-y-8">
-        <SEOHead title="Memuat Detail Program..." />
-        <LoadingSkeleton count={1} />
-      </div>
-    );
+  function login() {
+    navigate('/login?' + new URLSearchParams({ redirect: location.pathname + location.search }));
   }
-
-  if (isError && !displayProgram) {
-    return (
-      <div className="container mx-auto max-w-7xl px-4 py-16">
-        <SEOHead title="Gagal Memuat Program" />
-        <ErrorAlert
-          message="Gagal memuat detail program dari server."
-          onRetry={() => refetch()}
-        />
-      </div>
-    );
-  }
-
-  if (!displayProgram) {
-    return (
-      <div className="container mx-auto max-w-7xl px-4 py-16">
-        <SEOHead title="Program Tidak Ditemukan" />
-        <EmptyState
-          title="Program Tidak Ditemukan"
-          description="Maaf, program kajian yang Anda cari tidak ada dalam direktori kami."
-          actionText="Kembali ke Daftar Program"
-          onAction={() => navigate(catalog)}
-        />
-      </div>
-    );
-  }
-
-  const userProgressList = getUserLessonProgress(userId);
-  const nextLesson = lessons.find(lesson => !userProgressList.some(progress => progress.lessonId === lesson.id && progress.isCompleted)) || lessons[0];
-  const lessonPrefix = location.pathname.startsWith('/belajar') ? '/belajar/lesson' : '/lesson';
 
   return (
-    <div className="space-y-12 pb-16">
-      <SEOHead
-        title={displayProgram.title}
-        description={displayProgram.description}
-      />
-      <LearningSyncNotice {...learning} />
-
-      {/* Program Header */}
-      <section className="bg-stone-900 text-white py-12 sm:py-16 border-b border-stone-800">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-8 space-y-4">
-              <Link to={catalog} className="inline-flex min-h-11 items-center font-semibold text-emerald-200 underline underline-offset-4">Semua program</Link>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-md bg-emerald-800 px-3 py-1 text-xs font-semibold text-emerald-200">
-                  {programCategoryLabel(displayProgram.category)}
-                </span>
-                {enrolled && (
-                  <span className="rounded-md bg-amber-500/20 border border-amber-500/40 px-3 py-1 text-xs font-bold text-amber-300 flex items-center gap-1">
-                    <UserCheck size={14} /> Terdaftar di Kajian Saya
-                  </span>
-                )}
-              </div>
-
-              {displayProgram.coverImage && <div className="h-48 overflow-hidden rounded-xl sm:h-64"><AppImage src={displayProgram.coverImage} alt={`Sampul ${displayProgram.title}`} kind="program" loading="eager" className="h-full w-full object-cover" /></div>}
-              <div className="flex items-start justify-between gap-4">
-                <h1 className="min-w-0 break-words text-3xl font-extrabold sm:text-4xl lg:text-5xl text-stone-100 leading-tight">
-                  {displayProgram.title}
-                </h1>
-                <button
-                  type="button"
-                  onClick={handleBookmarkToggle}
-                  className={`p-3 rounded-2xl border transition-all ${
-                    bookmarked
-                      ? 'bg-amber-500 text-black border-amber-400 shadow-md'
-                      : 'bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700'
-                  }`}
-                  aria-label={bookmarked ? 'Hapus dari tersimpan' : 'Simpan program'}
-                  aria-pressed={bookmarked}
-                >
-                  <Bookmark size={20} className={bookmarked ? 'fill-black' : ''} />
-                </button>
-              </div>
-
-              <p className="text-emerald-300 font-medium text-lg">{displayProgram.subtitle || ''}</p>
-              <p className="text-stone-300 text-sm sm:text-base leading-relaxed">
-                {displayProgram.description}
-              </p>
-
-              {/* Progress bar if enrolled */}
-              {enrolled && lessons.length > 0 && (
-                <div className="rounded-2xl bg-stone-800/80 p-4 border border-stone-700 space-y-2 max-w-xl">
-                  <div className="flex justify-between text-xs font-semibold text-stone-300">
-                    <span>Progres Belajar Anda</span>
-                    <span className="text-amber-400 font-bold">
-                      {progressInfo.completedCount} / {lessons.length} Pertemuan ({progressInfo.percentage}%)
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-stone-900 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-all duration-500"
-                      style={{ width: `${progressInfo.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-4 flex flex-wrap gap-4 items-center">
-                <button
-                  type="button"
-                  onClick={handleEnrollToggle}
-                  disabled={learning.loading || learning.pending}
-                  className={`rounded-xl px-6 py-3 text-sm font-bold shadow-lg transition-all min-h-[44px] flex items-center gap-2 ${
-                    enrolled
-                      ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                  }`}
-                >
-                  {enrolled ? (
-                    <>
-                      <UserCheck size={18} />
-                      <span>Terdaftar (Klik untuk Batal)</span>
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle size={18} />
-                      <span>Ikuti Kajian Ini</span>
-                    </>
-                  )}
-                </button>
-
-                {nextLesson && (
-                  <Link
-                     to={`${lessonPrefix}/${encodeURIComponent(nextLesson.id)}`}
-                    className="rounded-xl border border-stone-700 bg-stone-800 px-6 py-3 text-sm font-semibold text-stone-200 hover:bg-stone-700 transition-all min-h-[44px] flex items-center gap-2"
-                  >
-                    <PlayCircle size={18} className="text-emerald-400" />
-                    <span>{enrolled ? 'Lanjutkan belajar' : 'Mulai pertemuan pertama'}</span>
-                  </Link>
-                )}
-              </div>
-            </div>
-
-            <div className="lg:col-span-4">
-              <div className="rounded-2xl border border-stone-700 bg-stone-800/90 p-6 space-y-4 shadow-xl">
-                <h3 className="font-bold text-stone-100 text-sm border-b border-stone-700 pb-2 flex items-center gap-2">
-                  <BookOpen size={16} className="text-emerald-400" /> Informasi Program
-                </h3>
-                <div className="space-y-3 text-xs text-stone-300">
-                  <div>
-                    <span className="block text-stone-400">Pemateri:</span>
-                    <span className="font-bold text-stone-100 text-sm">{displayProgram.instructor || 'Belum diatur'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-stone-400">Kitab Rujukan:</span>
-                    <span className="font-bold text-stone-100">{displayProgram.bookTitle || '-'}</span>
-                    {displayProgram.author && <span className="block text-stone-400 text-[11px]">Karya: {displayProgram.author}</span>}
-                  </div>
-                  <div>
-                    <span className="block text-stone-400">Jadwal Rutin:</span>
-                    <span className="font-semibold text-emerald-400">{displayProgram.routineSchedule || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-stone-400">Lokasi Majelis:</span>
-                    <span className="font-semibold text-stone-200">{displayProgram.venueName || 'Belum diatur'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Curriculum / Lessons List */}
-      <section id="curriculum" className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="border-b border-stone-200 pb-4">
-          <h2 className="text-2xl font-bold text-slate-900">Daftar Rekaman & Materi Pertemuan</h2>
-          <p className="text-sm text-slate-600 mt-1">Daftar pertemuan yang telah terselenggara dan dipublikasikan.</p>
-        </div>
-
-        {lessonsQuery.isLoading ? (
-          <p role="status" className="py-4 text-slate-600">Memuat pertemuan…</p>
-        ) : lessonsQuery.isError && lessons.length === 0 ? (
-          <ErrorAlert message="Pertemuan belum dapat dimuat." onRetry={() => void lessonsQuery.refetch()} />
-        ) : lessons.length === 0 ? (
-          <EmptyState
-            title="Belum Ada Rekaman Pertemuan"
-            description="Pertemuan akan tampil di sini setelah diterbitkan."
-          />
+    <div className={'public-discovery' + (inPortal ? ' public-discovery--embedded' : '')}>
+      <SEOHead title={program?.title || 'Detail Program'} description={program?.description} />
+      <Link to={back} className="discovery-action discovery-action--text discovery-back"><ArrowLeft size={16} aria-hidden="true" /> Kembali ke katalog</Link>
+      {programQuery.isLoading ? <DiscoveryLoading label="Memuat program kajian…" /> :
+        programQuery.isError && !notFound && !program ? (
+          <DiscoveryError message="Program kajian belum dapat dimuat." retry={() => void programQuery.refetch()} retrying={programQuery.isFetching} />
+        ) : !program ? (
+          <DiscoveryEmpty title="Program tidak ditemukan" description="Program mungkin tidak lagi diterbitkan." />
         ) : (
-          <div className="space-y-4">
-            {lessons.map((lesson) => {
-              const isComp = userProgressList.some((p) => p.lessonId === lesson.id && p.isCompleted);
-              return (
-                <div
-                  key={lesson.id}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border p-5 shadow-xs gap-4 transition-all ${
-                    isComp ? 'border-emerald-500/40 bg-emerald-50/30' : 'border-stone-200 bg-white hover:border-emerald-900/30'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                      <span className="rounded-md bg-stone-100 px-2 py-0.5 font-bold text-slate-800">
-                        Pertemuan #{lesson.meetingNumber}
-                      </span>
-                      {lesson.date && <span>{lesson.date}</span>}
-                      {lesson.duration && <span>{lesson.duration}</span>}
-                      {isComp && (
-                        <span className="rounded-md bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Selesai
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-base">{lesson.title}</h3>
-                    <p className="text-xs text-slate-600">{lesson.summary}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Link
-                       to={`${lessonPrefix}/${lesson.id}`}
-                      className="rounded-xl bg-emerald-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-950 transition-colors min-h-[44px] flex items-center gap-2"
-                    >
-                      <PlayCircle size={16} />
-                      <span>{isComp ? 'Simak Ulang' : 'Buka Pertemuan'}</span>
-                    </Link>
-                  </div>
+          <>
+            <LearningSyncNotice {...learning} />
+            <div className="discovery-detail-grid">
+              <div className="discovery-section">
+                <DiscoveryHeader title={program.title} description={program.subtitle} />
+                <div className="discovery-agenda-tags">
+                  <span className="discovery-tag">{programCategoryLabel(program.category)}</span>
+                  {enrolled && <span className="discovery-tag">Diikuti</span>}
                 </div>
-              );
-            })}
-          </div>
+                {program.description && <p className="discovery-prose">{program.description}</p>}
+                <div className="discovery-actions">
+                  {resume && <Link to={detailPath(lessonPrefix, resume.id)} className="discovery-action discovery-action--primary">
+                    <PlayCircle size={17} aria-hidden="true" /> {next ? enrolled ? 'Lanjut belajar' : 'Mulai pertemuan' : 'Ulangi pertemuan'}
+                  </Link>}
+                  <button type="button" disabled={learning.loading || learning.pending}
+                    className={'discovery-action' + (!resume && !enrolled ? ' discovery-action--primary' : '')}
+                    onClick={() => { if (!userId) login(); else void learning.follow(program.id); }}>
+                    {!enrolled && <Plus size={17} aria-hidden="true" />}
+                    {learning.pending ? 'Menyimpan…' : learning.loading ? 'Memuat status…' : enrolled ? 'Berhenti mengikuti' : 'Ikuti kajian'}
+                  </button>
+                  <button type="button" className="discovery-action" aria-pressed={saved}
+                    onClick={() => {
+                      if (!userId) return login();
+                      const value = toggleBookmark(userId, 'program', program.id);
+                      setBookmark({ account: userId, id: program.id, saved: value });
+                    }}>
+                    <Bookmark size={17} aria-hidden="true" fill={saved ? 'currentColor' : 'none'} />
+                    Simpan program
+                  </button>
+                </div>
+                {enrolled && lessons.length > 0 && <div className="discovery-section discovery-progress">
+                  <label htmlFor="program-progress" className="discovery-count">{completedCount} dari {lessons.length} pertemuan selesai</label>
+                  <progress id="program-progress" value={completedCount} max={lessons.length} />
+                </div>}
+              </div>
+              <aside className="discovery-detail-info" aria-label="Informasi program">
+                {program.coverImage && <div className="discovery-venue-image discovery-detail-image mb-4">
+                  <AppImage src={program.coverImage} alt={'Sampul ' + program.title} kind="program" loading="eager" />
+                </div>}
+                <dl>
+                  {program.instructor && <div>
+                    <dt>Pemateri</dt>
+                    <dd>{isAbuHaidar(program.instructor)
+                      ? <Link to="/speaker" className="discovery-action discovery-action--text">{program.instructor}</Link>
+                      : program.instructor}</dd>
+                  </div>}
+                  {program.bookTitle && <div><dt>Kitab rujukan</dt><dd>{program.bookTitle}</dd>{program.author && <dd className="discovery-meta">{program.author}</dd>}</div>}
+                  {program.venueName && <div><dt>Lokasi tercatat</dt><dd>{program.venueName}</dd></div>}
+                </dl>
+                <Link to={agendaPath(schedule, { programId: program.id })} className="discovery-action mt-2">
+                  <CalendarDays size={16} aria-hidden="true" /> Lihat jadwal program
+                </Link>
+              </aside>
+            </div>
+
+            <section id="curriculum" className="discovery-section" aria-labelledby="curriculum-heading">
+              <div className="discovery-section-heading"><h2 id="curriculum-heading">Kurikulum & pertemuan</h2></div>
+              {lessonsQuery.isLoading ? <DiscoveryLoading label="Memuat pertemuan…" /> :
+                lessonsQuery.isError && !lessons.length ? (
+                  <DiscoveryError message="Pertemuan belum dapat dimuat." retry={() => void lessonsQuery.refetch()} retrying={lessonsQuery.isFetching} />
+                ) : !lessons.length ? (
+                  <DiscoveryEmpty title="Belum ada pertemuan yang diterbitkan" />
+                ) : (
+                  <ol className="discovery-agenda-list">
+                    {lessons.map((lesson, index) => <li key={lesson.id} className="discovery-agenda">
+                      <div>
+                        <p className="discovery-agenda-time">Pertemuan {lesson.sequence || index + 1}</p>
+                        {lesson.duration && <p className="discovery-meta">{lesson.duration}</p>}
+                      </div>
+                      <div className="min-w-0">
+                        {completed.has(lesson.id) && <span className="discovery-tag"><CheckCircle2 className="inline" size={14} aria-hidden="true" /> Selesai</span>}
+                        <h3 className="discovery-item-title">{lesson.title}</h3>
+                        {lesson.date && <p className="discovery-meta">{lesson.date}</p>}
+                        {lesson.description && <p className="discovery-excerpt">{lesson.description}</p>}
+                        <Link to={detailPath(lessonPrefix, lesson.id)} className="discovery-action discovery-action--text">
+                          {completed.has(lesson.id) ? 'Simak ulang' : 'Buka pertemuan'} <ArrowRight size={16} aria-hidden="true" />
+                        </Link>
+                      </div>
+                    </li>)}
+                  </ol>
+                )}
+            </section>
+          </>
         )}
-      </section>
     </div>
   );
 }

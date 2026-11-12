@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({
   programs: [
     { id: 'tauhid', slug: 'tauhid', title: 'Fawaid Tauhid', description: 'Belajar tauhid', category: 'Tauhid' as string | null, status: 'draft' },
     { id: 'tafsir', slug: 'tafsir', title: 'Kajian Tafsir', description: 'Belajar tafsir', category: 'Tafsir', status: 'published' },
-    { id: 'none', slug: 'none', title: 'Program tanpa kategori', description: 'Deskripsi', category: null, status: 'draft' },
+    { id: 'none', slug: 'none', title: 'Program tanpa kategori', description: 'Deskripsi', category: null, status: 'published' },
   ], create: vi.fn(), update: vi.fn(),
 }));
 vi.mock('@refinedev/core', () => ({
@@ -42,7 +42,8 @@ describe('Program categories across public and admin views', () => {
     expect(screen.getByText('Program tanpa kategori')).toBeDefined();
     expect(screen.queryByText('Kajian Tafsir')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Semua' }));
-    expect(screen.getByText('Fawaid Tauhid')).toBeDefined();
+    expect(screen.getByText('Kajian Tafsir')).toBeDefined();
+    expect(screen.queryByText('Fawaid Tauhid')).toBeNull();
   });
   it('filters admin programs by category and resets filters', () => {
     show(<AdminProgramsPage />);

@@ -74,7 +74,7 @@ const resourcesConfig = [{ name: 'schedules' }, { name: 'venues' }, { name: 'pro
 describe('Venues & Schedules UI & Features Integration Tests', () => {
   it('renders Public SchedulesPage with Asia/Jakarta timezone and status change indicators', async () => {
     render(
-      <MemoryRouter initialEntries={['/schedules']}>
+      <MemoryRouter initialEntries={['/schedules?view=perubahan']}>
         <Refine dataProvider={safeDataProvider} resources={resourcesConfig}>
           <Routes>
             <Route path="/schedules" element={<SchedulesPage />} />
@@ -83,12 +83,12 @@ describe('Venues & Schedules UI & Features Integration Tests', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Jadwal Kajian Pekanan/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Jadwal kajian/i })).toBeDefined();
     expect(screen.getByText(/Asia\/Jakarta \(WIB\)/i)).toBeDefined();
 
     await waitFor(() => {
-      expect(screen.getByText(/⏰ DIUNDUR/)).toBeDefined();
-      expect(screen.getByText(/Catatan Pengunduran:/)).toBeDefined();
+      expect(screen.getByText(/^Diundur$/)).toBeDefined();
+      expect(screen.getByText(/Catatan pengunduran:/i)).toBeDefined();
     });
   });
 
@@ -109,7 +109,7 @@ describe('Venues & Schedules UI & Features Integration Tests', () => {
 
     expect(screen.getByText(/Salin Alamat/i)).toBeDefined();
     expect(screen.getByText(/Bagikan Lokasi/i)).toBeDefined();
-    expect(screen.getByText(/Buka Google Maps ↗/i)).toBeDefined();
+    expect(screen.getByRole('link', { name: /Petunjuk arah/i })).toBeDefined();
   });
 
   it('renders AdminVenuesPage CRUD interface', async () => {

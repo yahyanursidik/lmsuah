@@ -18,13 +18,13 @@ beforeEach(() => { state.schedules = [{ id: 'fixture', title: 'Kajian fixture', 
 afterEach(cleanup);
 
 describe('Technical support footer and broadcast destinations', () => {
-  it('explains when to contact support and provides the exact email, advisor and profile', () => {
+  it('keeps the support email without the advisor name, profile link or title', () => {
     render(<MemoryRouter><PublicLayout /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Bantuan teknis' })).toBeDefined();
     expect(screen.getByText(/Mengalami kendala, error, atau kegagalan sistem/)).toBeDefined();
     expect(screen.getByRole('link', { name: 'ahlan@yahyanursidik.my.id' }).getAttribute('href')).toBe('mailto:ahlan@yahyanursidik.my.id');
-    expect(screen.getByRole('link', { name: 'Yahya Nursidik' }).getAttribute('href')).toBe('https://yahyanursidik.my.id/');
-    expect(screen.getByText(/Special Advisor for Digital Transformation, Innovation & Business YTS/)).toBeDefined();
+    expect(screen.queryByText('Yahya Nursidik')).toBeNull();
+    expect(screen.queryByText(/Special Advisor for Digital Transformation, Innovation & Business YTS/)).toBeNull();
   });
 
   it.each([SchedulesPage, ParticipantSchedulePage])('corrects the old channel link and label in %s', Page => {

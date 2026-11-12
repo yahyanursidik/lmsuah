@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
   },
 }));
 vi.mock("@refinedev/core", () => ({
+  useGetIdentity: () => ({ data: undefined }),
   useList: ({ resource }: { resource: string }) => ({
     result: {
       data:

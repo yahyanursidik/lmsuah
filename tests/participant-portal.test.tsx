@@ -5,6 +5,8 @@ import { ParticipantLayout } from '../src/pages/participant/ParticipantLayout';
 import { DashboardPage } from '../src/pages/participant/DashboardPage';
 import { MyProgramsPage } from '../src/pages/participant/MyProgramsPage';
 import { ProfilePage } from '../src/pages/participant/ProfilePage';
+import { SavedItemsPage } from '../src/pages/participant/SavedItemsPage';
+import { portalQueryClient } from '../src/lib/query-client';
 
 const logout = vi.fn();
 let storage: Record<string, string> = {};
@@ -17,8 +19,16 @@ const memoryStorage = {
 Object.defineProperty(window, 'localStorage', { value: memoryStorage, configurable: true });
 const apiData: Record<string, unknown[]> = {
   programs: [{ id: 'program-1', slug: 'program-satu', title: 'Program API Terbaru', description: 'Konten terbaru dari admin.', status: 'published' }],
-  lessons: [{ id: 'lesson-1', programId: 'program-1', title: 'Pertemuan API Pertama', sequence: 1, status: 'published', materialCount: 2, hasQuiz: true }],
-  schedules: [{ id: 'schedule-1', programId: 'program-1', title: 'Jadwal API', day: 'Ahad', date: '9 Agustus 2026', startTime: '09:00', status: 'Rutin' }],
+  lessons: [
+    { id: 'lesson-1', programId: 'program-1', title: 'Pertemuan API Pertama', sequence: 1, status: 'published', materialCount: 2, hasQuiz: true },
+    { id: 'lesson-2', programId: 'program-1', title: 'Pertemuan API Kedua', sequence: 2, status: 'published' },
+    { id: 'lesson-private', programId: 'program-private', title: 'Pertemuan tak terbit', sequence: 1, status: 'published' },
+  ],
+  schedules: [
+    { id: 'old', title: 'Agenda lama', date: '2000-01-01' },
+    { id: 'delayed', title: 'Agenda diundur', date: '2098-01-01', status: 'Diundur' },
+    { id: 'schedule-1', programId: 'program-1', title: 'Jadwal API', day: 'Ahad', date: '2099-08-09', startTime: '09:00', status: 'Rutin' },
+  ],
 };
 
 vi.mock('@refinedev/core', async () => {
@@ -41,8 +51,9 @@ function renderPortal(path: string, element: React.ReactNode) {
 
 describe('Participant portal experience', () => {
   beforeEach(() => {
-    memoryStorage.clear(); logout.mockClear();
+    memoryStorage.clear(); logout.mockClear(); portalQueryClient.clear();
     apiData.enrollments = [];
+    apiData.progress = [];
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
       const resource = new URL(url, 'http://localhost').pathname.split('/')[2];
       if (resource === 'enrollments' && options?.method === 'POST') {
@@ -51,7 +62,7 @@ describe('Participant portal experience', () => {
         apiData.enrollments = [item];
         return Response.json({ data: item });
       }
-      const items = resource === 'enrollments' ? apiData.enrollments : [];
+      const items = resource === 'enrollments' || resource === 'progress' ? apiData[resource] : [];
       return Response.json({ data: { items, total: items.length, limit: 100 } });
     }));
   });
@@ -67,13 +78,38 @@ describe('Participant portal experience', () => {
     expect(screen.queryByRole('link', { name: /ruang admin/i })).toBeNull();
   });
 
-  it('dashboard menggunakan program, pertemuan, dan jadwal terbaru dari API', async () => {
+  it('menampilkan katalog untuk peserta baru dan hanya membuka agenda mendatang yang tepat', async () => {
     renderPortal('/dashboard', <DashboardPage />);
     await waitFor(() => expect(screen.queryByText(/Menyinkronkan pendaftaran/i)).toBeNull());
     expect(screen.getAllByText('Program API Terbaru').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Pertemuan API Pertama/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Jadwal API')).toBeDefined();
-    expect(screen.getByRole('link', { name: /Lanjutkan belajar/i }).getAttribute('href')).toBe('/belajar/lesson/lesson-1');
+    expect(screen.queryByText('Agenda lama')).toBeNull();
+    expect(screen.queryByText('Agenda diundur')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Detail agenda' }).getAttribute('href')).toBe('/belajar/jadwal?agenda=schedule-1');
+    expect(screen.getByRole('link', { name: /Jelajahi katalog/i }).getAttribute('href')).toBe('/belajar/katalog');
+    expect(screen.queryByRole('link', { name: /Lanjutkan belajar/i })).toBeNull();
+  });
+
+  it('melanjutkan riwayat yang masih tersedia dan belum selesai', async () => {
+    apiData.progress = [
+      { id: 'a', userId: 'participant-1', lessonId: 'lesson-private', isCompleted: false, lastPositionSeconds: 10, updatedAt: '2026-10-03T10:00:00Z' },
+      { id: 'b', userId: 'participant-1', lessonId: 'lesson-2', isCompleted: true, lastPositionSeconds: 130, updatedAt: '2026-10-02T10:00:00Z' },
+      { id: 'c', userId: 'participant-1', lessonId: 'lesson-1', isCompleted: false, lastPositionSeconds: 125, updatedAt: '2026-10-01T10:00:00Z' },
+    ];
+    renderPortal('/dashboard', <DashboardPage />);
+    expect((await screen.findByRole('link', { name: /Lanjutkan belajar/i })).getAttribute('href')).toBe('/belajar/lesson/lesson-1');
+    expect(screen.getByText('Posisi tersimpan: 2:05')).toBeDefined();
+    expect(screen.queryByText('Pertemuan tak terbit')).toBeNull();
+  });
+
+  it('membuka tab Catatan dari pintasan dashboard', async () => {
+    render(<MemoryRouter initialEntries={['/dashboard']}><Routes>
+      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/tersimpan" element={<SavedItemsPage />} />
+    </Routes></MemoryRouter>);
+    await waitFor(() => expect(screen.queryByText(/Menyinkronkan pendaftaran/i)).toBeNull());
+    fireEvent.click(screen.getByRole('link', { name: 'Catatan belajar' }));
+    expect(screen.getByRole('button', { name: /^Catatan \(/ }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('kajian tersedia dapat diikuti melalui API dan profil menyimpan preferensi', async () => {

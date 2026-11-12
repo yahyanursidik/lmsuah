@@ -1,98 +1,153 @@
-/* Hallmark · pre-emit critique: P4 H4 E4 S5 R5 V4
- * genre: modern-minimal · macrostructure: Guided Learning Workbench · design-system: design.md · designed-as-app */
-import { useEffect, useMemo, useState } from 'react';
+/* Hallmark · genre: modern-minimal · macrostructure: Learning Continuation Workbench · design-system: design.md · designed-as-app */
 import { useGetIdentity, useList } from '@refinedev/core';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bookmark, BookOpen, CalendarDays, CheckCircle2, CircleAlert, Clock3, FileText, MapPin, Play, RefreshCw } from 'lucide-react';
-import { getProgramProgress, getUserBookmarks, getUserNotes } from '@/lib/userStore';
+import { ArrowRight, Bookmark, BookOpen, CalendarDays, CheckCircle2, ClipboardCheck, ExternalLink, FileText, MapPin, Play, RefreshCw } from 'lucide-react';
+import { getUserBookmarks, getUserNotes } from '@/lib/userStore';
 import { useLearningData } from '@/lib/useLearningData';
 import { LearningSyncNotice } from '@/components/ui/LearningSyncNotice';
-import { PortalPanel, PortalSkeleton } from '@/components/ui/PortalNavigation';
-import { getLessonsForProgram, useParticipantPortalData } from './useParticipantPortalData';
+import { DashboardState } from '@/components/ui/DashboardState';
+import { formatAgendaDate, getAgendaStream, getUpcomingAgenda } from '@/lib/public-home';
+import { isSafeStreamUrl } from '../../../shared/schedule-stream';
+import { useParticipantPortalData } from './useParticipantPortalData';
 
 type Identity = { id: string; name?: string };
 type Announcement = { id: string; title: string; content: string; linkUrl?: string; createdAt?: string };
 const shortcuts = [
-  { title: 'Katalog kajian', detail: 'Temukan program untuk dipelajari', href: '/belajar/katalog', icon: BookOpen },
-  { title: 'Jadwal majelis', detail: 'Siapkan waktu untuk hadir', href: '/belajar/jadwal', icon: CalendarDays },
-  { title: 'Lokasi majelis', detail: 'Alamat dan petunjuk tempat', href: '/belajar/lokasi', icon: MapPin },
-  { title: 'Catatan belajar', detail: 'Buka catatan dan materi tersimpan', href: '/tersimpan', icon: Bookmark },
+  { title: 'Katalog kajian', href: '/belajar/katalog', icon: BookOpen },
+  { title: 'Kuis & hasil evaluasi', href: '/belajar/progres', icon: ClipboardCheck },
+  { title: 'Lokasi majelis', href: '/belajar/lokasi', icon: MapPin },
+  { title: 'Catatan belajar', href: '/tersimpan?tab=catatan', icon: FileText },
 ];
+const number = new Intl.NumberFormat('id-ID');
+const dateLabel = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
+const lessonHref = (id: string) => '/belajar/lesson/' + encodeURIComponent(id);
 
 export function DashboardPage() {
   const { data: identity } = useGetIdentity<Identity>();
   const userId = identity?.id || '';
-  const { programs, lessons, schedules, isProgramsLoading, isLessonsLoading, isSchedulesLoading, isRefreshing, isError, programsError, lessonsError, schedulesError, refetch } = useParticipantPortalData();
   const learning = useLearningData(userId);
-  const { progress, enrollments } = learning;
-  const [notes, setNotes] = useState(() => getUserNotes(userId));
-  const [bookmarks, setBookmarks] = useState(() => getUserBookmarks(userId));
+  const hasLearningHistory = !!userId && (learning.progress.length > 0 || learning.enrollments.some(item => item.status === 'active'));
+  const { programs, lessons, schedules, isProgramsLoading, isLessonsLoading, isSchedulesLoading, isRefreshing, programsError, lessonsError, schedulesError, refetch } = useParticipantPortalData({ includeLessons: hasLearningHistory });
   const { query: announcementsQuery, result: announcementsResult } = useList<Announcement>({
     resource: 'announcements', filters: [{ field: 'status', operator: 'eq', value: 'published' }],
-    sorters: [{ field: 'createdAt', order: 'desc' }], pagination: { pageSize: 5 }, queryOptions: { staleTime: 30_000, retry: 1 },
+    sorters: [{ field: 'createdAt', order: 'desc' }], pagination: { mode: 'server', currentPage: 1, pageSize: 5 },
   });
-  useEffect(() => {
-    setNotes(getUserNotes(userId)); setBookmarks(getUserBookmarks(userId));
-  }, [userId]);
-  const enrolledPrograms = useMemo(() => programs.filter(program => enrollments.some(item => item.programId === program.id && item.status === 'active')), [enrollments, programs]);
-  const learningPrograms = enrolledPrograms.length > 0 ? enrolledPrograms : programs.slice(0, 2);
-  const recentProgress = [...progress].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
-  const continueLesson = (recentProgress && lessons.find(lesson => lesson.id === recentProgress.lessonId && !recentProgress.isCompleted))
-    || learningPrograms.flatMap(program => getLessonsForProgram(lessons, program.id)).find(lesson => !progress.some(item => item.lessonId === lesson.id && item.isCompleted));
-  const continueProgram = continueLesson ? programs.find(program => program.id === continueLesson.programId) : undefined;
-  const savedPosition = progress.find(item => item.lessonId === continueLesson?.id)?.lastPositionSeconds;
-  const nextSchedule = schedules.find(schedule => schedule.status !== 'Dibatalkan');
   const announcements = announcementsResult.data || [];
-  const contentLoading = isProgramsLoading || isLessonsLoading;
-  const refreshing = isRefreshing || announcementsQuery.isFetching;
-  const refresh = () => { void refetch(); void announcementsQuery.refetch(); };
-  const stats = [
-    { label: 'Kajian diikuti', value: enrolledPrograms.length, suffix: 'program', icon: BookOpen, href: '/belajar', unavailable: programsError },
-    { label: 'Pertemuan selesai', value: progress.filter(item => item.isCompleted).length, suffix: 'pertemuan', icon: CheckCircle2, href: '/belajar/progres' },
-    { label: 'Catatan privat', value: notes.length, suffix: 'catatan', icon: FileText, href: '/tersimpan' },
-    { label: 'Tersimpan', value: bookmarks.length, suffix: 'item', icon: Bookmark, href: '/tersimpan' },
+  const notes = userId ? getUserNotes(userId) : [];
+  const bookmarks = userId ? getUserBookmarks(userId) : [];
+  const accountReady = !!userId && !learning.loading && !learning.error;
+  const contentReady = !isProgramsLoading && !isLessonsLoading && !programsError && !lessonsError;
+  const publishedPrograms = programs.filter(item => item.status === 'published');
+  const programById = new Map(publishedPrograms.map(item => [item.id, item]));
+  const validLessons = lessons.filter((lesson): lesson is typeof lesson & { programId: string } => lesson.status === 'published' && !!lesson.programId && programById.has(lesson.programId));
+  const lessonById = new Map(validLessons.map(lesson => [lesson.id, lesson]));
+  const progressById = new Map(learning.progress.map(item => [item.lessonId, item]));
+  const followedIds = new Set(learning.enrollments.filter(item => item.status === 'active').map(item => item.programId));
+  const followed = publishedPrograms.filter(item => followedIds.has(item.id));
+  const recent = [...learning.progress].filter(item => !item.isCompleted && lessonById.has(item.lessonId))
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+  const next = accountReady && contentReady
+    ? (recent && lessonById.get(recent.lessonId)) || validLessons.filter(lesson => followedIds.has(lesson.programId) && !progressById.get(lesson.id)?.isCompleted)
+      .sort((a, b) => a.sequence - b.sequence)[0]
+    : undefined;
+  const savedProgress = next && progressById.get(next.id);
+  const position = savedProgress?.lastPositionSeconds || 0;
+  const program = next?.programId ? programById.get(next.programId) : undefined;
+  const nextSchedule = getUpcomingAgenda(schedules)[0];
+  const stream = nextSchedule ? getAgendaStream(nextSchedule) : undefined;
+  const refreshing = !!(isRefreshing || announcementsQuery.isFetching || learning.loading);
+  const refresh = () => { void refetch(); void announcementsQuery.refetch(); if (userId) void learning.refresh(); };
+  const metrics = [
+    { title: 'Kajian diikuti', value: accountReady && !isProgramsLoading && !programsError ? followed.length : undefined, href: '/belajar', icon: BookOpen },
+    { title: 'Pertemuan selesai', value: accountReady && contentReady ? validLessons.filter(lesson => progressById.get(lesson.id)?.isCompleted).length : undefined, href: '/belajar/progres', icon: CheckCircle2 },
+    { title: 'Catatan', value: userId ? notes.length : undefined, href: '/tersimpan?tab=catatan', icon: FileText },
+    { title: 'Tersimpan', value: userId ? bookmarks.length : undefined, href: '/tersimpan', icon: Bookmark },
   ];
-  return <div className="portal-dashboard">
+
+  return <div className="dash-workbench">
+    <header className="dash-heading">
+      <div><h1>Assalamu’alaikum, {identity?.name?.trim() || 'Peserta'}</h1><p className="dash-meta">Ruang belajar Kajian Abu Haidar</p></div>
+      <button type="button" className="portal-button" onClick={refresh} disabled={refreshing} aria-busy={refreshing}>
+        <RefreshCw size={16} aria-hidden="true" /> {refreshing ? 'Memuat…' : 'Segarkan'}
+      </button>
+    </header>
     <LearningSyncNotice {...learning} />
-    <section className="portal-welcome">
-      <h1>Assalamu’alaikum, {identity?.name || 'Peserta'}</h1>
-      <p>Senang Anda kembali. Lanjutkan belajar atau pilih kajian yang ingin Anda ikuti.</p>
-      <div className="portal-actions">
-        {continueLesson ? <Link className="portal-button portal-button--primary" to={'/belajar/lesson/' + continueLesson.id}><Play size={16} aria-hidden="true" />Lanjutkan belajar</Link> : <Link className="portal-button portal-button--primary" to="/belajar/katalog"><BookOpen size={16} aria-hidden="true" />Pilih kajian</Link>}
-        <Link className="portal-button" to="/belajar/progres">Lihat progres</Link>
-        <button type="button" className="portal-button" onClick={refresh} disabled={refreshing} aria-busy={refreshing}><RefreshCw size={16} className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />{refreshing ? 'Memuat…' : 'Segarkan'}</button>
-      </div>
+    <div className="dash-grid">
+      <section className="dash-panel dash-panel--learning" aria-labelledby="learning-next">
+        <h2 id="learning-next">Langkah belajar berikutnya</h2>
+        {next ? <>
+          <h3 className="dash-lead-title">{next.title}</h3>
+          <p className="dash-meta">{program?.title} · Pertemuan {next.sequence}</p>
+          {position > 0 && <p className="dash-meta">Posisi tersimpan: {Math.floor(position / 60)}:{String(Math.floor(position % 60)).padStart(2, '0')}</p>}
+          <div className="dash-actions">
+            <Link to={lessonHref(next.id)} className="portal-button portal-button--primary"><Play size={16} aria-hidden="true" />{savedProgress ? 'Lanjutkan belajar' : 'Buka pertemuan'}</Link>
+            {program && <Link to={'/belajar/katalog/' + encodeURIComponent(program.id)} className="dash-link">Kurikulum <ArrowRight size={16} aria-hidden="true" /></Link>}
+          </div>
+        </> : <DashboardState
+          loading={learning.loading || isProgramsLoading || isLessonsLoading ? 'Memeriksa langkah belajar…' : undefined}
+          error={programsError || lessonsError ? 'Pertemuan belum dapat diperiksa.' : undefined}
+          busy={isRefreshing} onRetry={() => void refetch()}
+          empty={<><p>{learning.error ? 'Progres belum terverifikasi. Anda tetap bisa membuka katalog.' : followed.length ? 'Belum ada pertemuan berikutnya di kajian yang Anda ikuti.' : 'Pilih kajian untuk mulai belajar.'}</p>
+          <div className="dash-actions"><Link to={followed.length && !learning.error ? '/belajar' : '/belajar/katalog'} className="portal-button portal-button--primary">{followed.length && !learning.error ? 'Buka kajian saya' : 'Jelajahi katalog'} <ArrowRight size={16} aria-hidden="true" /></Link></div></>}
+        />}
+      </section>
+      <section className="dash-panel dash-panel--agenda" aria-labelledby="participant-agenda">
+        <div className="dash-panel-head"><h2 id="participant-agenda">Agenda terdekat</h2><Link className="dash-link" to="/belajar/jadwal">Semua jadwal</Link></div>
+        {nextSchedule ? <>
+          <p className="dash-meta"><time dateTime={nextSchedule.date}>{formatAgendaDate(nextSchedule.date)}</time>{nextSchedule.startTime && ' · ' + nextSchedule.startTime + ' WIB'}</p>
+          <h3 className="dash-lead-title">{nextSchedule.title}</h3>
+          {nextSchedule.venueName && <p className="dash-meta">{nextSchedule.venueName}</p>}
+          {nextSchedule.status === 'Pindah Lokasi' && <p className="dash-meta">Lokasi berubah</p>}
+          <div className="dash-actions">
+            <Link to={'/belajar/jadwal?' + new URLSearchParams({ agenda: nextSchedule.id })} className="portal-button"><CalendarDays size={16} aria-hidden="true" /> Detail agenda</Link>
+            {stream && <a href={stream} target="_blank" rel="noopener noreferrer" className="dash-link">Buka siaran <ExternalLink size={14} aria-hidden="true" /></a>}
+          </div>
+        </> : <DashboardState loading={isSchedulesLoading ? 'Memuat agenda…' : undefined} error={schedulesError ? 'Jadwal belum dapat dimuat.' : undefined} empty="Belum ada agenda mendatang." busy={isRefreshing} onRetry={() => void refetch()} />}
+      </section>
+    </div>
+    <section className="dash-metrics" aria-label="Ringkasan belajar">
+      {metrics.map(({ title, value, href, icon: Icon }) => <Link key={title} to={href}>
+        <Icon size={18} aria-hidden="true" /><strong>{value === undefined ? '—' : number.format(value)}</strong><span>{title}</span>
+        {value === undefined && <small>{learning.loading || !identity || isProgramsLoading || isLessonsLoading ? 'Memuat…' : 'Tidak tersedia'}</small>}
+      </Link>)}
     </section>
-    {isError && <div role="alert" className="portal-feedback portal-feedback--error"><CircleAlert size={20} aria-hidden="true" /><div><strong>Sebagian konten belum dapat dimuat.</strong><p>Data yang sudah tersedia tetap dapat dibuka. Gunakan Segarkan untuk mencoba lagi.</p></div></div>}
-    <section aria-label="Statistik belajar" className="portal-metrics">{stats.map(({ label, value, suffix, icon: Icon, href, unavailable }) => <Link key={label} to={href} className="portal-metric"><div className="portal-metric-title"><span>{label}</span><Icon size={18} aria-hidden="true" /></div><strong>{!identity || (label === 'Kajian diikuti' && isProgramsLoading) || unavailable ? '—' : value}</strong><small>{unavailable ? 'Belum dapat dimuat' : suffix}</small></Link>)}</section>
-    <div className="portal-main-grid">
-      <div className="portal-side-stack">
-        <PortalPanel title="Lanjutkan dari sini" description="Pertemuan berikutnya untuk perjalanan belajar Anda.">
-          {contentLoading ? <PortalSkeleton label="Memuat pertemuan…" /> : continueLesson ? <div>
-            <h3 className="font-semibold text-base">{continueLesson.title}</h3><p className="portal-muted mt-2">{continueProgram?.title || 'Program kajian'} · Pertemuan {continueLesson.sequence}</p>
-            {Boolean(savedPosition) && <p className="portal-muted mt-3 flex gap-2 items-center"><Clock3 size={16} aria-hidden="true" />Terakhir di menit {Math.floor((savedPosition || 0) / 60)}</p>}
-            <Link to={'/belajar/lesson/' + continueLesson.id} className="portal-button mt-4">Buka pertemuan <ArrowRight size={16} aria-hidden="true" /></Link>
-          </div> : <div className="portal-empty"><BookOpen size={24} aria-hidden="true" /><strong>{lessonsError ? 'Pertemuan belum dapat dimuat' : 'Siap memulai kajian?'}</strong><p>{lessonsError ? 'Coba muat ulang melalui tombol Segarkan.' : 'Pilih program dari katalog untuk melihat pertemuan dan materi yang tersedia.'}</p><Link to="/belajar/katalog" className="portal-button">Jelajahi katalog</Link></div>}
-        </PortalPanel>
-        <PortalPanel title={enrolledPrograms.length > 0 ? 'Kajian aktif' : 'Pilihan kajian'} description={enrolledPrograms.length > 0 ? 'Program yang sedang Anda ikuti.' : 'Program tersedia. Buka detail untuk mulai belajar.'} action={<Link to="/belajar" className="portal-button">Semua kajian</Link>}>
-          {contentLoading ? <PortalSkeleton label="Memuat program kajian…" /> : learningPrograms.length > 0 ? <div className="portal-list">{learningPrograms.map(program => {
-            const programLessons = getLessonsForProgram(lessons, program.id);
-            const info = getProgramProgress(userId, programLessons);
-            const next = programLessons.find(lesson => !progress.some(item => item.lessonId === lesson.id && item.isCompleted)) || programLessons[0];
-            return <article key={program.id} className="portal-list-item"><div><h3>{program.title}</h3><p className="portal-muted">{info.completedCount}/{info.totalCount} pertemuan selesai</p><progress className="portal-progress" max={100} value={info.percentage} aria-label={'Progres ' + program.title} /></div><Link to={next ? '/belajar/lesson/' + next.id : '/belajar/katalog/' + (program.slug || program.id)} className="portal-button">{next ? 'Lanjutkan' : 'Lihat program'}<ArrowRight size={16} aria-hidden="true" /></Link></article>;
-          })}</div> : <div className="portal-empty"><BookOpen size={24} aria-hidden="true" /><strong>{programsError ? 'Program belum dapat dimuat' : 'Belum ada kajian tersedia'}</strong><p>{programsError ? 'Periksa koneksi dan coba Segarkan.' : 'Program yang dipublikasikan admin akan muncul di sini.'}</p><Link to="/belajar/katalog" className="portal-button">Buka katalog</Link></div>}
-        </PortalPanel>
-        <PortalPanel title="Papan pengumuman" description="Informasi terbaru dari pengelola kajian.">
-          {announcementsQuery.isLoading ? <PortalSkeleton label="Memuat pengumuman…" /> : announcementsQuery.isError ? <div className="portal-feedback portal-feedback--error" role="alert">Pengumuman belum dapat dimuat. Coba tombol Segarkan.</div> : announcements.length ? <div className="portal-list">{announcements.map(item => <article className="portal-list-item" key={item.id}><div><h3>{item.title}</h3><p className="portal-muted whitespace-pre-line">{item.content}</p>{item.createdAt && <p className="portal-muted">{new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })}</p>}{item.linkUrl && <a href={item.linkUrl} target="_blank" rel="noreferrer" className="portal-button mt-3">Buka tautan <ArrowRight size={16} aria-hidden="true" /></a>}</div></article>)}</div> : <p className="portal-muted">Belum ada pengumuman terbaru.</p>}
-        </PortalPanel>
+    <div className="dash-grid">
+      <div className="dash-stack">
+        <section className="dash-panel" aria-labelledby="participant-courses">
+          <div className="dash-panel-head">
+            <h2 id="participant-courses">{followed.length && accountReady ? 'Kajian aktif' : 'Program tersedia'}</h2>
+            <Link className="dash-link" to={followed.length && accountReady ? '/belajar' : '/belajar/katalog'}>{followed.length && accountReady ? 'Kajian saya' : 'Buka katalog'} <ArrowRight size={16} aria-hidden="true" /></Link>
+          </div>
+          {isProgramsLoading || programsError || !publishedPrograms.length
+            ? <DashboardState loading={isProgramsLoading ? 'Memuat program…' : undefined} error={programsError ? 'Program belum dapat dimuat.' : undefined} empty="Belum ada program terbit." busy={isRefreshing} onRetry={() => void refetch()} />
+            : <ul className="dash-list">{(followed.length && accountReady ? followed : publishedPrograms).slice(0, 3).map(item => {
+              const meetings = validLessons.filter(lesson => lesson.programId === item.id);
+              const completed = meetings.filter(lesson => progressById.get(lesson.id)?.isCompleted).length;
+              return <li key={item.id}><Link className="dash-row" to={(accountReady && followedIds.has(item.id) ? '/belajar/program/' : '/belajar/katalog/') + encodeURIComponent(item.id)}>
+                <span><strong>{item.title}</strong>{accountReady && contentReady && followedIds.has(item.id) && <small className="dash-meta">{meetings.length ? completed + ' dari ' + meetings.length + ' pertemuan selesai' : 'Belum ada pertemuan terbit'}</small>}</span>
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link></li>;
+            })}</ul>}
+        </section>
+        <section className="dash-panel" aria-labelledby="participant-notices">
+          <div className="dash-panel-head"><h2 id="participant-notices">Pengumuman</h2></div>
+          {announcementsQuery.isLoading || announcementsQuery.isError || !announcements.length
+            ? <DashboardState loading={announcementsQuery.isLoading ? 'Memuat pengumuman…' : undefined} error={announcementsQuery.isError ? 'Pengumuman belum dapat dimuat.' : undefined} empty="Belum ada pengumuman." busy={announcementsQuery.isFetching} onRetry={() => void announcementsQuery.refetch()} />
+            : <ul className="dash-list">{announcements.map(item => <li key={item.id}>
+              <details className="dash-notice"><summary>{item.title}</summary>
+                {item.createdAt && Number.isFinite(Date.parse(item.createdAt)) && <time className="dash-meta" dateTime={item.createdAt}>{dateLabel.format(new Date(item.createdAt))}</time>}
+                <p>{item.content}</p>
+                {item.linkUrl && isSafeStreamUrl(item.linkUrl) && <a className="dash-link" href={item.linkUrl} target="_blank" rel="noopener noreferrer">Buka tautan <ExternalLink size={14} aria-hidden="true" /></a>}
+              </details>
+            </li>)}</ul>}
+        </section>
       </div>
-      <aside className="portal-side-stack">
-        <PortalPanel title="Akses cepat"><div className="portal-shortcuts">{shortcuts.map(({ title, detail, href, icon: Icon }) => <Link className="portal-shortcut" key={href} to={href}><Icon size={20} aria-hidden="true" /><span><strong>{title}</strong><small>{detail}</small></span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div></PortalPanel>
-        <PortalPanel title="Agenda kajian" action={<Link to="/belajar/jadwal" className="portal-button">Semua jadwal</Link>}>
-          {isSchedulesLoading ? <PortalSkeleton label="Memuat jadwal…" /> : nextSchedule ? <div><h3 className="font-semibold">{nextSchedule.title}</h3><p className="portal-muted mt-2">{nextSchedule.day} · {nextSchedule.date}</p><p className="portal-muted">{nextSchedule.time || [nextSchedule.startTime, nextSchedule.endTime].filter(Boolean).join(' – ') || 'Waktu menyusul'}</p>{nextSchedule.status && nextSchedule.status !== 'Rutin' && <p className="portal-feedback mt-3">{nextSchedule.status}: {nextSchedule.statusReason || 'Periksa pembaruan jadwal.'}</p>}<Link to={nextSchedule.venueId ? '/belajar/lokasi/' + nextSchedule.venueId : '/belajar/lokasi'} className="portal-button mt-4"><MapPin size={16} aria-hidden="true" />Lihat lokasi</Link></div> : <div className="portal-empty"><CalendarDays size={24} aria-hidden="true" /><strong>{schedulesError ? 'Jadwal belum dapat dimuat' : 'Belum ada agenda tersedia'}</strong><p>{schedulesError ? 'Periksa koneksi dan coba Segarkan.' : 'Jadwal yang dipublikasikan akan tampil di sini.'}</p></div>}
-        </PortalPanel>
-        <p className="portal-muted">Pendaftaran dan progres akun nyata disinkronkan ke server. Catatan serta koleksi tersimpan tetap berada di browser ini; akun demo memakai data lokal.</p>
-      </aside>
+      <section className="dash-panel" aria-labelledby="participant-shortcuts">
+        <div className="dash-panel-head"><h2 id="participant-shortcuts">Akses cepat</h2></div>
+        <ul className="dash-list">{shortcuts.map(({ title, href, icon: Icon }) => <li key={href}>
+          <Link to={href} className="dash-row"><Icon size={18} aria-hidden="true" /><span><strong>{title}</strong></span><ArrowRight size={16} aria-hidden="true" /></Link>
+        </li>)}</ul>
+      </section>
     </div>
   </div>;
 }

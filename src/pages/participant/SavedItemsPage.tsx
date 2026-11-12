@@ -1,22 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useGetIdentity } from '@refinedev/core';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Bookmark, BookOpen, Clock3, FileText, Search, Trash2, Video } from 'lucide-react';
 import { deleteNote, getUserBookmarks, getUserNotes, toggleBookmark } from '@/lib/userStore';
 import { useParticipantPortalData } from './useParticipantPortalData';
 
 export function SavedItemsPage() {
-  const { data: identity } = useGetIdentity<{ id: string }>();
-  const userId = identity?.id || 'demo-peserta-1';
+  const { data: identity, isLoading: accountLoading } = useGetIdentity<{ id: string }>();
+  const userId = identity?.id || '';
   const { programs, lessons } = useParticipantPortalData();
-  const [activeTab, setActiveTab] = useState<'bookmarks' | 'notes'>('bookmarks');
-  const [bookmarks, setBookmarks] = useState(() => getUserBookmarks(userId));
-  const [notes, setNotes] = useState(() => getUserNotes(userId));
+  const [params, setParams] = useSearchParams();
+  const activeTab = params.get('tab') === 'catatan' ? 'notes' : 'bookmarks';
+  const setActiveTab = (tab: 'bookmarks' | 'notes') => {
+    const next = new URLSearchParams(params);
+    if (tab === 'notes') next.set('tab', 'catatan');
+    else next.delete('tab');
+    setParams(next, { replace: true, preventScrollReset: true });
+  };
+  const [, refreshCollection] = useState(0);
   const [query, setQuery] = useState('');
-  useEffect(() => { setBookmarks(getUserBookmarks(userId)); setNotes(getUserNotes(userId)); }, [userId]);
+  if (!userId) return <p role={accountLoading ? 'status' : 'alert'}>{accountLoading ? 'Memuat akun…' : 'Akun belum dapat diperiksa. Kembali ke dashboard dan coba lagi.'}</p>;
+  const bookmarks = getUserBookmarks(userId);
+  const notes = getUserNotes(userId);
 
-  const removeBookmark = (resourceType: 'program' | 'lesson', resourceId: string) => { toggleBookmark(userId, resourceType, resourceId); setBookmarks(getUserBookmarks(userId)); };
-  const removeNote = (noteId: string) => { deleteNote(userId, noteId); setNotes(getUserNotes(userId)); };
+  const removeBookmark = (resourceType: 'program' | 'lesson', resourceId: string) => { toggleBookmark(userId, resourceType, resourceId); refreshCollection(value => value + 1); };
+  const removeNote = (noteId: string) => { deleteNote(userId, noteId); refreshCollection(value => value + 1); };
   const visibleBookmarks = bookmarks.filter((bookmark) => { const resource = bookmark.resourceType === 'program' ? programs.find((item) => item.id === bookmark.resourceId) : lessons.find((item) => item.id === bookmark.resourceId); return (resource?.title || bookmark.resourceId).toLowerCase().includes(query.toLowerCase()); });
   const visibleNotes = notes.filter((note) => { const lesson = lessons.find((item) => item.id === note.lessonId); return `${lesson?.title || ''} ${note.content}`.toLowerCase().includes(query.toLowerCase()); });
 

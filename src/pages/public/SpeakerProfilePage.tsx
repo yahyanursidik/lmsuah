@@ -2,24 +2,19 @@ import { Link } from 'react-router-dom';
 import { AppImage } from '../../components/ui/AppImage';
 import { programCategoryLabel } from '../../../shared/program-category';
 import { useList } from '@refinedev/core';
-import { MOCK_SPEAKER, MOCK_PROGRAMS } from '../../mock/publicData';
+import { MOCK_SPEAKER } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
-import type { PublicLessonSummary, PublicProgramSummary } from '../../types';
+import { EmptyState, ErrorAlert, LoadingSkeleton } from '../../components/public/UIStates';
+import type { PublicProgramSummary } from '../../types';
 
 export function SpeakerProfilePage() {
-  const { query: programsQuery, result: programsResult } = useList<PublicProgramSummary>({ resource: 'programs', pagination: { mode: 'off' } });
-  const { result: lessonsResult } = useList<PublicLessonSummary>({ resource: 'lessons', pagination: { mode: 'off' } });
-
-  const apiPrograms = programsResult?.data || [];
-  const apiLessons = lessonsResult?.data || [];
-  const isFetched = programsQuery.isFetched || apiPrograms.length > 0;
-  const programs = isFetched ? (apiPrograms.length > 0 ? apiPrograms : []) : (programsQuery.isError ? MOCK_PROGRAMS : MOCK_PROGRAMS);
-
-  const speaker = {
-    ...MOCK_SPEAKER,
-    activeProgramsCount: programs.length,
-    totalKajiansCount: apiLessons.length > 0 ? apiLessons.length : MOCK_SPEAKER.totalKajiansCount,
-  };
+  const { query: programsQuery, result: programsResult } = useList<PublicProgramSummary>({
+    resource: 'programs',
+    pagination: { mode: 'off' },
+    filters: [{ field: 'status', operator: 'eq', value: 'published' }],
+  });
+  const programs = programsResult?.data || [];
+  const speaker = MOCK_SPEAKER;
 
   return (
     <div className="space-y-12 pb-16">
@@ -78,6 +73,9 @@ export function SpeakerProfilePage() {
       <section className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-slate-900">Program Kajian yang Diampu</h2>
+          {programsQuery.isLoading ? <LoadingSkeleton count={2} /> :
+            programsQuery.isError && !programs.length ? <ErrorAlert message="Program kajian belum dapat dimuat." onRetry={() => void programsQuery.refetch()} /> :
+            !programs.length ? <EmptyState title="Belum ada program yang diterbitkan" /> :
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {programs.map((prog) => (
               <div key={prog.id} className="rounded-xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-3">
@@ -89,14 +87,14 @@ export function SpeakerProfilePage() {
                   <p className="text-xs text-slate-600 line-clamp-2">{prog.description}</p>
                 </div>
                 <Link
-                  to={`/programs/${prog.id}`}
-                  className="block text-xs font-bold text-emerald-900 hover:underline pt-2 border-t border-stone-100"
+                  to={`/programs/${encodeURIComponent(prog.id)}`}
+                  className="flex min-h-11 items-center text-sm font-semibold text-emerald-900 hover:underline border-t border-stone-100"
                 >
                   Lihat Program & Kurikulum →
                 </Link>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </section>
     </div>

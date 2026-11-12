@@ -4,6 +4,19 @@ Versi aplikasi mengikuti Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag Git mema
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-12
+
+### Beranda dan dashboard
+
+- Beranda kini menampilkan pencarian judul atau kitab, program terbit, pintasan sesuai peran, dan agenda mendatang berdasarkan waktu WIB. Katalog mempertahankan kata kunci di URL dan filter kategori kustom. Kondisi memuat, gagal, dan kosong tidak lagi digantikan data contoh.
+- Detail agenda terhubung ke lokasi dan siaran yang valid. Tautan kurikulum dan pertemuan tetap berada di portal peserta saat dibuka dari ruang belajar.
+- Dashboard admin memakai total API dan menampilkan tiga draft terbaru per jenis. Pintasan membuka daftar program berfilter draft atau langsung menandai pertemuan di kurikulum.
+- Dashboard peserta membedakan mulai dan lanjut belajar, menampilkan posisi tersimpan untuk pertemuan yang masih tersedia, serta menghubungkan agenda, kuis, hasil evaluasi, dan tab Catatan.
+- PR dashboard tidak menambah migrasi atau mengubah konfigurasi Netlify maupun flag server. Migrasi kategori 0015 sudah ada di `main` dan tetap memiliki prosedur penerapan terpisah.
+
+### Perubahan yang sudah ada di main sejak v0.4.0
+
+- Penghapusan lintas modul menggunakan pengecekan dependensi dan menawarkan arsip bila data masih digunakan. Validasi penerbitan program selaras dengan daftar kesiapan.
 - Kategori program kini disimpan mandiri, dapat diatur pada tambah/edit, persiapan, dan draft revisi; kategori jadwal tidak lagi menimpa kategori program.
 - Menghapus default “Fiqih” pada beranda, memakai label netral “Kajian” untuk kategori kosong, dan menambahkan filter kategori dinamis di publik/admin termasuk kategori kustom.
 - Menambahkan migrasi aditif `0015_program_category`; tidak ada klasifikasi otomatis data lama atau perubahan snapshot yang sudah disetujui. Panduan penerapan: `docs/program-categories.md`.

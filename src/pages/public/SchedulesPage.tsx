@@ -1,39 +1,38 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useList } from '@refinedev/core';
 import { MapPin } from 'lucide-react';
-import { MOCK_SCHEDULES, MOCK_VENUES, ScheduleItem, Venue } from '../../mock/publicData';
+import type { ScheduleItem, Venue } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
-import { scheduleStreamUrl, TARBIYAH_CHANNEL_NAME } from '../../../shared/schedule-stream';
+import { getAgendaStream } from '../../lib/public-home';
+import { TARBIYAH_CHANNEL_NAME, TARBIYAH_LIVE_URL, TARBIYAH_STREAMS_URL } from '../../../shared/schedule-stream';
 
 export function SchedulesPage() {
   const [filterType, setFilterType] = useState<'Semua' | 'Rutin' | 'Tematik' | 'Perubahan' | 'Live'>('Semua');
+  const [params, setParams] = useSearchParams();
+  const agendaId = params.get('agenda');
 
   const { query: listQuery, result: listResult } = useList<ScheduleItem>({
     resource: 'schedules',
     pagination: { mode: 'off' },
   });
-  const { query: venuesQuery, result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
+  const { result: venuesResult } = useList<Venue>({
+    resource: 'venues', pagination: { mode: 'off' },
+    filters: [{ field: 'status', operator: 'eq', value: 'active' }],
+  });
 
-  const apiItems = listResult?.data || [];
-  const apiVenues = venuesResult?.data || [];
-  const isFetched = listQuery.isFetched || apiItems.length > 0;
-  const isVenuesFetched = venuesQuery.isFetched || apiVenues.length > 0;
-
-  const venues = isVenuesFetched ? apiVenues : (venuesQuery.isError ? MOCK_VENUES : []);
-  const rawSchedules: ScheduleItem[] = (isFetched ? apiItems : (listQuery.isError ? MOCK_SCHEDULES : [])).map((schedule) => ({
-    ...schedule,
-    venueName: schedule.venueName || venues.find((venue) => venue.id === schedule.venueId)?.name,
-  }));
+  const rawSchedules = listResult?.data || [];
+  const venueNames = new Map((venuesResult?.data || []).map(venue => [venue.id, venue.name]));
   const isLoading = listQuery.isLoading;
   const isError = listQuery.isError;
   const refetch = listQuery.refetch;
 
   const filteredSchedules = rawSchedules.filter((sch) => {
+    if (agendaId) return sch.id === agendaId;
     if (filterType === 'Semua') return true;
     if (filterType === 'Perubahan') return Boolean(sch.status && sch.status !== 'Rutin');
-    if (filterType === 'Live') return sch.isLiveStream;
+    if (filterType === 'Live') return Boolean(getAgendaStream(sch));
     return sch.type === filterType;
   });
 
@@ -54,16 +53,22 @@ export function SchedulesPage() {
           Jadwal Kajian Pekanan & Tematik
         </h1>
         <p className="text-slate-600 max-w-2xl">
-          Hadiri majelis ilmu di lokasi yang terhubung langsung dari data admin, atau ikuti siaran langsung ketika tersedia.
+          Lihat waktu, lokasi, dan tautan siaran kajian.
         </p>
         <Link to="/venues" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 text-xs font-bold text-slate-800 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"><MapPin className="h-4 w-4 text-emerald-800" /> Jelajahi lokasi majelis</Link>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-stone-200 pb-3 overflow-x-auto">
+      {agendaId ? (
+        <Link to="/schedules" onClick={() => setFilterType('Semua')} className="inline-flex min-h-11 items-center rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-emerald-900 focus-visible:outline-2">
+          Lihat semua agenda
+        </Link>
+      ) : <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 pb-3">
         {(['Semua', 'Rutin', 'Tematik', 'Perubahan', 'Live'] as const).map((t) => (
           <button
             key={t}
+            type="button"
+            aria-pressed={filterType === t}
             onClick={() => setFilterType(t)}
             className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors min-h-[44px] flex items-center whitespace-nowrap ${
               filterType === t
@@ -71,10 +76,10 @@ export function SchedulesPage() {
                 : 'bg-stone-100 text-slate-700 hover:bg-stone-200'
             }`}
           >
-            {t === 'Semua' ? 'Semua agenda' : t}
+            {t === 'Semua' ? 'Semua agenda' : t === 'Live' ? 'Ada siaran' : t}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Content Rendering */}
       {isLoading ? (
@@ -86,13 +91,17 @@ export function SchedulesPage() {
         />
       ) : filteredSchedules.length === 0 ? (
         <EmptyState
-          title="Jadwal Tidak Ditemukan"
-          description="Belum ada jadwal kajian untuk kategori ini."
+          title={agendaId ? 'Agenda tidak ditemukan' : 'Tidak ada jadwal'}
+          description={agendaId ? 'Agenda mungkin telah dihapus. Lihat daftar untuk menemukan jadwal lain.' : 'Belum ada jadwal kajian untuk kategori ini.'}
+          actionText={agendaId ? 'Lihat semua jadwal' : undefined}
+          onAction={() => { setFilterType('Semua'); setParams({}); }}
         />
       ) : (
         <div className="space-y-6">
           {filteredSchedules.map((sch) => {
-            const streamUrl = scheduleStreamUrl(sch);
+            const streamUrl = getAgendaStream(sch);
+            const venueName = venueNames.get(sch.venueId) || sch.venueName;
+            const venueLink = venueNames.has(sch.venueId) ? `/venues/${encodeURIComponent(sch.venueId)}` : undefined;
             const isCancelled = sch.status === 'Dibatalkan';
             const isRescheduled = sch.status === 'Diundur';
             const isRelocated = sch.status === 'Pindah Lokasi';
@@ -109,11 +118,11 @@ export function SchedulesPage() {
                     : 'border-stone-200 hover:border-emerald-900/30'
                 }`}
               >
-                <div className="space-y-3 flex-1">
+                <div className="min-w-0 space-y-3 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Status Change Badge */}
                     {isCancelled && (
-                      <span className="rounded-md bg-red-800 px-3 py-1 text-xs font-extrabold text-white animate-pulse">
+                      <span className="rounded-md bg-red-800 px-3 py-1 text-xs font-extrabold text-white">
                         🚫 DIBATALKAN
                       </span>
                     )}
@@ -137,17 +146,16 @@ export function SchedulesPage() {
                       Kajian {sch.type}
                     </span>
 
-                    {sch.isLiveStream && (
+                    {streamUrl && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse" />
-                        Live {TARBIYAH_CHANNEL_NAME} / YouTube
+                        {streamUrl === TARBIYAH_STREAMS_URL || streamUrl === TARBIYAH_LIVE_URL ? `Siaran: ${TARBIYAH_CHANNEL_NAME}` : 'Tautan siaran tersedia'}
                       </span>
                     )}
                   </div>
 
-                  <h3 className={`text-xl font-bold ${isCancelled ? 'line-through text-slate-500' : 'text-slate-900'}`}>
+                  <h2 className={`break-words text-xl font-bold ${isCancelled ? 'line-through text-slate-500' : 'text-slate-900'}`}>
                     {sch.title}
-                  </h3>
+                  </h2>
 
                   {/* Status Reason Alert Box */}
                   {sch.statusReason && (
@@ -170,37 +178,28 @@ export function SchedulesPage() {
                       📅 {sch.day}, {sch.date}
                     </div>
                     <div className="flex items-center gap-1 font-semibold text-emerald-900">
-                      ⏰ {sch.time || `${sch.startTime} - ${sch.endTime}`} WIB
+                      ⏰ {sch.time || [sch.startTime, sch.endTime].filter(Boolean).join(' – ') || 'Waktu menyusul'}
+                      {(sch.time || sch.startTime || sch.endTime) && ' WIB'}
                     </div>
                     <div className="flex items-center gap-1">
                       👤 {sch.speaker}
                     </div>
-                    <div className="flex items-center gap-1 font-medium text-slate-800">
-                      📍{' '}
-                      {sch.venueId ? (
-                        <Link
-                          to={`/venues/${sch.venueId}`}
-                          className="text-emerald-900 underline font-bold hover:text-emerald-700"
-                        >
-                          {sch.venueName || 'Lihat Detail Lokasi'}
-                        </Link>
-                      ) : (
-                        <span>{sch.venueName}</span>
-                      )}
-                    </div>
+                    {venueName && <div className="flex items-center gap-1 font-medium text-slate-800">
+                      <MapPin size={14} aria-hidden="true" /> {venueName}
+                    </div>}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  {sch.venueId && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {venueLink && (
                     <Link
-                      to={`/venues/${sch.venueId}`}
+                      to={venueLink}
                       className="flex min-h-11 items-center justify-center rounded-xl border border-stone-300 px-4 py-2.5 text-xs font-bold text-slate-800 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
                     >
                       Detail Lokasi 📍
                     </Link>
                   )}
-                  {streamUrl && !isCancelled && (
+                  {streamUrl && (
                     <a
                       href={streamUrl}
                       target="_blank"

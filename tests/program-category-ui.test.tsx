@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   ], create: vi.fn(), update: vi.fn(),
 }));
 vi.mock('@refinedev/core', () => ({
+  useGetIdentity: () => ({ data: undefined }),
   useList: ({ resource }: { resource: string }) => ({ result: { data: resource === 'programs' ? state.programs : [] }, query: { isFetched: true, isLoading: false, isError: false, refetch: vi.fn() } }),
   useOne: () => ({ result: { programRevisions: false }, query: { isLoading: false, isError: false } }),
   useCreate: () => ({ mutate: state.create, mutation: { isPending: false } }),

@@ -1,5 +1,5 @@
 import { useGetIdentity } from "@refinedev/core";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   CalendarDays,
   Clock3,
@@ -12,13 +12,17 @@ import { useLearningData } from "@/lib/useLearningData";
 import { LearningSyncNotice } from '@/components/ui/LearningSyncNotice';
 import { useParticipantPortalData } from "./useParticipantPortalData";
 import { useState } from "react";
-import { scheduleStreamUrl, TARBIYAH_CHANNEL_NAME } from '../../../shared/schedule-stream';
+import { getAgendaStream } from '../../lib/public-home';
+import { TARBIYAH_CHANNEL_NAME, TARBIYAH_LIVE_URL, TARBIYAH_STREAMS_URL } from '../../../shared/schedule-stream';
+import { ErrorAlert } from '../../components/public/UIStates';
 
 export function ParticipantSchedulePage() {
   const { data: identity } = useGetIdentity<{ id: string }>();
   const userId = identity?.id || "";
   const learning = useLearningData(userId);
-  const { schedules, programs, isLoading } = useParticipantPortalData();
+  const { schedules, programs, isSchedulesLoading, schedulesError, refetch } = useParticipantPortalData();
+  const [params] = useSearchParams();
+  const agendaId = params.get('agenda');
   const [filter, setFilter] = useState<"all" | "mine" | "changed">("all");
   const enrolledIds = new Set(
     learning.enrollments
@@ -26,6 +30,7 @@ export function ParticipantSchedulePage() {
       .map((item) => item.programId),
   );
   const visible = schedules.filter((schedule) => {
+    if (agendaId) return schedule.id === agendaId;
     if (filter === "mine")
       return Boolean(schedule.programId && enrolledIds.has(schedule.programId));
     if (filter === "changed")
@@ -58,7 +63,9 @@ export function ParticipantSchedulePage() {
           </span>
         </div>
       </header>
-      <div className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 bg-stone-100 p-1 sm:inline-grid">
+      {agendaId ? <Link to="/belajar/jadwal" onClick={() => setFilter('all')} className="inline-flex min-h-11 items-center rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-emerald-900 focus-visible:outline-2">
+        Lihat semua agenda
+      </Link> : <div className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 bg-stone-100 p-1 sm:inline-grid">
         {(
           [
             ["all", "Semua"],
@@ -76,13 +83,15 @@ export function ParticipantSchedulePage() {
             {label}
           </button>
         ))}
-      </div>
-      {isLoading && schedules.length === 0 ? (
-        <div className="h-64 animate-pulse rounded-xl bg-stone-200" />
+      </div>}
+      {isSchedulesLoading && schedules.length === 0 ? (
+        <p role="status" className="rounded-xl border border-stone-200 bg-white p-5 text-slate-700">Memuat jadwal…</p>
+      ) : schedulesError && schedules.length === 0 ? (
+        <ErrorAlert message="Jadwal kajian belum dapat dimuat." onRetry={() => void refetch()} />
       ) : visible.length > 0 ? (
         <div className="space-y-4">
           {visible.map((schedule) => {
-            const streamUrl = scheduleStreamUrl(schedule);
+            const streamUrl = getAgendaStream(schedule);
             const changed = schedule.status && schedule.status !== "Rutin";
             const cancelled = schedule.status === "Dibatalkan";
             const program = programs.find(
@@ -122,9 +131,10 @@ export function ParticipantSchedulePage() {
                       <span className="rounded-md bg-stone-100 px-2 py-1 text-[10px] font-bold text-slate-600">
                         {schedule.type || "Kajian"}
                       </span>
-                      {schedule.isLiveStream && (
+                      {streamUrl && (
                         <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700">
-                          <Radio className="h-3 w-3" /> Live {TARBIYAH_CHANNEL_NAME}
+                          <Radio className="h-3 w-3" aria-hidden="true" />
+                          {streamUrl === TARBIYAH_STREAMS_URL || streamUrl === TARBIYAH_LIVE_URL ? `Siaran: ${TARBIYAH_CHANNEL_NAME}` : 'Tautan siaran tersedia'}
                         </span>
                       )}
                     </div>
@@ -134,9 +144,9 @@ export function ParticipantSchedulePage() {
                       {schedule.title}
                     </h2>
                     {program && (
-                      <p className="mt-1 text-xs text-slate-500">
+                      <Link to={`/belajar/katalog/${encodeURIComponent(program.id)}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-800 underline underline-offset-4 focus-visible:outline-2">
                         Program: {program.title}
-                      </p>
+                      </Link>
                     )}
                     {schedule.statusReason && (
                       <p
@@ -164,7 +174,7 @@ export function ParticipantSchedulePage() {
                         <MapPin className="h-3.5 w-3.5" /> Detail lokasi
                       </Link>
                     )}
-                    {streamUrl && !cancelled && (
+                    {streamUrl && (
                       <a
                         href={streamUrl}
                         target="_blank"
@@ -184,10 +194,10 @@ export function ParticipantSchedulePage() {
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-5 py-12 text-center">
           <CalendarDays className="mx-auto h-7 w-7 text-slate-400" />
           <h2 className="mt-3 text-base font-bold text-slate-900">
-            Tidak ada jadwal pada filter ini
+            {agendaId ? 'Agenda tidak ditemukan' : 'Tidak ada jadwal pada filter ini'}
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            Pilih Semua untuk melihat seluruh agenda yang tersedia.
+            {agendaId ? 'Agenda mungkin telah dihapus. Lihat semua agenda untuk menemukan jadwal lain.' : 'Pilih Semua untuk melihat seluruh agenda yang tersedia.'}
           </p>
         </div>
       )}

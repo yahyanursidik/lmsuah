@@ -60,7 +60,6 @@ export function PublicLayout() {
       <section aria-labelledby="technical-support-title" className="mx-auto mt-4 max-w-7xl border-t border-[var(--color-rule)] pt-4">
         <h2 id="technical-support-title" className="font-semibold text-[var(--color-ink)]">Bantuan teknis</h2>
         <p className="mt-1">Mengalami kendala, error, atau kegagalan sistem? Hubungi <a href="mailto:ahlan@yahyanursidik.my.id" className="inline-flex min-h-11 max-w-full items-center break-all font-semibold text-[var(--color-accent)] underline underline-offset-4">ahlan@yahyanursidik.my.id</a>.</p>
-        <p><a href="https://yahyanursidik.my.id/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold hover:underline">Yahya Nursidik</a><span className="block sm:inline"> — Special Advisor for Digital Transformation, Innovation &amp; Business YTS</span></p>
       </section>
     </footer>
     <nav aria-label="Navigasi cepat seluler" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[var(--color-rule)] bg-[var(--color-surface)] pb-[env(safe-area-inset-bottom)] lg:hidden">

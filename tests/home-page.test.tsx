@@ -11,6 +11,7 @@ import { getUpcomingAgenda } from '../src/lib/public-home';
 import type { ScheduleItem } from '../src/mock/publicData';
 import { TARBIYAH_STREAMS_URL } from '../shared/schedule-stream';
 
+const nextAgenda = vi.hoisted(() => '00000000-0000-4000-8000-000000000001');
 const state = vi.hoisted(() => ({
   identity: undefined as { id: string; role: string } | undefined,
   loading: new Set<string>(),
@@ -26,7 +27,7 @@ const state = vi.hoisted(() => ({
     { id: 'cancelled', title: 'Agenda batal', date: '2099-01-01', status: 'Dibatalkan', isLiveStream: true },
     { id: 'rescheduled', title: 'Agenda diundur', date: '2099-01-01', status: 'Diundur', isLiveStream: true },
     { id: 'latest', title: 'Agenda berikutnya', date: '2099-01-03', isLiveStream: true, streamUrl: 'javascript:alert(1)' },
-    { id: 'next', title: 'Pertemuan pekanan', programId: 'fiqih', date: '2099-01-02', startTime: '09:00', venueId: 'venue', isLiveStream: true },
+    { id: nextAgenda, title: 'Pertemuan pekanan', programId: 'fiqih', date: '2099-01-02', startTime: '09:00', venueId: 'venue', isLiveStream: true },
   ],
   venues: [{ id: 'venue', name: 'Masjid Uji', city: 'Bandung', status: 'active' }],
 }));
@@ -40,12 +41,12 @@ vi.mock('@refinedev/core', () => ({
       query: { isLoading: state.loading.has(options.resource), isError: state.errors.has(options.resource), refetch: state.refetch },
     };
   },
-  useOne: () => ({ result: state.venues[0], query: { isLoading: false, isError: false } }),
+  useOne: ({ resource, id }: { resource: 'schedules' | 'venues'; id: string }) => ({
+    result: state[resource]?.find(item => item.id === id),
+    query: { isLoading: false, isError: false },
+  }),
 }));
 vi.mock('../src/lib/useLearningData', () => ({ useLearningData: () => ({ enrollments: [], progress: [], loading: false, pending: false, error: '' }) }));
-vi.mock('../src/pages/participant/useParticipantPortalData', () => ({
-  useParticipantPortalData: () => ({ schedules: state.schedules, programs: state.programs, isSchedulesLoading: false }),
-}));
 
 beforeEach(() => {
   state.identity = undefined;
@@ -112,7 +113,7 @@ describe('Homepage discovery and learning journeys', () => {
     renderJourney('/speaker');
     expect(screen.getByRole('heading', { name: 'Ustadz Abu Haidar As-Sundawy' })).toBeDefined();
     expect(screen.getByRole('alert').textContent).toContain('Program kajian belum dapat dimuat');
-    expect(screen.queryByRole('link', { name: /Lihat Program & Kurikulum/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Lihat kurikulum/ })).toBeNull();
     expect(state.calls.mock.calls.some(([options]) => options.resource === 'lessons')).toBe(false);
   });
 
@@ -125,7 +126,7 @@ describe('Homepage discovery and learning journeys', () => {
     expect(section.queryByText('Agenda diundur')).toBeNull();
     expect(section.getByRole('link', { name: 'Buka siaran' }).getAttribute('href')).toBe(TARBIYAH_STREAMS_URL);
     const agenda = section.getByRole('link', { name: 'Pertemuan pekanan' });
-    expect(agenda.getAttribute('href')).toBe(participant ? '/belajar/jadwal?agenda=next' : '/schedules?agenda=next');
+    expect(agenda.getAttribute('href')).toBe((participant ? '/belajar/jadwal' : '/schedules') + '?agenda=' + nextAgenda);
     fireEvent.click(agenda);
     expect(screen.getByRole('heading', { name: 'Pertemuan pekanan' })).toBeDefined();
     expect(screen.queryByRole('heading', { name: 'Agenda berikutnya' })).toBeNull();
@@ -135,8 +136,8 @@ describe('Homepage discovery and learning journeys', () => {
 
   it('connects an actual location back to the schedule detail', () => {
     renderJourney('/venues/venue');
-    const links = screen.getAllByRole('link', { name: 'Detail agenda' });
-    const next = links.find(link => link.getAttribute('href') === '/schedules?agenda=next');
+    const links = screen.getAllByRole('link', { name: /Detail agenda/ });
+    const next = links.find(link => link.getAttribute('href') === '/schedules?agenda=' + nextAgenda);
     expect(next).toBeDefined();
     fireEvent.click(next!);
     expect(screen.getByRole('heading', { name: 'Pertemuan pekanan' })).toBeDefined();

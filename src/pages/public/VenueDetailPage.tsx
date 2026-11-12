@@ -1,331 +1,144 @@
 import { useState } from 'react';
+import { ArrowLeft, ArrowRight, CalendarDays, Copy, MapPin, Navigation, Share2 } from 'lucide-react';
+import { useList, useOne } from '@refinedev/core';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { AppImage } from '../../components/ui/AppImage';
-import { getVenueFallbackImage } from '../../lib/image-source';
-import { useParams, Link, useLocation } from 'react-router-dom';
-import { useOne, useList } from '@refinedev/core';
-import type { Venue, ScheduleItem } from '../../mock/publicData';
+import { DiscoveryEmpty, DiscoveryError, DiscoveryHeader, DiscoveryLoading } from '../../components/public/DiscoveryUI';
 import { SEOHead } from '../../components/public/SEOHead';
-import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
-import { Copy, Check, Share2, MapPin, ExternalLink, Calendar, Phone, Users, Home } from 'lucide-react';
+import { getVenueFallbackImage } from '../../lib/image-source';
+import {
+  agendaDateText, agendaPath, agendaTimeText, detailPath, directoryReturnPath, discoveryPaths, discoveryQueryOptions,
+  isActiveVenue, venueMapsHref, type DiscoveryVenue,
+} from '../../lib/public-discovery';
+import { getUpcomingAgenda } from '../../lib/public-home';
+import type { ScheduleItem } from '../../mock/publicData';
 
 export function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  const participant = location.pathname.startsWith('/belajar');
-  const venuePath = participant ? '/belajar/lokasi' : '/venues';
-  const schedulePath = participant ? '/belajar/jadwal' : '/schedules';
-  const [copiedAddress, setCopiedAddress] = useState(false);
-  const [sharedLocation, setSharedLocation] = useState(false);
+  const { venues, schedule } = discoveryPaths(location.pathname);
+  const back = directoryReturnPath(venues, location.state);
+  const [action, setAction] = useState<'copy' | 'share' | null>(null);
+  const [feedback, setFeedback] = useState('');
 
-  const { query: venueQuery, result: refineVenue } = useOne<Venue>({
+  const { query: venueQuery, result: item } = useOne<DiscoveryVenue>({
     resource: 'venues',
-    id: id || '',
-    queryOptions: { enabled: !!id },
+    id: id ? encodeURIComponent(id) : '',
+    queryOptions: { ...discoveryQueryOptions, enabled: !!id, retry: false },
   });
+  const venue = item && isActiveVenue(item) && (!id || item.id === id || item.slug === id) ? item : undefined;
 
-  const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({
+  const { query: agendaQuery, result: agendaResult } = useList<ScheduleItem>({
     resource: 'schedules',
-    filters: [{ field: 'venueId', operator: 'eq', value: refineVenue?.id }],
+    filters: venue ? [{ field: 'venueId', operator: 'eq', value: venue.id }] : [],
     pagination: { mode: 'off' },
-    queryOptions: { enabled: !!refineVenue?.id },
+    queryOptions: { ...discoveryQueryOptions, enabled: !!venue },
   });
+  const upcoming = venue ? getUpcomingAgenda((agendaResult.data || []).filter(row => row.venueId === venue.id)).slice(0, 3) : [];
+  const address = venue && [venue.address, venue.district, venue.city, venue.postalCode].filter(Boolean).join(', ');
+  const map = venue && venueMapsHref(venue, 'directions');
+  const notFound = [403, 404].includes(venueQuery.error?.statusCode || 0);
 
-  const venue = refineVenue;
-  const isLoading = venueQuery.isLoading;
-  const isError = venueQuery.isError;
-  const refetch = venueQuery.refetch;
-
-  const locationSchedules = schedulesResult?.data || [];
-
-  const handleCopyAddress = async () => {
-    if (!venue) return;
-    const fullText = [venue.name, venue.address, venue.city].filter(Boolean).join(', ');
+  async function copyAddress() {
+    if (!address || action) return;
+    setAction('copy');
+    setFeedback('');
     try {
-      await navigator.clipboard.writeText(fullText);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2500);
+      await navigator.clipboard.writeText(address);
+      setFeedback('Alamat disalin.');
     } catch {
-      // Fallback
-    }
-  };
-
-  const handleShareLocation = async () => {
-    if (!venue) return;
-    const shareData = {
-      title: venue.name,
-      text: `Lokasi Majelis Kajian ${venue.name} - ${venue.address}`,
-      url: new URL(`/venues/${encodeURIComponent(venue.id)}`, window.location.origin).href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        // User cancelled share
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(shareData.url);
-        setSharedLocation(true);
-        setTimeout(() => setSharedLocation(false), 2500);
-      } catch {
-        // Fallback
-      }
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto max-w-7xl px-4 py-16 space-y-8">
-        <SEOHead title="Memuat Detail Lokasi..." />
-        <LoadingSkeleton count={1} />
-      </div>
-    );
+      setFeedback('Alamat belum tersalin. Pilih dan salin teks alamat secara manual.');
+    } finally { setAction(null); }
   }
 
-  if (isError && !venue) {
-    return (
-      <div className="container mx-auto max-w-7xl px-4 py-16">
-        <SEOHead title="Lokasi Tidak Ditemukan" />
-        <ErrorAlert
-          message="Gagal memuat informasi lokasi dari server."
-          onRetry={() => refetch()}
-        />
-      </div>
-    );
-  }
-
-  if (!venue) {
-    return (
-      <div className="container mx-auto max-w-7xl px-4 py-16">
-        <SEOHead title="Lokasi Tidak Ditemukan" />
-        <EmptyState
-          title="Lokasi Tidak Ditemukan"
-          description="Maaf, informasi lokasi masjid yang Anda cari tidak tersedia."
-        />
-        <Link to={venuePath} className="mt-4 inline-flex min-h-11 items-center font-semibold text-emerald-900 underline">Semua lokasi</Link>
-      </div>
-    );
+  async function shareLocation() {
+    if (!venue || action) return;
+    setAction('share');
+    setFeedback('');
+    const url = new URL(detailPath('/venues', venue.id), window.location.origin).href;
+    try {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: venue.name, url });
+          return;
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return;
+        }
+      }
+      await navigator.clipboard.writeText(url);
+      setFeedback('Tautan lokasi disalin.');
+    } catch {
+      setFeedback('Tautan belum dapat dibagikan. Salin alamat halaman dari peramban.');
+    } finally { setAction(null); }
   }
 
   return (
-    <div className="space-y-12 pb-16">
-      <SEOHead
-        title={venue.name}
-        description={`Detail lokasi masjid ${venue.name}, alamat, petunjuk Google Maps, dan jadwal kajian rutin.`}
-      />
-
-      {/* Venue Header */}
-      <section className="bg-stone-900 text-white py-12 sm:py-16 border-b border-stone-800">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-8 space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link to={venuePath} className="inline-flex min-h-11 items-center font-semibold text-emerald-200 underline underline-offset-4">Semua lokasi</Link>
-                {(venue.city || venue.province) && <span className="rounded-md bg-emerald-800 px-3 py-1 text-xs font-semibold text-emerald-200">
-                  {[venue.city, venue.province].filter(Boolean).join(', ')}
-                </span>}
+    <div className={'public-discovery' + (venues.startsWith('/belajar/') ? ' public-discovery--embedded' : '')}>
+      <SEOHead title={venue?.name || 'Detail Lokasi'} description={venue ? 'Alamat dan jadwal kajian di ' + venue.name : undefined} />
+      <Link to={back} className="discovery-action discovery-action--text discovery-back"><ArrowLeft size={16} aria-hidden="true" /> Kembali ke lokasi</Link>
+      {venueQuery.isLoading ? <DiscoveryLoading label="Memuat lokasi majelis…" /> :
+        venueQuery.isError && !notFound && !venue ? (
+          <DiscoveryError message="Lokasi majelis belum dapat dimuat." retry={() => void venueQuery.refetch()} retrying={venueQuery.isFetching} />
+        ) : !venue ? (
+          <DiscoveryEmpty title="Lokasi tidak ditemukan" description="Lokasi mungkin tidak lagi aktif." />
+        ) : (
+          <>
+            <div className="discovery-detail-grid">
+              <div className="discovery-section">
+                <DiscoveryHeader title={venue.name} />
+                {address && <p className="discovery-meta"><MapPin size={17} aria-hidden="true" /> {address}</p>}
+                {venue.description && <p className="discovery-prose">{venue.description}</p>}
+                <div className="discovery-actions">
+                  {map && <a className="discovery-action discovery-action--primary" href={map} target="_blank" rel="noopener noreferrer"
+                    aria-label="Petunjuk arah (tab baru)"><Navigation size={16} aria-hidden="true" /> Petunjuk arah</a>}
+                  {address && <button type="button" className="discovery-action" aria-disabled={action !== null} onClick={() => void copyAddress()}>
+                    <Copy size={16} aria-hidden="true" /> {action === 'copy' ? 'Menyalin…' : 'Salin alamat'}
+                  </button>}
+                  <button type="button" className="discovery-action" aria-disabled={action !== null} onClick={() => void shareLocation()}>
+                    <Share2 size={16} aria-hidden="true" /> {action === 'share' ? 'Membagikan…' : 'Bagikan lokasi'}
+                  </button>
+                </div>
+                {feedback && <p role="status" className="discovery-meta">{feedback}</p>}
+                {(venue.facilities?.length > 0 || venue.capacity || venue.phone) && <aside className="discovery-detail-info" aria-label="Informasi masjid">
+                  <dl>
+                    {venue.facilities?.length > 0 && <div><dt>Fasilitas</dt><dd>{venue.facilities.join(' · ')}</dd></div>}
+                    {venue.capacity && <div><dt>Kapasitas</dt><dd>{venue.capacity}</dd></div>}
+                    {venue.phone && <div><dt>Telepon</dt><dd>{venue.phone}</dd></div>}
+                  </dl>
+                </aside>}
               </div>
-
-              <h1 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl text-stone-100">
-                {venue.name}
-              </h1>
-
-              <p className="text-stone-300 text-sm sm:text-base leading-relaxed flex items-start gap-2">
-                <MapPin className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                <span>
-                  {[venue.address, venue.district].filter(Boolean).join(', ') || 'Alamat belum tersedia'}
-                </span>
-              </p>
-
-              {/* Action Buttons: Google Maps, Copy Address, Share */}
-              <div className="pt-4 flex flex-wrap items-center gap-3">
-                {venue.googleMapsUrl && (
-                  <a
-                    href={venue.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold text-white hover:bg-emerald-500 transition-colors min-h-[44px] flex items-center gap-2 shadow-md"
-                  >
-                    <span>Buka Google Maps ↗</span>
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleCopyAddress}
-                  className="rounded-xl border border-stone-700 bg-stone-800 px-5 py-3 text-xs font-bold text-stone-200 hover:bg-stone-700 transition-colors min-h-[44px] flex items-center gap-2 cursor-pointer"
-                >
-                  {copiedAddress ? (
-                    <>
-                      <Check className="h-4 w-4 text-emerald-400" />
-                      <span className="text-emerald-300">Alamat Tersalin!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 text-stone-400" />
-                      <span>Salin Alamat</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleShareLocation}
-                  className="rounded-xl border border-stone-700 bg-stone-800 px-5 py-3 text-xs font-bold text-stone-200 hover:bg-stone-700 transition-colors min-h-[44px] flex items-center gap-2 cursor-pointer"
-                >
-                  {sharedLocation ? (
-                    <>
-                      <Check className="h-4 w-4 text-emerald-400" />
-                      <span className="text-emerald-300">Link Tersalin!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Share2 className="h-4 w-4 text-stone-400" />
-                      <span>Bagikan Lokasi</span>
-                    </>
-                  )}
-                </button>
+              <div className="discovery-venue-image discovery-detail-image">
+                <AppImage src={venue.image} fallbackSrc={getVenueFallbackImage(venue)} kind="venue" alt={venue.name} loading="eager" />
               </div>
             </div>
 
-            <div className="lg:col-span-4 space-y-4">
-              <div className="rounded-2xl overflow-hidden border border-stone-700 bg-stone-800 h-52 shadow-xl">
-                <AppImage src={venue.image} fallbackSrc={getVenueFallbackImage(venue)} kind="venue" alt={venue.name} loading="eager" className="h-full w-full object-cover" />
+            <section className="discovery-section" aria-labelledby="venue-agenda-heading">
+              <div className="discovery-section-heading">
+                <h2 id="venue-agenda-heading">Agenda mendatang</h2>
+                <Link className="discovery-action discovery-action--text" to={agendaPath(schedule, { venueId: venue.id, view: 'semua' })}>
+                  <CalendarDays size={16} aria-hidden="true" /> Semua agenda di sini
+                </Link>
               </div>
-              <div className="rounded-2xl border border-stone-700 bg-stone-800/90 p-6 space-y-3.5 text-xs text-stone-300 shadow-xl">
-                <h3 className="font-bold text-stone-100 text-sm border-b border-stone-700 pb-2 flex items-center gap-2">
-                  <Home className="h-4 w-4 text-emerald-400" /> Informasi Masjid
-                </h3>
-                {venue.capacity && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-stone-400 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Kapasitas:</span>
-                    <span className="font-semibold text-stone-100">{venue.capacity}</span>
-                  </div>
-                )}
-                {venue.phone && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-stone-400 flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Telepon:</span>
-                    <span className="font-semibold text-stone-100">{venue.phone}</span>
-                  </div>
-                )}
-                {venue.postalCode && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-stone-400">Kode Pos:</span>
-                    <span className="font-semibold text-stone-100">{venue.postalCode}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Main Content: Agenda Schedules & Facilities */}
-      <section className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
-          {/* Schedules Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <Calendar className="h-6 w-6 text-emerald-900" /> Agenda Kajian di Lokasi Ini
-              </h2>
-              <span className="text-xs text-slate-500 font-medium">WIB (Asia/Jakarta)</span>
-            </div>
-
-            {schedulesQuery.isLoading ? (
-              <p role="status" className="py-4 text-slate-600">Memuat agenda lokasi…</p>
-            ) : schedulesQuery.isError && !locationSchedules.length ? (
-              <ErrorAlert message="Agenda di lokasi ini belum dapat dimuat." onRetry={() => void schedulesQuery.refetch()} />
-            ) : locationSchedules.length === 0 ? (
-              <EmptyState title="Belum Ada Agenda Terjadwal di Lokasi Ini" />
-            ) : (
-              <div className="space-y-4">
-                {locationSchedules.map((sch: ScheduleItem) => {
-                  const isCancelled = sch.status === 'Dibatalkan';
-                  const isRescheduled = sch.status === 'Diundur';
-                  const isRelocated = sch.status === 'Pindah Lokasi';
-
-                  return (
-                    <div
-                      key={sch.id}
-                      className={`rounded-2xl border p-5 bg-white shadow-xs space-y-2 transition-all ${
-                        isCancelled
-                          ? 'border-red-300 bg-red-50/30'
-                          : isRescheduled || isRelocated
-                          ? 'border-amber-300 bg-amber-50/30'
-                          : 'border-stone-200 hover:border-emerald-900/30'
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {isCancelled && (
-                            <span className="rounded-md bg-red-800 px-2.5 py-0.5 text-xs font-extrabold text-white">
-                              🚫 DIBATALKAN
-                            </span>
-                          )}
-                          {isRescheduled && (
-                            <span className="rounded-md bg-amber-600 px-2.5 py-0.5 text-xs font-extrabold text-white">
-                              ⏰ DIUNDUR
-                            </span>
-                          )}
-                          {isRelocated && (
-                            <span className="rounded-md bg-orange-600 px-2.5 py-0.5 text-xs font-extrabold text-white">
-                              📍 PINDAH LOKASI
-                            </span>
-                          )}
-                          {!isCancelled && !isRescheduled && !isRelocated && (
-                            <span className="rounded-md bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-900">
-                              {sch.category || 'Rutin'}
-                            </span>
-                          )}
-                          <span className="text-xs text-slate-500 font-semibold">{sch.day}, {sch.date}</span>
-                        </div>
-                        <span className="text-xs font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-md">
-                          {sch.time || [sch.startTime, sch.endTime].filter(Boolean).join(' – ') || 'Waktu menyusul'}
-                          {(sch.time || sch.startTime || sch.endTime) && ' WIB'}
-                        </span>
-                      </div>
-
-                      <h3 className={`font-bold text-slate-900 text-base ${isCancelled ? 'line-through text-slate-500' : ''}`}>
-                        {sch.title}
-                      </h3>
-
-                      {sch.statusReason && (
-                        <p className="text-xs text-amber-900 bg-amber-100 p-2.5 rounded-lg border border-amber-200 font-medium">
-                          ⚠️ {sch.statusReason}
-                        </p>
-                      )}
-                      <Link to={`${schedulePath}?${new URLSearchParams({ agenda: sch.id })}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-900 underline underline-offset-4">
-                        Detail agenda
+              {agendaQuery.isLoading ? <DiscoveryLoading label="Memuat agenda lokasi…" /> :
+                agendaQuery.isError && !upcoming.length ? (
+                  <DiscoveryError message="Agenda lokasi belum dapat dimuat." retry={() => void agendaQuery.refetch()} retrying={agendaQuery.isFetching} />
+                ) : !upcoming.length ? <DiscoveryEmpty title="Belum ada agenda mendatang di lokasi ini" /> :
+                <ul className="discovery-agenda-list">
+                  {upcoming.map(row => <li key={row.id} className="discovery-agenda">
+                    <p className="discovery-agenda-time">{agendaTimeText(row)}</p>
+                    <div className="min-w-0">
+                      <p className="discovery-meta">{agendaDateText(row.date)}</p>
+                      <h3 className="discovery-item-title">{row.title}</h3>
+                      <Link className="discovery-action discovery-action--text" to={agendaPath(schedule, { agenda: row.id })}
+                        aria-label={'Detail agenda: ' + row.title}>
+                        Detail agenda <ArrowRight size={16} aria-hidden="true" />
                       </Link>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-        </div>
-
-        {/* Sidebar: Facilities */}
-        <div className="lg:col-span-4 space-y-6">
-          {venue.facilities && venue.facilities.length > 0 && (
-            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
-              <h3 className="font-bold text-slate-900 text-base border-b border-stone-100 pb-2">Fasilitas Masjid</h3>
-              <ul className="space-y-2 text-xs text-slate-700">
-                {venue.facilities.map((fac, idx) => (
-                  <li key={idx} className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 shrink-0" />
-                    <span>{fac}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </section>
+                  </li>)}
+                </ul>}
+            </section>
+          </>
+        )}
     </div>
   );
 }

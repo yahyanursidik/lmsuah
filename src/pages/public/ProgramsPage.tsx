@@ -1,165 +1,64 @@
-import { useState } from 'react';
+import { CalendarDays, UserRound } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { programCategoryLabel, programCategoryOptions } from '../../../shared/program-category';
-import { AppImage } from '../../components/ui/AppImage';
-import { useLocation, Link, useSearchParams } from 'react-router-dom';
-import { useList } from '@refinedev/core';
-import type { PublicProgramSummary } from '../../types';
-import { PUBLIC_SEARCH_LIMIT } from '../../lib/public-home';
+import {
+  DiscoveryChoices, DiscoveryEmpty, DiscoveryError, DiscoveryHeader, DiscoveryLoading,
+  DiscoveryResults, DiscoverySearch, DiscoverySelect, ProgramIndexEntry,
+} from '../../components/public/DiscoveryUI';
 import { SEOHead } from '../../components/public/SEOHead';
-import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
+import { discoveryPaths, matchesDiscoverySearch, useDiscoveryFilters, usePublishedProgramIndex } from '../../lib/public-discovery';
 
 export function ProgramsPage() {
-  const [params, setParams] = useSearchParams();
-  const search = (params.get('q') || '').slice(0, PUBLIC_SEARCH_LIMIT);
-  const [category, setCategory] = useState<string | null>(null);
   const location = useLocation();
+  const { catalog, schedule } = discoveryPaths(location.pathname);
+  const { params, change, search, setSearch, reset } = useDiscoveryFilters();
+  const category = params.get('kategori') || '';
+  const { items: programs, query } = usePublishedProgramIndex();
+  const categories = programCategoryOptions(programs);
+  const options = [{ value: '', label: 'Semua' }, ...categories.map(label => ({ value: label, label }))];
+  if (category && !categories.includes(category)) options.push({ value: category, label: 'Kategori pilihan' });
 
-  function setSearch(value: string) {
-    const next = new URLSearchParams(params);
-    if (value) next.set('q', value.slice(0, PUBLIC_SEARCH_LIMIT));
-    else next.delete('q');
-    setParams(next, { replace: true, preventScrollReset: true });
-  }
-
-  const { query: listQuery, result: listResult } = useList<PublicProgramSummary & { routineSchedule?: string | null }>({
-    resource: 'programs',
-    pagination: { mode: 'off' },
-    filters: [{ field: 'status', operator: 'eq', value: 'published' }],
+  const visible = programs.filter(program => {
+    const label = programCategoryLabel(program.category);
+    return (!category || category === label) && matchesDiscoverySearch(search, [
+      program.title, program.description, program.bookTitle, program.instructor, label,
+    ]);
   });
-
-  const rawPrograms = listResult?.data || [];
-  const categories = programCategoryOptions(rawPrograms);
-  const isLoading = listQuery.isLoading;
-  const isError = listQuery.isError;
-  const refetch = listQuery.refetch;
-
-  const terms = search.trim().toLocaleLowerCase('id-ID').split(/\s+/).filter(Boolean);
-  const filteredPrograms = rawPrograms.filter((prog) => {
-    const searchable = [prog.title, prog.description, prog.bookTitle, programCategoryLabel(prog.category)].filter(Boolean).join(' ').toLocaleLowerCase('id-ID');
-    const matchesSearch = terms.every(term => searchable.includes(term));
-
-    const matchesCategory = category === null || programCategoryLabel(prog.category) === category;
-
-    return matchesSearch && matchesCategory;
-  });
+  const filtered = Boolean(search || category);
 
   return (
-    <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <SEOHead
-        title="Program Kajian Kitab"
-        description="Daftar seluruh program kajian kitab terstruktur Ustadz Abu Haidar As-Sundawy."
-      />
+    <div className={'public-discovery' + (catalog.startsWith('/belajar/') ? ' public-discovery--embedded' : '')}>
+      <SEOHead title="Program Kajian Kitab" description="Pilih program kajian kitab, buka kurikulum, dan simak pertemuan Ustadz Abu Haidar As-Sundawy." />
+      <DiscoveryHeader title="Program kajian kitab" description="Temukan kitab atau topik, lalu buka kurikulum untuk mulai belajar."
+        actions={<>
+          <Link className="discovery-action" to={schedule}><CalendarDays size={17} aria-hidden="true" /> Jadwal kajian</Link>
+          <Link className="discovery-action discovery-action--text" to="/speaker"><UserRound size={17} aria-hidden="true" /> Profil pemateri</Link>
+        </>} />
 
-      <div className="space-y-3">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-          Program Kajian Kitab
-        </h1>
-        <p className="text-slate-600 max-w-2xl">
-          Pelajari Islam dari sumbernya secara bertahap melalui pembahasan kitab-kitab ulama Ahlussunnah wal Jama'ah.
-        </p>
+      <div className="discovery-toolbar">
+        <DiscoverySearch label="Cari program kajian" value={search} onChange={setSearch} placeholder="Judul, kitab, atau topik…" />
+        {categories.length > 0 && (categories.length > 8
+          ? <DiscoverySelect label="Kategori program" value={category} options={options} onChange={value => change({ kategori: value })} />
+          : <DiscoveryChoices label="Kategori program" value={category} options={options} onChange={value => change({ kategori: value })} />)}
       </div>
 
-      {/* Filter & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-        <div className="relative flex-1">
-          <label htmlFor="catalog-search" className="sr-only">Cari program kajian</label>
-          <input
-            id="catalog-search"
-            type="search"
-            value={search}
-            maxLength={PUBLIC_SEARCH_LIMIT}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari judul program, deskripsi, atau nama kitab..."
-            className="w-full rounded-xl border border-stone-300 px-4 py-2.5 text-sm text-slate-900 focus:border-emerald-900 focus:outline-none focus:ring-1 focus:ring-emerald-900 min-h-[44px]"
-          />
-        </div>
-
-        {/* Category Tabs */}
-        <div aria-label="Filter kategori program" className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto pb-2 sm:max-w-[60%] sm:pb-0">
-          {[null, ...categories].map((cat) => (
-            <button
-              key={cat === null ? 'all' : `category-${cat}`}
-              type="button"
-              aria-pressed={category === cat}
-              onClick={() => setCategory(cat)}
-              className={`rounded-lg px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors min-h-[44px] flex items-center ${
-                category === cat
-                  ? 'bg-emerald-900 text-white'
-                  : 'bg-stone-100 text-slate-700 hover:bg-stone-200'
-              }`}
-            >
-              {cat === null ? 'Semua' : cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content Rendering */}
-      {isLoading ? (
-        <LoadingSkeleton count={3} />
-      ) : isError && rawPrograms.length === 0 ? (
-        <ErrorAlert
-          message="Gagal memuat data program dari server."
-          onRetry={() => refetch()}
-        />
-      ) : filteredPrograms.length === 0 ? (
-        <EmptyState
-          title={rawPrograms.length ? 'Program tidak ditemukan' : 'Belum ada program yang diterbitkan'}
-          description={rawPrograms.length ? 'Coba kata kunci lain atau pilih kategori yang berbeda.' : 'Program kajian akan tampil di sini setelah diterbitkan.'}
-          actionText={rawPrograms.length ? 'Hapus filter' : undefined}
-          onAction={() => {
-            setSearch('');
-            setCategory(null);
-          }}
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredPrograms.map((prog) => (
-            <div
-              key={prog.id}
-              className="group flex flex-col justify-between rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-xs hover:shadow-md transition-all"
-            >
-              <div className="relative h-48 overflow-hidden bg-stone-100">
-                <AppImage
-                  src={prog.coverImage}
-                  kind="program"
-                  alt={prog.title}
-                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <span title={programCategoryLabel(prog.category)} className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
-                  {programCategoryLabel(prog.category)}
-                </span>
-              </div>
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
-                    {prog.title}
-                  </h3>
-                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                    {prog.description}
-                  </p>
-                </div>
-                <div className="border-t border-stone-100 pt-3 space-y-2 text-xs text-slate-500">
-                  <div className="flex items-center justify-between">
-                    <span>Kitab Rujukan:</span>
-                    <span className="font-semibold text-slate-800">{prog.bookTitle || '-'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Jadwal Rutin:</span>
-                    <span className="font-semibold text-slate-800">{prog.routineSchedule || '-'}</span>
-                  </div>
-                </div>
-                <Link
-                  to={`${location.pathname.startsWith('/belajar') ? '/belajar/katalog' : '/programs'}/${encodeURIComponent(prog.id)}`}
-                  className="mt-2 block w-full rounded-xl border border-stone-300 py-2.5 text-center text-xs font-bold text-slate-800 hover:bg-emerald-900 hover:text-white hover:border-emerald-900 transition-all min-h-[44px] flex items-center justify-center"
-                >
-                  Detail Program & Kurikulum
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {query.isLoading ? <DiscoveryLoading label="Memuat program kajian…" /> :
+        query.isError && !programs.length ? (
+          <DiscoveryError message="Program kajian belum dapat dimuat." retry={() => void query.refetch()} retrying={query.isFetching} />
+        ) : !visible.length ? (
+          <DiscoveryEmpty title={filtered ? 'Program tidak ditemukan' : 'Belum ada program yang diterbitkan'}
+            description={filtered ? 'Coba judul kitab atau kategori lain.' : undefined}>
+            {filtered && <button type="button" className="discovery-action" onClick={reset}>Hapus filter</button>}
+          </DiscoveryEmpty>
+        ) : (
+          <DiscoveryResults items={visible} unit="program" page={params.get('page')} showPage={page => change({ page }, true)}>
+            {entries => <ul className="discovery-index">
+              {entries.map(program => <li key={program.id}>
+                <ProgramIndexEntry program={program} directory={catalog} search={location.search} />
+              </li>)}
+            </ul>}
+          </DiscoveryResults>
+        )}
     </div>
   );
 }

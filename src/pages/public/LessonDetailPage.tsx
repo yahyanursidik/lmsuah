@@ -78,6 +78,7 @@ export function LessonDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const catalog = location.pathname.startsWith('/belajar') ? '/belajar/katalog' : '/programs';
   const { data: identity } = useGetIdentity<{ id: string; name: string }>();
   const userId = identity?.id || '';
   const learning = useLearningData(userId);
@@ -250,16 +251,16 @@ export function LessonDetailPage() {
         <LearningSyncNotice {...learning} />
 
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-xs text-stone-500 flex-wrap">
-          <Link to="/programs" className="hover:text-emerald-900 font-medium">Program</Link>
+        <nav aria-label="Jejak pertemuan" className="flex items-center gap-2 text-xs text-stone-500 flex-wrap">
+          <Link to={catalog} className="inline-flex min-h-11 items-center font-semibold text-emerald-900 underline underline-offset-4">Program kajian</Link>
           {lesson.programId && (
             <>
-              <span>/</span>
-              <Link to={`/programs/${lesson.programId}`} className="hover:text-emerald-900 font-medium">Detail Program</Link>
+              <span aria-hidden="true">/</span>
+              <Link to={`${catalog}/${encodeURIComponent(lesson.programId)}`} className="inline-flex min-h-11 items-center font-semibold text-emerald-900 underline underline-offset-4">Kurikulum</Link>
             </>
           )}
-          <span>/</span>
-          <span className="text-slate-700 font-semibold truncate max-w-[200px]">{lesson.title}</span>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page" className="text-slate-700 font-semibold truncate max-w-[200px]">{lesson.title}</span>
         </nav>
 
         {/* Header */}

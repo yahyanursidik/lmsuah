@@ -56,7 +56,7 @@ export interface PortalVenue {
 
 const portalQueryOptions = { staleTime: 30_000, retry: 1 };
 
-export function useParticipantPortalData() {
+export function useParticipantPortalData({ includeLessons = true }: { includeLessons?: boolean } = {}) {
   const programsQuery = useList<PortalProgram>({
     resource: 'programs',
     filters: [{ field: 'status', operator: 'eq', value: 'published' }],
@@ -69,7 +69,7 @@ export function useParticipantPortalData() {
     filters: [{ field: 'status', operator: 'eq', value: 'published' }],
     sorters: [{ field: 'sequence', order: 'asc' }],
     pagination: { mode: 'off' },
-    queryOptions: portalQueryOptions,
+    queryOptions: { ...portalQueryOptions, enabled: includeLessons },
   });
   const schedulesQuery = useList<PortalSchedule>({
     resource: 'schedules',
@@ -84,25 +84,26 @@ export function useParticipantPortalData() {
     queryOptions: portalQueryOptions,
   });
   const venues = venuesQuery.result.data || [];
+  const venueById = new Map(venues.map(venue => [venue.id, venue.name]));
   const schedules = (schedulesQuery.result.data || []).map(schedule => ({
     ...schedule,
-    venueName: schedule.venueName || venues.find(venue => venue.id === schedule.venueId)?.name,
+    venueName: schedule.venueName || venueById.get(schedule.venueId || ''),
   }));
-  const queries = [programsQuery, lessonsQuery, schedulesQuery, venuesQuery];
+  const queries = [programsQuery, ...(includeLessons ? [lessonsQuery] : []), schedulesQuery, venuesQuery];
   return {
     programs: programsQuery.result.data || [],
-    lessons: lessonsQuery.result.data || [],
+    lessons: includeLessons ? lessonsQuery.result.data || [] : [],
     schedules,
     venues,
     isLoading: queries.some(item => item.query.isLoading),
     isProgramsLoading: programsQuery.query.isLoading,
-    isLessonsLoading: lessonsQuery.query.isLoading,
+    isLessonsLoading: includeLessons && lessonsQuery.query.isLoading,
     isSchedulesLoading: schedulesQuery.query.isLoading,
     isRefreshing: queries.some(item => item.query.isFetching),
     isFallback: false,
     isError: queries.some(item => item.query.isError),
     programsError: programsQuery.query.isError,
-    lessonsError: lessonsQuery.query.isError,
+    lessonsError: includeLessons && lessonsQuery.query.isError,
     schedulesError: schedulesQuery.query.isError,
     refetch: () => Promise.all(queries.map(item => item.query.refetch())),
   };

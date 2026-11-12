@@ -6,7 +6,7 @@ import { ImageUrlField } from '@/components/ui/ImageUrlField';
 import { ProgramCategoryField } from '@/components/ui/ProgramCategoryField';
 import { programCategoryLabel, programCategoryOptions } from '../../../shared/program-category';
 import { useUploadsPending } from '@/lib/media-upload-state';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreate, useDelete, useList, useOne, useUpdate } from '@refinedev/core';
 import {
   Archive,
@@ -124,7 +124,15 @@ export function AdminProgramsPage() {
   const [deleteError, setDeleteError] = useState('');
   const [formData, setFormData] = useState<ProgramFormData>(EMPTY_FORM);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [params, setParams] = useSearchParams();
+  const statusParam = params.get('status');
+  const statusFilter: StatusFilter = statusParam === 'draft' || statusParam === 'published' || statusParam === 'archived' ? statusParam : 'all';
+  const setStatusFilter = (status: StatusFilter) => {
+    const next = new URLSearchParams(params);
+    if (status === 'all') next.delete('status');
+    else next.set('status', status);
+    setParams(next, { replace: true, preventScrollReset: true });
+  };
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('updated-desc');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');

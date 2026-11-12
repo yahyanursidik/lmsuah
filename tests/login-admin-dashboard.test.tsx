@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AuthProvider, DataProvider, Refine } from '@refinedev/core';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -13,18 +13,19 @@ const dataByResource: Record<string, Array<Record<string, unknown>>> = {
   ],
   lessons: [
     { id: 'l-1', title: 'Materi Terbit', status: 'published' },
-    { id: 'l-2', title: 'Materi Draft', status: 'draft' },
+    { id: 'l-2', title: 'Materi Draft', status: 'draft', programId: 'p-2' },
     { id: 'l-3', title: 'Materi Kedua', status: 'published' },
   ],
-  venues: [{ id: 'v-1', name: 'Masjid UAH' }],
+  venues: [{ id: 'v-1', name: 'Masjid UAH', status: 'active' }, { id: 'v-2', name: 'Masjid lama', status: 'inactive' }],
   schedules: [{ id: 's-1', title: 'Kajian Pekanan' }],
 };
 
 const dashboardProvider = {
-  getList: vi.fn(async ({ resource }: { resource: string }) => ({
-    data: dataByResource[resource] ?? [],
-    total: dataByResource[resource]?.length ?? 0,
-  })),
+  getList: vi.fn(async ({ resource, pagination, filters }: Parameters<DataProvider['getList']>[0]) => {
+    const status = filters?.find(filter => 'field' in filter && filter.field === 'status')?.value;
+    const items = (dataByResource[resource] ?? []).filter(item => !status || item.status === status);
+    return { data: items.slice(0, pagination?.pageSize), total: items.length };
+  }),
   getOne: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -103,8 +104,12 @@ describe('Login and admin dashboard experience', () => {
 
     expect(await screen.findByText('Program Draft')).toBeDefined();
     expect(screen.getByText('Materi Draft')).toBeDefined();
-    expect(screen.getByText('1 sudah terbit')).toBeDefined();
-    expect(screen.getByText('1 masih draft')).toBeDefined();
+    const metrics = within(screen.getByRole('region', { name: 'Ringkasan pengelolaan' }));
+    expect(metrics.getByRole('link', { name: '2 Program kajian' })).toBeDefined();
+    expect(metrics.getByRole('link', { name: '1 Lokasi aktif' })).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Materi Draft' }).getAttribute('href')).toBe('/admin/programs/p-2/curriculum?lesson=l-2');
+    expect(screen.getByRole('link', { name: 'Semua program draft' }).getAttribute('href')).toBe('/admin/programs?status=draft');
+    expect(vi.mocked(dashboardProvider.getList).mock.calls.every(([options]) => options.pagination?.mode === 'server' && (options.pagination?.pageSize ?? 0) <= 3)).toBe(true);
     expect(screen.getByRole('link', { name: /Kelola program/i }).getAttribute('href')).toBe('/admin/programs');
     expect(screen.queryByText(/1,240 Jamaah/i)).toBeNull();
   });

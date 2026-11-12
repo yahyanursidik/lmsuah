@@ -3,7 +3,7 @@ import { AppImage } from '../../components/ui/AppImage';
 import { getVenueFallbackImage } from '../../lib/image-source';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { useOne, useList } from '@refinedev/core';
-import { MOCK_VENUES, MOCK_PROGRAMS, MOCK_SCHEDULES, Venue, Program, ScheduleItem } from '../../mock/publicData';
+import type { Venue, ScheduleItem } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import { Copy, Check, Share2, MapPin, ExternalLink, Calendar, Phone, Users, Home } from 'lucide-react';
@@ -11,6 +11,9 @@ import { Copy, Check, Share2, MapPin, ExternalLink, Calendar, Phone, Users, Home
 export function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const participant = location.pathname.startsWith('/belajar');
+  const venuePath = participant ? '/belajar/lokasi' : '/venues';
+  const schedulePath = participant ? '/belajar/jadwal' : '/schedules';
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [sharedLocation, setSharedLocation] = useState(false);
 
@@ -20,27 +23,23 @@ export function VenueDetailPage() {
     queryOptions: { enabled: !!id },
   });
 
-  const { result: schedulesResult } = useList<ScheduleItem>({
+  const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({
     resource: 'schedules',
-    filters: [{ field: 'venueId', operator: 'eq', value: id }],
+    filters: [{ field: 'venueId', operator: 'eq', value: refineVenue?.id }],
+    pagination: { mode: 'off' },
+    queryOptions: { enabled: !!refineVenue?.id },
   });
 
-  const mockVenue = MOCK_VENUES.find((v) => v.id === id);
-  const rawVenue = refineVenue || mockVenue;
-  const venue: Venue | undefined = rawVenue;
+  const venue = refineVenue;
   const isLoading = venueQuery.isLoading;
   const isError = venueQuery.isError;
   const refetch = venueQuery.refetch;
 
-  const apiSchedules = schedulesResult?.data || [];
-  const mockSchedules = MOCK_SCHEDULES.filter((s) => s.venueId === id);
-  const locationSchedules = apiSchedules.length > 0 ? apiSchedules : mockSchedules;
-
-  const activePrograms: Program[] = MOCK_PROGRAMS.filter((p) => p.venueId === id);
+  const locationSchedules = schedulesResult?.data || [];
 
   const handleCopyAddress = async () => {
     if (!venue) return;
-    const fullText = `${venue.name}, ${venue.address}, ${venue.city}`;
+    const fullText = [venue.name, venue.address, venue.city].filter(Boolean).join(', ');
     try {
       await navigator.clipboard.writeText(fullText);
       setCopiedAddress(true);
@@ -55,7 +54,7 @@ export function VenueDetailPage() {
     const shareData = {
       title: venue.name,
       text: `Lokasi Majelis Kajian ${venue.name} - ${venue.address}`,
-      url: window.location.href,
+      url: new URL(`/venues/${encodeURIComponent(venue.id)}`, window.location.origin).href,
     };
 
     if (navigator.share) {
@@ -66,7 +65,7 @@ export function VenueDetailPage() {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareData.url);
         setSharedLocation(true);
         setTimeout(() => setSharedLocation(false), 2500);
       } catch {
@@ -103,9 +102,8 @@ export function VenueDetailPage() {
         <EmptyState
           title="Lokasi Tidak Ditemukan"
           description="Maaf, informasi lokasi masjid yang Anda cari tidak tersedia."
-          actionText="Kembali ke Daftar Lokasi"
-          onAction={() => window.history.back()}
         />
+        <Link to={venuePath} className="mt-4 inline-flex min-h-11 items-center font-semibold text-emerald-900 underline">Semua lokasi</Link>
       </div>
     );
   }
@@ -122,13 +120,11 @@ export function VenueDetailPage() {
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-8 space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-emerald-800 px-3 py-1 text-xs font-semibold text-emerald-200">
-                  {venue.city || 'Kota Bandung'}, {venue.province || 'Jawa Barat'}
-                </span>
-                <span className="rounded-md bg-stone-800 px-3 py-1 text-xs font-semibold text-stone-300">
-                  Zona WIB (Asia/Jakarta)
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link to={venuePath} className="inline-flex min-h-11 items-center font-semibold text-emerald-200 underline underline-offset-4">Semua lokasi</Link>
+                {(venue.city || venue.province) && <span className="rounded-md bg-emerald-800 px-3 py-1 text-xs font-semibold text-emerald-200">
+                  {[venue.city, venue.province].filter(Boolean).join(', ')}
+                </span>}
               </div>
 
               <h1 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl text-stone-100">
@@ -138,7 +134,7 @@ export function VenueDetailPage() {
               <p className="text-stone-300 text-sm sm:text-base leading-relaxed flex items-start gap-2">
                 <MapPin className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                 <span>
-                  {venue.address} {venue.district ? `(${venue.district}, ${venue.city})` : ''}
+                  {[venue.address, venue.district].filter(Boolean).join(', ') || 'Alamat belum tersedia'}
                 </span>
               </p>
 
@@ -238,7 +234,11 @@ export function VenueDetailPage() {
               <span className="text-xs text-slate-500 font-medium">WIB (Asia/Jakarta)</span>
             </div>
 
-            {locationSchedules.length === 0 ? (
+            {schedulesQuery.isLoading ? (
+              <p role="status" className="py-4 text-slate-600">Memuat agenda lokasi…</p>
+            ) : schedulesQuery.isError && !locationSchedules.length ? (
+              <ErrorAlert message="Agenda di lokasi ini belum dapat dimuat." onRetry={() => void schedulesQuery.refetch()} />
+            ) : locationSchedules.length === 0 ? (
               <EmptyState title="Belum Ada Agenda Terjadwal di Lokasi Ini" />
             ) : (
               <div className="space-y-4">
@@ -283,7 +283,8 @@ export function VenueDetailPage() {
                           <span className="text-xs text-slate-500 font-semibold">{sch.day}, {sch.date}</span>
                         </div>
                         <span className="text-xs font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-md">
-                          ⏰ {sch.time || `${sch.startTime} - ${sch.endTime}`} WIB
+                          {sch.time || [sch.startTime, sch.endTime].filter(Boolean).join(' – ') || 'Waktu menyusul'}
+                          {(sch.time || sch.startTime || sch.endTime) && ' WIB'}
                         </span>
                       </div>
 
@@ -296,6 +297,9 @@ export function VenueDetailPage() {
                           ⚠️ {sch.statusReason}
                         </p>
                       )}
+                      <Link to={`${schedulePath}?${new URLSearchParams({ agenda: sch.id })}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-900 underline underline-offset-4">
+                        Detail agenda
+                      </Link>
                     </div>
                   );
                 })}
@@ -303,26 +307,6 @@ export function VenueDetailPage() {
             )}
           </div>
 
-          {/* Active Programs Section */}
-          {activePrograms.length > 0 && (
-            <div className="space-y-4 pt-4 border-t border-stone-200">
-              <h3 className="text-xl font-bold text-slate-900">Program Kajian Rutin Lengkap</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {activePrograms.map((prog) => (
-                  <div key={prog.id} className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs space-y-2">
-                    <h4 className="font-bold text-slate-900 text-sm">{prog.title}</h4>
-                    <p className="text-xs text-emerald-900 font-semibold">{prog.routineSchedule}</p>
-                    <Link
-                      to={location.pathname.startsWith('/belajar') ? `/belajar/katalog/${prog.id}` : `/programs/${prog.id}`}
-                      className="block text-xs font-bold text-slate-700 hover:text-emerald-900 pt-2"
-                    >
-                      Lihat Detail Program & Kurikulum →
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Sidebar: Facilities */}

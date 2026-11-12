@@ -6,7 +6,7 @@ import { useLearningData } from '../../lib/useLearningData';
 import { LearningSyncNotice } from '../../components/ui/LearningSyncNotice';
 import { useOne, useList, useGetIdentity } from '@refinedev/core';
 import { Bookmark, CheckCircle2, PlayCircle, BookOpen, UserCheck, PlusCircle } from 'lucide-react';
-import { MOCK_PROGRAMS, Program } from '../../mock/publicData';
+import type { Program } from '../../mock/publicData';
 import { SEOHead } from '../../components/public/SEOHead';
 import { EmptyState, LoadingSkeleton, ErrorAlert } from '../../components/public/UIStates';
 import {
@@ -24,39 +24,37 @@ export function ProgramDetailPage() {
   const learning = useLearningData(userId);
   const navigate = useNavigate();
   const location = useLocation();
+  const catalog = location.pathname.startsWith('/belajar') ? '/belajar/katalog' : '/programs';
 
-  const { query: oneQuery, result: refineProgram } = useOne<Program>({
+  const { query: oneQuery, result: refineProgram } = useOne<Omit<Program, 'status' | 'lessons'> & { status: string }>({
     resource: 'programs',
     id: id || '',
     queryOptions: {
       enabled: !!id,
     },
   });
+  const displayProgram = refineProgram?.status === 'published' ? refineProgram : undefined;
 
   const { query: lessonsQuery, result: lessonsListResult } = useList<{ id: string; title: string; sequence: number; date?: string; duration?: string; description?: string; status: string }>({
     resource: 'lessons',
-    filters: refineProgram?.id ? [{ field: 'programId', operator: 'eq', value: refineProgram.id }, { field: 'status', operator: 'eq', value: 'published' }] : [],
+    filters: displayProgram?.id ? [{ field: 'programId', operator: 'eq', value: displayProgram.id }, { field: 'status', operator: 'eq', value: 'published' }] : [],
     sorters: [{ field: 'sequence', order: 'asc' }],
     pagination: { mode: 'off' },
-    queryOptions: { enabled: !!refineProgram?.id },
+    queryOptions: { enabled: !!displayProgram?.id },
   });
 
-  const mockItem = MOCK_PROGRAMS.find((p) => p.id === id);
-  const displayProgram: Program | undefined = refineProgram || mockItem;
   const isLoading = oneQuery.isLoading;
   const isError = oneQuery.isError;
   const refetch = oneQuery.refetch;
 
-  const lessons = useMemo(() => (lessonsListResult?.data || []).length > 0
-    ? lessonsListResult.data.map((l, index) => ({
+  const lessons = useMemo(() => (lessonsListResult?.data || []).map((l, index) => ({
         id: l.id,
         title: l.title,
         meetingNumber: l.sequence || index + 1,
-        date: l.date || 'Tersedia',
-        duration: l.duration || 'Video',
-        summary: l.description || 'Materi pertemuan kajian syar\'i.',
-      }))
-    : (displayProgram?.lessons || []), [lessonsListResult?.data, displayProgram?.lessons]);
+        date: l.date,
+        duration: l.duration,
+        summary: l.description,
+      })), [lessonsListResult?.data]);
 
   const [enrolled, setEnrolled] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -78,6 +76,7 @@ export function ProgramDetailPage() {
 
   const handleBookmarkToggle = () => {
     if (!displayProgram?.id) return;
+    if (!userId) { navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`); return; }
     const newState = toggleBookmark(userId, 'program', displayProgram.id);
     setBookmarked(newState);
   };
@@ -111,7 +110,7 @@ export function ProgramDetailPage() {
           title="Program Tidak Ditemukan"
           description="Maaf, program kajian yang Anda cari tidak ada dalam direktori kami."
           actionText="Kembali ke Daftar Program"
-          onAction={() => window.history.back()}
+          onAction={() => navigate(catalog)}
         />
       </div>
     );
@@ -128,19 +127,16 @@ export function ProgramDetailPage() {
         description={displayProgram.description}
       />
       <LearningSyncNotice {...learning} />
-      {lessonsQuery?.isError && <ErrorAlert message="Pertemuan gagal dimuat. Daftar belum dapat dipastikan lengkap." onRetry={() => lessonsQuery.refetch()} />}
 
       {/* Program Header */}
       <section className="bg-stone-900 text-white py-12 sm:py-16 border-b border-stone-800">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-8 space-y-4">
-              <div className="flex items-center gap-3">
+              <Link to={catalog} className="inline-flex min-h-11 items-center font-semibold text-emerald-200 underline underline-offset-4">Semua program</Link>
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-md bg-emerald-800 px-3 py-1 text-xs font-semibold text-emerald-200">
                   {programCategoryLabel(displayProgram.category)}
-                </span>
-                <span className="rounded-md bg-stone-800 px-3 py-1 text-xs font-semibold text-stone-300">
-                  {displayProgram.status || 'Berlangsung'}
                 </span>
                 {enrolled && (
                   <span className="rounded-md bg-amber-500/20 border border-amber-500/40 px-3 py-1 text-xs font-bold text-amber-300 flex items-center gap-1">
@@ -151,7 +147,7 @@ export function ProgramDetailPage() {
 
               {displayProgram.coverImage && <div className="h-48 overflow-hidden rounded-xl sm:h-64"><AppImage src={displayProgram.coverImage} alt={`Sampul ${displayProgram.title}`} kind="program" loading="eager" className="h-full w-full object-cover" /></div>}
               <div className="flex items-start justify-between gap-4">
-                <h1 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl text-stone-100 leading-tight">
+                <h1 className="min-w-0 break-words text-3xl font-extrabold sm:text-4xl lg:text-5xl text-stone-100 leading-tight">
                   {displayProgram.title}
                 </h1>
                 <button
@@ -162,7 +158,8 @@ export function ProgramDetailPage() {
                       ? 'bg-amber-500 text-black border-amber-400 shadow-md'
                       : 'bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700'
                   }`}
-                  title={bookmarked ? 'Hapus Bookmark' : 'Simpan Bookmark'}
+                  aria-label={bookmarked ? 'Hapus dari tersimpan' : 'Simpan program'}
+                  aria-pressed={bookmarked}
                 >
                   <Bookmark size={20} className={bookmarked ? 'fill-black' : ''} />
                 </button>
@@ -216,13 +213,13 @@ export function ProgramDetailPage() {
                   )}
                 </button>
 
-                {lessons.length > 0 && lessons[0] && (
+                {nextLesson && (
                   <Link
-                     to={`${lessonPrefix}/${nextLesson?.id}`}
+                     to={`${lessonPrefix}/${encodeURIComponent(nextLesson.id)}`}
                     className="rounded-xl border border-stone-700 bg-stone-800 px-6 py-3 text-sm font-semibold text-stone-200 hover:bg-stone-700 transition-all min-h-[44px] flex items-center gap-2"
                   >
                     <PlayCircle size={18} className="text-emerald-400" />
-                    <span>{enrolled ? 'Lanjutkan Belajar' : 'Mulai Simak Lesson #1'}</span>
+                    <span>{enrolled ? 'Lanjutkan belajar' : 'Mulai pertemuan pertama'}</span>
                   </Link>
                 )}
               </div>
@@ -265,10 +262,14 @@ export function ProgramDetailPage() {
           <p className="text-sm text-slate-600 mt-1">Daftar pertemuan yang telah terselenggara dan dipublikasikan.</p>
         </div>
 
-        {lessons.length === 0 ? (
+        {lessonsQuery.isLoading ? (
+          <p role="status" className="py-4 text-slate-600">Memuat pertemuan…</p>
+        ) : lessonsQuery.isError && lessons.length === 0 ? (
+          <ErrorAlert message="Pertemuan belum dapat dimuat." onRetry={() => void lessonsQuery.refetch()} />
+        ) : lessons.length === 0 ? (
           <EmptyState
             title="Belum Ada Rekaman Pertemuan"
-            description="Pertemuan untuk program ini sedang disiapkan dan akan diunggah segera."
+            description="Pertemuan akan tampil di sini setelah diterbitkan."
           />
         ) : (
           <div className="space-y-4">
@@ -286,8 +287,8 @@ export function ProgramDetailPage() {
                       <span className="rounded-md bg-stone-100 px-2 py-0.5 font-bold text-slate-800">
                         Pertemuan #{lesson.meetingNumber}
                       </span>
-                      <span>• {lesson.date}</span>
-                      <span>• {lesson.duration}</span>
+                      {lesson.date && <span>{lesson.date}</span>}
+                      {lesson.duration && <span>{lesson.duration}</span>}
                       {isComp && (
                         <span className="rounded-md bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 flex items-center gap-1">
                           <CheckCircle2 size={12} /> Selesai

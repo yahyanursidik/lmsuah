@@ -29,7 +29,7 @@ describe('Technical support footer and broadcast destinations', () => {
 
   it.each([SchedulesPage, ParticipantSchedulePage])('corrects the old channel link and label in %s', Page => {
     render(<MemoryRouter><Page /></MemoryRouter>);
-    expect(screen.getByText(/Live Tarbiyah Sunnah Channel/)).toBeDefined();
+    expect(screen.getByText('Siaran: Tarbiyah Sunnah Channel')).toBeDefined();
     expect(screen.queryByText(/Live Radio Rodja/)).toBeNull();
     expect(screen.getByRole('link', { name: /Tonton live/i }).getAttribute('href')).toBe(TARBIYAH_STREAMS_URL);
   });

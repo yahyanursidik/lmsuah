@@ -1,7 +1,7 @@
 /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
  * Hallmark · genre: modern-minimal · macrostructure: expandable curriculum workbench · design-system: design.md · designed-as-app
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useCreate,
   useDelete,
@@ -24,7 +24,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useOutletContext, useParams } from "react-router-dom";
+import { useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { ErrorAlert } from "../../components/public/UIStates";
 import { DataLoading } from '../../components/ui/DataLoading';
 import { useDialog } from "../../components/ui/useDialog";
@@ -76,6 +76,7 @@ const materialLabel: Record<LessonMaterial["type"], string> = {
 
 function MeetingCard({
   lesson,
+  highlighted,
   onEdit,
   onMaterial,
   onQuiz,
@@ -85,6 +86,7 @@ function MeetingCard({
   onChanged,
 }: {
   lesson: CurriculumLessonItem;
+  highlighted: boolean;
   onEdit: () => void;
   onMaterial: () => void;
   onQuiz: () => void;
@@ -114,7 +116,7 @@ function MeetingCard({
           : FileText;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+    <article id={'meeting-' + lesson.id} tabIndex={highlighted ? -1 : undefined} aria-label={highlighted ? 'Pertemuan dipilih: ' + lesson.title : undefined} className={`scroll-mt-24 overflow-hidden rounded-xl border bg-slate-50 ${highlighted ? 'border-emerald-700 focus:outline-2 focus:outline-emerald-700' : 'border-slate-200'}`}>
       {pdfOpen && <AdminTranscriptDialog lessonId={lesson.id} onClose={() => setPdfOpen(false)} onChanged={() => { void detailQuery.query.refetch(); onChanged(); }} />}
       <div className="border-b border-slate-200 px-4"><button type="button" onClick={() => setPdfOpen(true)} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">Kelola PDF privat & versi transkrip</button></div>
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 text-xs text-slate-600"><span>Urutan global {lesson.sequence}</span><button disabled={moving} type="button" onClick={() => onMove(-1)} aria-label={`Naikkan urutan ${lesson.title}`} className="rounded-lg px-3 font-semibold hover:bg-slate-200">↑ Naik</button><button disabled={moving} type="button" onClick={() => onMove(1)} aria-label={`Turunkan urutan ${lesson.title}`} className="rounded-lg px-3 font-semibold hover:bg-slate-200">↓ Turun</button></div>
@@ -281,6 +283,8 @@ function MeetingCard({
 
 export function AdminCurriculumPage() {
   const { id: programId } = useParams<{ id: string }>();
+  const [params, setParams] = useSearchParams();
+  const selectedLessonId = params.get('lesson');
   const revisionMode = useOutletContext<{ revisionMode: boolean } | undefined>()?.revisionMode;
   const [lessonEditor, setLessonEditor] = useState<{
     lessonId: string | null;
@@ -322,6 +326,13 @@ export function AdminCurriculumPage() {
   );
   const isLoading =
     chaptersQuery.query.isLoading || lessonsQuery.query.isLoading;
+  const selectedLessonExists = lessons.some(lesson => lesson.id === selectedLessonId);
+  useEffect(() => {
+    if (!selectedLessonId || !selectedLessonExists || isLoading || revisionMode) return;
+    const meeting = document.getElementById('meeting-' + selectedLessonId);
+    meeting?.focus({ preventScroll: true });
+    meeting?.scrollIntoView?.({ block: 'nearest' });
+  }, [selectedLessonId, selectedLessonExists, isLoading, revisionMode]);
   const isSavingModule = Boolean(
     createChapterMutation.isPending || updateChapterMutation.isPending,
   );
@@ -443,6 +454,7 @@ export function AdminCurriculumPage() {
         <MeetingCard
           key={lesson.id}
           lesson={lesson}
+          highlighted={selectedLessonId === lesson.id}
           onEdit={() => setLessonEditor({ lessonId: lesson.id, chapterId })}
           onMaterial={() =>
             setContentDialog({ type: "material", lessonId: lesson.id })
@@ -484,6 +496,14 @@ export function AdminCurriculumPage() {
   return (
     <div className="space-y-5">
       {(chaptersQuery.query.isFetching || lessonsQuery.query.isFetching) && <DataLoading compact label="Memperbarui kurikulum…" />}
+      {selectedLessonId && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+        <p>{selectedLessonExists ? 'Pertemuan dari dashboard ditandai.' : 'Pertemuan yang dipilih tidak ditemukan di kurikulum ini.'}</p>
+        <button type="button" className="min-h-11 font-semibold underline" onClick={() => {
+          const next = new URLSearchParams(params);
+          next.delete('lesson');
+          setParams(next, { replace: true, preventScrollReset: true });
+        }}>Hapus penanda</button>
+      </div>}
       <label className="block text-sm font-semibold text-slate-700">
         Cari pertemuan
         <input

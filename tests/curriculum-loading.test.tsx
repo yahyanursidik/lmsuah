@@ -15,10 +15,17 @@ vi.mock('@refinedev/core', () => ({
   useDelete: () => ({ mutate: vi.fn(), mutation: { isPending: false } }),
 }));
 vi.mock('../src/pages/admin/AdminLessonForm', () => ({ AdminLessonForm: ({ onClose }: { onClose: () => void }) => <button onClick={onClose}>Batalkan form</button> }));
-const mount = () => render(<MemoryRouter initialEntries={['/program/program/curriculum']}><Routes><Route path="/program/:id/curriculum" element={<AdminCurriculumPage />} /></Routes></MemoryRouter>);
+const mount = (search = '') => render(<MemoryRouter initialEntries={['/program/program/curriculum' + search]}><Routes><Route path="/program/:id/curriculum" element={<AdminCurriculumPage />} /></Routes></MemoryRouter>);
 afterEach(() => { cleanup(); state.loading = false; state.failed = false; state.detailFailed = false; state.refetch.mockClear(); });
 
 describe('Curriculum loading and errors', () => {
+  it('focuses the exact meeting and lets the admin clear the dashboard marker', () => {
+    mount('?lesson=lesson');
+    const meeting = screen.getByRole('article', { name: 'Pertemuan dipilih: Pertemuan contoh' });
+    expect(document.activeElement).toBe(meeting);
+    fireEvent.click(screen.getByRole('button', { name: 'Hapus penanda' }));
+    expect(screen.queryByRole('article', { name: /Pertemuan dipilih/ })).toBeNull();
+  });
   it('labels the initial loading panel', () => {
     state.loading = true; mount();
     expect(screen.getByRole('status').textContent).toContain('Memuat modul dan pertemuan');

@@ -1,277 +1,168 @@
-import { Link } from 'react-router-dom';
-import { AppImage } from '../../components/ui/AppImage';
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useGetIdentity, useList } from '@refinedev/core';
+import { ArrowRight, CalendarDays, ExternalLink, Search } from 'lucide-react';
 import { programCategoryLabel } from '../../../shared/program-category';
-import { getVenueFallbackImage } from '../../lib/image-source';
-import { useList } from '@refinedev/core';
-import { MOCK_PROGRAMS, MOCK_SCHEDULES, MOCK_SPEAKER, MOCK_VENUES, type ScheduleItem, type Venue } from '../../mock/publicData';
+import { AppImage } from '../../components/ui/AppImage';
 import { SEOHead } from '../../components/public/SEOHead';
 import { KnowledgeJourney } from '../../components/public/KnowledgeJourney';
-import type { PublicLessonSummary, PublicProgramSummary } from '../../types';
+import { getVenueFallbackImage } from '../../lib/image-source';
+import { catalogSearchPath, formatAgendaDate, getAgendaStream, getUpcomingAgenda, PUBLIC_SEARCH_LIMIT } from '../../lib/public-home';
+import { isAdminRole } from '../../providers/authProvider';
+import type { ScheduleItem, Venue } from '../../mock/publicData';
+import type { PublicProgramSummary } from '../../types';
+import './home-page.css';
+
+type HomeQuery = { isLoading: boolean; isError: boolean; isFetching?: boolean; refetch: () => unknown };
+
+function SectionState({ query, label, empty }: { query: HomeQuery; label: string; empty: string }) {
+  if (query.isLoading || (query.isError && query.isFetching)) {
+    return <p className="home-state" role="status">Memuat {label}…</p>;
+  }
+  if (query.isError) {
+    return <div className="home-state home-state--error">
+      <p role="alert">{label.charAt(0).toUpperCase() + label.slice(1)} belum dapat dimuat.</p>
+      <button type="button" className="home-action home-action--outline" onClick={() => void query.refetch()}>Coba lagi</button>
+    </div>;
+  }
+  return <p className="home-state">{empty}</p>;
+}
 
 export function HomePage() {
-  const { query: programsQuery, result: programsResult } = useList<PublicProgramSummary>({ resource: 'programs', pagination: { mode: 'off' } });
-  const { result: lessonsResult } = useList<PublicLessonSummary>({ resource: 'lessons', pagination: { mode: 'off' } });
-  const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({ resource: 'schedules', pagination: { mode: 'off' } });
-  const { query: venuesQuery, result: venuesResult } = useList<Venue>({ resource: 'venues', pagination: { mode: 'off' } });
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const { data: user } = useGetIdentity<{ id: string; role?: string }>();
+  const isAdmin = isAdminRole(user?.role);
+  const isParticipant = !!user && !isAdmin;
+  const catalog = isParticipant ? '/belajar/katalog' : '/programs';
+  const schedulePath = isParticipant ? '/belajar/jadwal' : '/schedules';
+  const venuePath = isParticipant ? '/belajar/lokasi' : '/venues';
 
-  const apiPrograms = programsResult?.data || [];
-  const apiLessons = lessonsResult?.data || [];
-  const apiSchedules = schedulesResult?.data || [];
-  const apiVenues = venuesResult?.data || [];
-
-  const isProgramsReady = programsQuery.isFetched || apiPrograms.length > 0;
-  const isSchedulesReady = schedulesQuery.isFetched || apiSchedules.length > 0;
-  const isVenuesReady = venuesQuery.isFetched || apiVenues.length > 0;
-
-  const rawPrograms = isProgramsReady ? apiPrograms : (programsQuery.isError ? MOCK_PROGRAMS : []);
-  const rawSchedules = isSchedulesReady ? apiSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : []);
-  const rawVenues = isVenuesReady ? apiVenues : (venuesQuery.isError ? MOCK_VENUES : []);
-
-  const programs = (rawPrograms.length > 0 ? rawPrograms : (programsQuery.isError ? MOCK_PROGRAMS : [])).map((prog) => {
-    const progLessons = apiLessons.filter((l) => l.programId === prog.id);
-    return {
-      id: prog.id,
-      title: prog.title,
-      description: prog.description || 'Pembahasan modul kitab induk syar\'i.',
-      category: programCategoryLabel(prog.category),
-      bookTitle: prog.bookTitle || prog.title,
-      totalLessons: progLessons.length,
-      coverImage: prog.coverImage,
-    };
+  const { query: programsQuery, result: programsResult } = useList<PublicProgramSummary>({
+    resource: 'programs', pagination: { currentPage: 1, pageSize: 4, mode: 'server' },
+    filters: [{ field: 'status', operator: 'eq', value: 'published' }],
+    sorters: [{ field: 'updatedAt', order: 'desc' }],
+  });
+  const { query: schedulesQuery, result: schedulesResult } = useList<ScheduleItem>({
+    resource: 'schedules', pagination: { mode: 'off' },
+  });
+  const { query: venuesQuery, result: venuesResult } = useList<Venue>({
+    resource: 'venues', pagination: { mode: 'off' },
+    filters: [{ field: 'status', operator: 'eq', value: 'active' }],
   });
 
-  const venues = (rawVenues.length > 0 ? rawVenues : (venuesQuery.isError ? MOCK_VENUES : [])).map((v) => {
-    const activeKajians = apiSchedules.filter((s) => s.venueId === v.id).length;
-    return {
-      ...v,
-      image: v.image,
-      activeKajiansCount: activeKajians || v.activeKajiansCount || 1,
-    };
-  });
+  const [featured, ...otherPrograms] = (programsResult?.data || []).slice(0, 4);
+  const agendas = getUpcomingAgenda(schedulesResult?.data || []).slice(0, 2);
+  const venues = venuesResult?.data || [];
+  const venueNames = new Map(venues.map(venue => [venue.id, venue.name]));
 
-  const schedules = (rawSchedules.length > 0 ? rawSchedules : (schedulesQuery.isError ? MOCK_SCHEDULES : [])).map((schedule) => ({
-    ...schedule,
-    venueName: schedule.venueName || venues.find((v) => v.id === schedule.venueId)?.name || 'Masjid Umar bin Khattab Bandung',
-  }));
-
-  const speaker = {
-    ...MOCK_SPEAKER,
-    activeProgramsCount: programs.length,
-    totalKajiansCount: apiLessons.length > 0 ? apiLessons.length : MOCK_SPEAKER.totalKajiansCount,
-  };
+  function searchPrograms(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    navigate(catalogSearchPath(catalog, search));
+  }
 
   return (
-    <div className="space-y-16 pb-12">
-      <SEOHead
-        title="Beranda Majelis Ilmu"
-        description="Portal resmi pembelajaran syar'i dan arsip majelis ilmu Ustadz Abu Haidar As-Sundawy hafizhahullah."
-      />
+    <div className="home-page">
+      <SEOHead title="Beranda Majelis Ilmu" description="Pelajari kajian kitab dan temukan jadwal majelis Ustadz Abu Haidar As-Sundawy hafizhahullah." />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-stone-200/80 bg-[#F7F5ED] py-16 sm:py-24">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-center">
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-900/20 bg-emerald-900/5 px-3.5 py-1 text-xs font-semibold text-emerald-900">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-700 motion-reduce:animate-none" />
-                <span>Portal Pembelajaran Syar'i Ustadz Abu Haidar As-Sundawy</span>
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl leading-[1.2]">
-                Terlewat Kajian? Tidak Sempat Hadir? Atau Ingin Mengulang Kembali Kajian yang Pernah Dihadiri?
-              </h1>
-              <p className="text-lg text-slate-700 leading-relaxed max-w-2xl">
-                Mari tetap terkoneksi dengan ilmu. Dapatkan akses penuh, rekaman kajian yang disesuaikan agar nyaman ketika dipelajari, transkrip, hingga kuis evaluasi pemahaman dari kajian-kajian Ustadz Abu Haidar As-Sundawy (hafizhahullah).
-              </p>
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <Link
-                  to="/programs"
-                  className="flex min-h-11 items-center justify-center rounded-xl bg-emerald-900 px-6 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 active:bg-emerald-950"
-                >
-                  Jelajahi Program Kitab
-                </Link>
-                <Link
-                  to="/schedules"
-                  className="flex min-h-11 items-center justify-center rounded-xl border border-stone-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-800 shadow-2xs hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 active:bg-stone-100"
-                >
-                  Jadwal Kajian Pekanan
-                </Link>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5">
-              <div className="relative mx-auto max-w-md rounded-2xl border border-stone-300/80 bg-white p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">Kajian Pekanan Terdekat</span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-900">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                    Live Stream
-                  </span>
-                </div>
-                {schedules.slice(0, 2).map((sch) => (
-                  <div key={sch.id} className="rounded-xl bg-stone-50 p-4 border border-stone-200/60 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-stone-500 font-medium">
-                      <span>{sch.day}, {sch.date}</span>
-                      <span className="text-emerald-900 font-bold">{sch.time || [sch.startTime, sch.endTime].filter(Boolean).join(' – ') || 'Menyusul'}</span>
-                    </div>
-                    <h4 className="font-bold text-slate-900 text-sm leading-snug">{sch.title}</h4>
-                    <p className="text-xs text-slate-600">📍 {sch.venueName}</p>
-                  </div>
-                ))}
-                <Link
-                  to="/schedules"
-                  className="block text-center text-xs font-bold text-emerald-900 hover:underline pt-1"
-                >
-                  Lihat Semua Jadwal Pekanan →
-                </Link>
-              </div>
-            </div>
+      <div className="home-lead">
+        <section className="home-intro" aria-labelledby="home-title">
+          <h1 id="home-title">Belajar kajian,<br className="home-title-break" /> setahap demi setahap.</h1>
+          <p className="home-teacher">Bersama Ustadz Abu Haidar As-Sundawy <span>hafizhahullah</span></p>
+          <form className="home-search" role="search" onSubmit={searchPrograms}>
+            <label className="sr-only" htmlFor="home-search">Cari judul kajian atau kitab</label>
+            <input id="home-search" type="search" value={search} onChange={event => setSearch(event.target.value)} maxLength={PUBLIC_SEARCH_LIMIT} placeholder="Judul atau kitab" />
+            <button type="submit"><Search size={18} aria-hidden="true" /> Cari</button>
+          </form>
+          <div className="home-intro-actions">
+            <Link className="home-action home-action--solid" to={user ? (isAdmin ? '/admin' : '/dashboard') : catalog}>
+              {user ? (isAdmin ? 'Buka portal admin' : 'Lanjut belajar') : 'Jelajahi program'} <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+            <Link className="home-action home-action--link" to={user ? catalog : '/login'}>
+              {user ? 'Katalog kajian' : 'Masuk ke ruang belajar'}
+            </Link>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Animation Section: Journey of Knowledge */}
-      <KnowledgeJourney />
-
-      {/* Featured Programs Grid */}
-      <section className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-stone-200 pb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Program Kajian Kitab</h2>
-            <p className="text-sm text-slate-600 mt-1">Pembahasan kitab-kitab syar'i yang diampu oleh Ustadz Abu Haidar As-Sundawy.</p>
+        <section className="home-agenda" aria-labelledby="home-agenda-title">
+          <div className="home-agenda-heading">
+            <CalendarDays size={22} aria-hidden="true" />
+            <h2 id="home-agenda-title">Agenda terdekat</h2>
           </div>
-          <Link to="/programs" className="text-sm font-semibold text-emerald-900 hover:underline">
-            Lihat Semua Program ({programs.length}) →
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {programs.map((prog) => (
-            <div
-              key={prog.id}
-              className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs hover:border-emerald-900/30"
-            >
-              <div className="relative h-48 overflow-hidden bg-stone-100">
-                <AppImage
-                  src={prog.coverImage}
-                  alt={prog.title}
-                  kind="program"
-                  className="h-full w-full object-cover"
-                />
-                <span title={prog.category} className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-md bg-slate-950/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs">
-                  {prog.category}
-                </span>
-              </div>
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
-                    {prog.title}
-                  </h3>
-                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                    {prog.description}
+          {agendas.length ? (
+            <ul className="home-agenda-list">
+              {agendas.map(agenda => {
+                const stream = getAgendaStream(agenda);
+                const venue = venueNames.get(agenda.venueId) || agenda.venueName;
+                return <li key={agenda.id}>
+                  <p className="home-meta home-agenda-time">
+                    <time dateTime={agenda.date}>{formatAgendaDate(agenda.date)}</time>
+                    {agenda.startTime && <span>{agenda.startTime} WIB</span>}
                   </p>
-                </div>
-                <div className="border-t border-stone-100 pt-3 space-y-2 text-xs text-slate-500">
-                  <div className="flex items-center justify-between">
-                    <span>Kitab Rujukan:</span>
-                    <span className="font-semibold text-slate-800">{prog.bookTitle}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Total Pertemuan:</span>
-                    <span className="font-semibold text-slate-800">{prog.totalLessons} Pertemuan</span>
-                  </div>
-                </div>
-                <Link
-                  to={`/programs/${prog.id}`}
-                  className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-stone-300 py-2.5 text-center text-xs font-bold text-slate-800 hover:border-emerald-900 hover:bg-emerald-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
-                >
-                  Lihat Detail Program
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+                  <Link className="home-agenda-title" to={`${schedulePath}?${new URLSearchParams({ agenda: agenda.id })}`}>{agenda.title}<ArrowRight size={16} aria-hidden="true" /></Link>
+                  {venue && <p className="home-meta">{venue}</p>}
+                  {stream && <a href={stream} target="_blank" rel="noopener noreferrer" className="home-action home-action--link">
+                    Buka siaran <ExternalLink size={14} aria-hidden="true" />
+                  </a>}
+                </li>;
+              })}
+            </ul>
+          ) : <SectionState query={schedulesQuery} label="agenda" empty="Belum ada agenda mendatang." />}
+          <Link className="home-action home-action--link" to={schedulePath}>Semua jadwal <ArrowRight size={16} aria-hidden="true" /></Link>
+        </section>
+      </div>
 
-      {/* Speaker Section */}
-      <section className="bg-stone-900 text-white py-16">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-4">
-              <div className="relative aspect-square overflow-hidden rounded-2xl border border-amber-500/30 bg-black p-4 shadow-2xl flex items-center justify-center">
-                <AppImage
-                  src={speaker.image}
-                  alt={speaker.name}
-                  kind="avatar"
-                  className="h-full w-full object-contain rounded-xl"
-                />
-              </div>
-            </div>
-            <div className="lg:col-span-8 space-y-6">
-              <div className="inline-block rounded-md bg-emerald-800/80 px-3 py-1 text-xs font-semibold text-emerald-200">
-                Pengampu Kajian
-              </div>
-              <h2 className="text-3xl font-bold sm:text-4xl text-stone-100">
-                {speaker.name} <span className="text-emerald-400 text-xl font-normal">({speaker.title})</span>
-              </h2>
-              <p className="text-stone-300 leading-relaxed text-sm sm:text-base">
-                {speaker.bio}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
-                <div className="rounded-xl bg-stone-800/80 p-4 border border-stone-700">
-                  <div className="text-2xl font-bold text-emerald-400">{speaker.activeProgramsCount}</div>
-                  <div className="text-xs text-stone-400">Program Aktif</div>
-                </div>
-                <div className="rounded-xl bg-stone-800/80 p-4 border border-stone-700">
-                  <div className="text-2xl font-bold text-emerald-400">{speaker.totalKajiansCount}+</div>
-                  <div className="text-xs text-stone-400">Arsip Rekaman</div>
-                </div>
-              </div>
-              <div className="pt-2">
-                <Link
-                  to="/speaker"
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition-colors min-h-[44px]"
-                >
-                  Biografi Lengkap & Profil Pemateri →
-                </Link>
-              </div>
-            </div>
+      <div className="home-learning">
+        <section aria-labelledby="home-programs-title">
+          <div className="home-section-heading">
+            <h2 id="home-programs-title">Program kajian</h2>
+            <Link className="home-action home-action--link" to={catalog}>Semua program <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
-        </div>
-      </section>
-
-      {/* Venues Preview */}
-      <section className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex items-center justify-between border-b border-stone-200 pb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Lokasi Majelis Offline</h2>
-            <p className="text-sm text-slate-600 mt-1">Masjid dan majelis penyelenggara kajian rutin Ustadz Abu Haidar As-Sundawy.</p>
-          </div>
-          <Link to="/venues" className="text-sm font-semibold text-emerald-900 hover:underline">
-            Lihat Semua Lokasi →
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {venues.slice(0, 4).map((v) => (
-            <div key={v.id} className="space-y-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs hover:border-emerald-900/30">
-              <div className="h-44 w-full bg-stone-100 overflow-hidden">
-                <AppImage src={v.image} fallbackSrc={getVenueFallbackImage(v)} kind="venue" alt={v.name} className="h-full w-full object-cover" />
-              </div>
-              <div className="p-6 pt-0 space-y-3">
-                <h3 className="text-lg font-bold text-slate-900">{v.name}</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">{v.address}</p>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-stone-100">
-                  <span className="font-semibold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-md">
-                    {v.activeKajiansCount} Program Rutin
-                  </span>
-                  <Link to={`/venues/${v.id}`} className="font-bold text-slate-800 hover:text-emerald-900">
-                    Detail Lokasi & Peta →
+          {featured ? (
+            <div className="home-programs">
+              <Link to={`${catalog}/${encodeURIComponent(featured.id)}`} className="home-featured">
+                <AppImage className="home-featured-image" kind="program" src={featured.coverImage} alt={featured.title} />
+                <div className="home-featured-body">
+                  <p className="home-meta">{programCategoryLabel(featured.category)}</p>
+                  <h3>{featured.title}</h3>
+                  {featured.bookTitle && featured.bookTitle !== featured.title && <p className="home-meta">{featured.bookTitle}</p>}
+                  <span className="home-featured-cta">Lihat kurikulum <ArrowRight size={16} aria-hidden="true" /></span>
+                </div>
+              </Link>
+              {otherPrograms.length > 0 && <ul className="home-program-list">
+                {otherPrograms.map(program => <li key={program.id}>
+                  <Link to={`${catalog}/${encodeURIComponent(program.id)}`}>
+                    <span><strong>{program.title}</strong><span className="home-meta">{programCategoryLabel(program.category)}</span></span>
+                    <ArrowRight size={17} aria-hidden="true" />
                   </Link>
-                </div>
-              </div>
+                </li>)}
+              </ul>}
             </div>
-          ))}
+          ) : <SectionState query={programsQuery} label="program kajian" empty="Belum ada program yang diterbitkan." />}
+        </section>
+        <KnowledgeJourney catalog={catalog} isParticipant={isParticipant} isAdmin={isAdmin} />
+      </div>
+
+      <section aria-labelledby="home-venues-title">
+        <div className="home-section-heading">
+          <h2 id="home-venues-title">Lokasi majelis</h2>
+          <Link className="home-action home-action--link" to={venuePath}>Semua lokasi <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
+        {venues.length ? <ul className="home-venues">
+          {venues.slice(0, 3).map(venue => <li key={venue.id}>
+            <Link to={`${venuePath}/${encodeURIComponent(venue.id)}`}>
+              <AppImage className="home-venue-image" kind="venue" src={venue.image} fallbackSrc={getVenueFallbackImage(venue)} alt={venue.name} />
+              <span className="home-venue-details"><strong>{venue.name}</strong>{(venue.city || venue.address) && <span className="home-meta">{venue.city || venue.address}</span>}</span>
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+          </li>)}
+        </ul> : <SectionState query={venuesQuery} label="lokasi majelis" empty="Belum ada lokasi majelis yang tersedia." />}
+      </section>
+
+      <section className="home-profile" aria-labelledby="home-profile-title">
+        <AppImage src="/logo-abu-haidar.jpg" kind="brand" alt="" width="52" height="52" className="home-profile-logo" />
+        <h2 id="home-profile-title">Ustadz Abu Haidar As-Sundawy</h2>
+        <Link className="home-action home-action--link" to="/speaker">Profil pemateri <ArrowRight size={16} aria-hidden="true" /></Link>
       </section>
     </div>
   );

@@ -154,7 +154,7 @@
   overflow-wrap: anywhere;
 }
 .home-agenda-title:hover { text-decoration: underline; text-underline-offset: 0.23em; }
-.home-meta { display: block; color: var(--color-ink-2); font-size: var(--text-sm); line-height: 1.45; }
+.home-meta { display: block; color: var(--color-ink-2); font-size: var(--text-sm); line-height: 1.45; overflow-wrap: anywhere; }
 .home-agenda-time { display: flex; }
 .home-state { padding-block: var(--space-sm); color: var(--color-ink-2); }
 .home-state--error { color: var(--color-error); }
